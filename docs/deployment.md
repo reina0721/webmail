@@ -150,7 +150,9 @@ docker compose --project-directory "$INSTALL_DIR" -f "$INSTALL_DIR/compose.yaml"
 
 ## 6. CLI 更新、备份和恢复
 
-以下入口可从任意工作目录调用，始终识别自身安装目录：
+**正在使用 v0.4.0-alpha.2：请直接按 [逐步升级教程](cli.md#从-v040-alpha2-升级逐步操作) 操作，包含找目录、备份、更新 CLI、更新应用和失败恢复。** 不需要重新安装或重新配置 Stalwart。
+
+以下为日常维护命令参考，可从任意工作目录调用，始终识别自身安装目录：
 
 ```bash
 INSTALL_DIR="$HOME/apps/mail-web"
@@ -158,7 +160,8 @@ INSTALL_DIR="$HOME/apps/mail-web"
 "$INSTALL_DIR/mailweb" doctor --json
 "$INSTALL_DIR/mailweb" logs --tail 100
 "$INSTALL_DIR/mailweb" backup
-"$INSTALL_DIR/mailweb" update --version vNEXT_VERSION --yes
+"$INSTALL_DIR/mailweb" self-update --version v0.4.0-alpha.4
+"$INSTALL_DIR/mailweb" update --version v0.4.0-alpha.4 --yes
 "$INSTALL_DIR/mailweb" restore "$INSTALL_DIR/backups/SNAPSHOT" --yes
 ```
 

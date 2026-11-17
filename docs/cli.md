@@ -90,24 +90,103 @@ curl -fsSL https://raw.githubusercontent.com/reina0721/webmail/main/install.sh |
   --dir /srv/mail-web --yes --version v0.4.0-alpha.4
 ```
 
-## 从 v0.4.0-alpha.2 升级
+## 从 v0.4.0-alpha.2 升级（逐步操作）
 
-在旧安装目录运行（默认 `~/apps/mail-web`；自定义安装目录须使用原路径）：
+在**运行 Webmail 的 Linux 服务器 SSH 终端**执行，不是在浏览器控制台或本地源码目录执行。使用当初安装时的维护用户；如果 Docker 命令提示权限不足，切换到原安装所用的用户或 root 后操作。
+
+### 1. 找到正在运行的旧安装目录
+
+先查看容器名、镜像和映射端口：
 
 ```bash
-cd ~/apps/mail-web
-./mailweb status --json
-./mailweb backup
-./mailweb self-update --version v0.4.0-alpha.4
-./mailweb update --version v0.4.0-alpha.4 --yes
+docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}'
+```
+
+找到镜像为 `mail-web:0.4.0-alpha.2`、端口与你网站一致的那一行。下面将 `你的Webmail容器名` 替换为该行的容器名：
+
+```bash
+CONTAINER='你的Webmail容器名'
+docker inspect "$CONTAINER" --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}'
+```
+
+输出就是原安装目录。用实际输出替换下面的路径，再确认版本；默认安装目录通常为 `~/apps/mail-web`，自定义安装不要直接照用默认路径：
+
+```bash
+cd '/上一步输出的原安装目录'
+pwd
 ./mailweb status --json
 ```
 
-旧版 Rust CLI 已支持原地升级，本版继续提供该能力；应用包内的管理 CLI 随应用一并更新。请先执行上面的 `self-update`，再更新应用，以获得 Docker classic／containerd 镜像标识兼容处理；无需重新初始化 Stalwart。下载和校验完成前不会停止现有服务，升级前自动保存一致性快照；更新过程会短暂重启服务。账号、邮件数据、加密配置、安装密钥和原监听参数会保留。若使用 `sudo` 安装，请继续使用同一维护用户和原目录。
+应看到 `version` 为 `v0.4.0-alpha.2`、`healthy` 为 `true`，以及原来的 `port`、`container` 和 `directory`。若没有 `./mailweb`，先停止操作，确认是否找错目录；更早的 Shell 安装见上面的“旧版迁移”。
 
-成功后浏览器刷新并检查页面底部版本。进入 **站点与默认设置 → 自动配置 Turnstile 人机验证**，补齐此前缺失或误填的验证配置，再进行真人与验证码收信验证。CLI 升级不会自行创建 Cloudflare 资源或修改注册开放策略。
+### 2. 备份并记下恢复路径
 
-仅升级管理工具可用 `./mailweb self-update --version v0.4.0-alpha.4`；它不会升级正在运行的应用。完全离线时下载本机架构的应用包与同版 `SHA256SUMS` 放在一起，运行 `./mailweb update --bundle /absolute/path/mail-web-linux-amd64.tar.gz --yes`（ARM64 对应 `arm64` 文件）。
+```bash
+./mailweb backup
+```
+
+成功后输出一个完整目录，例如 `/srv/mail-web/backups/1790000000000-12345`。记下**你实际得到的路径**，并把该快照复制到安全位置。备份包含账号数据、加密配置及解密密钥，不能公开。备份失败时先排查错误，不继续升级。
+
+### 3. 先更新管理工具，再更新应用
+
+先确认 [GitHub Release 页面](https://github.com/reina0721/webmail/releases/tag/v0.4.0-alpha.4) 已公开且有 `SHA256SUMS` 和本机架构附件；草稿或正在构建的版本无法下载。
+
+```bash
+./mailweb self-update --version v0.4.0-alpha.4
+./mailweb --version
+```
+
+第二条应输出 `mailwebctl 0.4.0-alpha.4`。这一步只更新管理工具，网站仍运行旧版。若下载失败或版本未改变，先处理终端错误，不继续下一条。
+
+```bash
+./mailweb update --version v0.4.0-alpha.4 --yes
+```
+
+管理工具会自动识别 AMD64／ARM64、下载并校验应用包，在升级前另存一致性快照，再短暂停止本实例并启动新版本。**不需要重装，不需要重新填写 Stalwart，不需要修改端口、DNS 或域名。** 原账号数据、加密配置、安装密钥和监听参数会保留。先执行 `self-update` 是为了获得 Docker classic／containerd 镜像标识兼容修复。
+
+### 4. 确认升级结果
+
+```bash
+./mailweb status --json
+./mailweb --version
+```
+
+应看到 `version: "v0.4.0-alpha.4"`、`running: true`、`healthy: true`，管理工具版本也为 `0.4.0-alpha.4`。浏览器刷新原网站，检查页面底部版本；原来的访问地址不变。健康状态异常时查看：
+
+```bash
+./mailweb logs --tail 100
+./mailweb doctor --json
+```
+
+升级后进入 **站点与默认设置 → 自动配置 Turnstile 人机验证**。已有 Cloudflare API Token 时，通过自动配置生成对应组件的 Site Key／Secret；Site Key 不能填写网站地址，Secret 不能填写 API Token。Turnstile 需要正式域名；暂时使用 IP 地址时，可先完成应用升级，待域名准备好后再配置验证服务。CLI 升级不会创建 Cloudflare 资源或改变注册开放策略。
+
+### 5. 如果升级失败，恢复匹配快照
+
+下载或 SHA-256 校验失败时，现有服务保持运行，解决网络或附件错误后可重试同一更新命令。若新版本启动失败，终端会输出对应的恢复命令，优先照该命令执行。
+
+手动恢复时，把下面的路径替换为步骤 2 记录的**真实快照路径**；不要原样复制示例路径：
+
+```bash
+./mailweb restore '/原安装目录/backups/实际快照目录' --yes
+./mailweb status --json
+```
+
+恢复会同时还原快照对应的旧镜像、数据库和配置，并撤销旧会话，之后需重新登录。旧镜像必须仍在本机；升级确认前不要清理 Docker 镜像和 `backups/`。不要只修改 `.env` 里的版本号或手工启动旧镜像，否则旧程序可能打开已迁移的新数据库。
+
+### 无法联网时
+
+从同一 Release 下载本机架构的 `mailwebctl-linux-amd64.tar.gz`／`mailwebctl-linux-arm64.tar.gz`、`mail-web-linux-amd64.tar.gz`／`mail-web-linux-arm64.tar.gz` 和 `SHA256SUMS`，放在服务器同一临时目录。先按校验清单核对两个归档，再解出新管理工具到临时目录；从临时目录调用新管理工具并显式指定旧安装目录：
+
+```bash
+# 以下以 AMD64 为例，ARM64 将两个文件名中的 amd64 改为 arm64。
+sha256sum --ignore-missing -c SHA256SUMS
+mkdir -p upgrade-cli
+tar -xzf mailwebctl-linux-amd64.tar.gz -C upgrade-cli
+./upgrade-cli/bin/mailwebctl --dir '/原安装目录' update \
+  --bundle "$PWD/mail-web-linux-amd64.tar.gz" --yes
+```
+
+校验输出必须同时包含 CLI 和应用包的 `OK`，任一失败均停止。应用包安装完成后会更新安装目录内的管理工具。随后回原安装目录执行步骤 4；失败时同样使用已记录的快照恢复。
 
 ## 更新与恢复
 

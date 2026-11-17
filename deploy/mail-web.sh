@@ -32,7 +32,7 @@ owned_container(){
  fi
 }
 repository(){
- repo=${MAIL_WEB_REPOSITORY:-$(value RELEASE_REPOSITORY)}; repo=${repo:-reina0721/mail-web}
+ repo=${MAIL_WEB_REPOSITORY:-$(value RELEASE_REPOSITORY)}; repo=${repo:-reina0721/webmail}
  case "$repo" in *[!a-zA-Z0-9_./-]*|/*|*..*|*/*/*) echo 'Invalid release repository' >&2; exit 1;; */*) ;; *) exit 1;; esac
 }
 metadata(){

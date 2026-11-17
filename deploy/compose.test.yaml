@@ -1,0 +1,68 @@
+services:
+  app:
+    image: ${MAIL_WEB_TEST_IMAGE:-mail-web:rebuild}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    user: '10001:10001'
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      BIND_ADDR: 0.0.0.0:${MAIL_WEB_TEST_PORT}
+      PUBLIC_ORIGIN: http://mailweb.localhost:${MAIL_WEB_TEST_PORT}
+      STATIC_DIR: /app/static
+      DATABASE_PATH: /runtime/data/mail.sqlite
+      SESSION_KEY_FILE: /runtime/secrets/session.key
+      SETUP_TOKEN_FILE: /runtime/secrets/setup.key
+      RUNTIME_CONFIG_FILE: /runtime/config/runtime.enc
+      LOG_DIR: /runtime/logs
+      STAGING_DIR: /runtime/data/staging
+      ALLOW_HTTP: 'true'
+      ALLOW_INSECURE_TEST_UPSTREAM: 'true'
+      MAIL_WEB_TEST_MODE: 'true'
+      MAIL_WEB_GATEWAY_HOST: app
+      MAIL_WEB_GATEWAY_BIND: 0.0.0.0:2526
+      MAIL_WEB_GATEWAY_PORT: '2526'
+      MAIL_WEB_GATEWAY_PRIVATE: 'true'
+      MAIL_WEB_CALENDAR_DOH: ${MAIL_WEB_TEST_CALENDAR_DOH:-}
+      RUST_LOG: mail_web=info
+    volumes: ['${MAIL_WEB_TEST_ROOT}/app:/runtime']
+    ports: ['127.0.0.1:${MAIL_WEB_TEST_PORT}:${MAIL_WEB_TEST_PORT}']
+    tmpfs: ['/tmp:size=64m,mode=1777']
+    networks:
+      default:
+        aliases: [mailweb.localhost]
+    healthcheck:
+      test: [CMD, /app/mail-web, --healthcheck]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  stalwart-a:
+    image: stalwartlabs/stalwart:v1.0.1-alpine
+    restart: unless-stopped
+    init: true
+    environment:
+      STALWART_PUBLIC_URL: http://stalwart-a:8080
+      STALWART_RECOVERY_ADMIN: bootstrap:${MAIL_WEB_TEST_ADMIN_A}
+    volumes: ['${MAIL_WEB_TEST_ROOT}/stalwart-a/etc:/etc/stalwart','${MAIL_WEB_TEST_ROOT}/stalwart-a/data:/var/lib/stalwart']
+    ports: ['127.0.0.1:${MAIL_WEB_TEST_STALWART_A_PORT}:8080']
+  stalwart-b:
+    image: stalwartlabs/stalwart:v1.0.1-alpine
+    restart: unless-stopped
+    init: true
+    environment:
+      STALWART_PUBLIC_URL: http://stalwart-b:8080
+      STALWART_RECOVERY_ADMIN: bootstrap:${MAIL_WEB_TEST_ADMIN_B}
+    volumes: ['${MAIL_WEB_TEST_ROOT}/stalwart-b/etc:/etc/stalwart','${MAIL_WEB_TEST_ROOT}/stalwart-b/data:/var/lib/stalwart']
+    ports: ['127.0.0.1:${MAIL_WEB_TEST_STALWART_B_PORT}:8080']
+  mailpit:
+    image: axllent/mailpit:v1.27
+    restart: unless-stopped
+    environment:
+      MP_DATABASE: /data/mailpit.db
+      MP_MAX_MESSAGES: '2000'
+    volumes: ['${MAIL_WEB_TEST_ROOT}/mailpit:/data']
+    ports: ['127.0.0.1:${MAIL_WEB_TEST_MAILPIT_PORT}:8025']
+networks:
+  default:
+    driver: bridge

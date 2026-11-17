@@ -1,0 +1,19 @@
+services:
+  app:
+    ports: !reset []
+  web:
+    image: node:24-bookworm-slim
+    working_dir: /source/frontend
+    user: '1000:1000'
+    environment:
+      MAIL_WEB_DEV_UPSTREAM: http://app:${MAIL_WEB_TEST_PORT}
+      NEXT_TELEMETRY_DISABLED: '1'
+      CI: 'true'
+      npm_config_cache: /tmp/npm-cache
+      COREPACK_HOME: /tmp/corepack-cache
+    volumes: ['../:/source']
+    ports: ['127.0.0.1:${MAIL_WEB_TEST_PORT}:4180']
+    command: [sh, -c, '(test -f apps/web/node_modules/next/package.json || corepack pnpm install --frozen-lockfile) && corepack pnpm --filter @mail-web/web exec next dev --hostname 0.0.0.0 --port 4180']
+    depends_on:
+      app:
+        condition: service_healthy

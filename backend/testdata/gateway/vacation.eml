@@ -1,0 +1,21 @@
+Received: from mx.probe.example.com (mailweb-gateway-probe-stalwart-1.mailweb-gateway-probe_default. [192.168.48.3])
+        by 96e8d564cfff (Mailpit) with SMTP
+        for <sender-a8b11383@outside.example.net>; Tue, 17 Nov 2026 03:51:46 +0000 (UTC)
+DKIM-Signature: v=1; a=ed25519-sha256; s=mw-proof; d=owner.proof.probe.example.com; c=relaxed/relaxed; r=y;
+	h=Content-type:Message-ID:Date:Subject:To:From:MIME-Version; t=1794887506; bh=
+	raJCI2roiRFPDuxONnP/Rn85x9wfrglg+lt+go40drU=; b=p3TkxGB3AQGWHCT3uMU6ct0bZUb
+	nY+pbyYgrTynroED7sU1/QtCzQBQSwKFMee8216W3wJ74EbojVZCV2l6BDQ==;
+Received: from localhost (localhost [127.0.0.1])
+	by mx.probe.example.com (Stalwart SMTP) with LMTP id 4BB853472801200;
+	Tue, 17 Nov 2026 03:51:46 +0000
+From: Other <forged@outside.example.net>
+To: sender-a8b11383@outside.example.net
+Subject: Auto: Gateway ownership a8b11383
+In-Reply-To: <a8b11383@outside.example.net>
+References: <a8b11383@outside.example.net>
+Date: Tue, 17 Nov 2026 03:51:46 +0000
+Message-ID: <18e8b8ad6241d39c.941d1714ba866fea.5df6f539ae03d7e7@mx.probe.example.com>
+Auto-Submitted: auto-replied
+Content-type: text/plain; charset=utf-8
+
+Gateway proof a8b11383

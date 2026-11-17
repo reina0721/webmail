@@ -1,0 +1,37 @@
+{
+  "scope": "independent restored local Docker stack only; main soak and production configuration unchanged",
+  "documentation": "https://developers.cloudflare.com/turnstile/troubleshooting/testing/",
+  "passed": true,
+  "cases": [
+    {
+      "case": "failure",
+      "officialProviderSuccess": false,
+      "officialProviderErrors": [
+        "invalid-input-response"
+      ],
+      "applicationStatus": 400,
+      "actualSmtpVerification": false,
+      "registrationPolicyPreserved": true
+    },
+    {
+      "case": "duplicate",
+      "officialProviderSuccess": false,
+      "officialProviderErrors": [
+        "timeout-or-duplicate"
+      ],
+      "applicationStatus": 400,
+      "actualSmtpVerification": false,
+      "registrationPolicyPreserved": true
+    },
+    {
+      "case": "success",
+      "officialProviderSuccess": true,
+      "officialProviderErrors": [],
+      "applicationStatus": 200,
+      "actualSmtpVerification": true,
+      "registrationPolicyPreserved": true
+    }
+  ],
+  "at": "2026-11-17T11:48:38.811056+00:00",
+  "productionModeRejectsTestKeys": true
+}

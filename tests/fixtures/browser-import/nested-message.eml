@@ -1,0 +1,31 @@
+From: Sakura <sakura@example.com>
+To: import@example.com
+Subject: Browser nested message preview acceptance
+Message-ID: <outer-nested-browser-acceptance@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="===============5653679473844546965=="
+
+--===============5653679473844546965==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
+
+6L+Z5bCB6YKu5Lu25YyF5ZCr5LiA5bCBIEVNTCDpgq7ku7bpmYTku7bvvIznlKjkuo7mnKzmnLrp
+mpTnprvnjq/looPpooTop4jpqozmlLbjgIIK
+
+--===============5653679473844546965==
+Content-Type: message/rfc822
+Content-Transfer-Encoding: 8bit
+MIME-Version: 1.0
+Content-Disposition: attachment
+
+From: Sakura <sakura@example.com>
+To: import@example.com
+Subject: Nested EML browser acceptance
+Message-ID: <nested-browser-acceptance@example.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+MIME-Version: 1.0
+
+嵌套邮件正文：预览应该显示发件人、主题和此段内容。
+
+--===============5653679473844546965==--

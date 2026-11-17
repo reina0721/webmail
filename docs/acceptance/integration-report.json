@@ -1,0 +1,50 @@
+[
+  {
+    "check": "Existing operator and actually registered user can log in",
+    "at": "2026-11-17T11:24:02.949786+00:00"
+  },
+  {
+    "check": "Public signup performs official Turnstile verification, real SMTP code delivery, registration and login",
+    "at": "2026-11-17T11:24:04.760943+00:00"
+  },
+  {
+    "check": "Invalid Turnstile token is rejected",
+    "at": "2026-11-17T11:24:04.765215+00:00"
+  },
+  {
+    "check": "Session gateway rejects cross-user accounts, directory management and submissions without an idempotency key",
+    "at": "2026-11-17T11:24:04.804343+00:00"
+  },
+  {
+    "check": "Contacts create/read/update persist on Stalwart",
+    "at": "2026-11-17T11:24:04.881831+00:00"
+  },
+  {
+    "check": "Calendar stores a real recurring event with timezone",
+    "at": "2026-11-17T11:24:04.931714+00:00"
+  },
+  {
+    "check": "Real file upload, folder creation, owner download and cross-user rejection",
+    "at": "2026-11-17T11:24:05.028449+00:00"
+  },
+  {
+    "check": "Server-persisted file trash and restore use upstream directory semantics",
+    "at": "2026-11-17T11:24:05.122743+00:00"
+  },
+  {
+    "check": "Rich email submission, idempotent retry, delivery and sanitized reader work against real Stalwart",
+    "at": "2026-11-17T11:24:05.257919+00:00"
+  },
+  {
+    "check": "Second real Stalwart completes independent readiness, SMTP verification, signup and mailbox login",
+    "at": "2026-11-17T11:24:06.644457+00:00"
+  },
+  {
+    "check": "Upstream outage preserves registration intent and does not break the second server",
+    "at": "2026-11-17T11:24:10.819398+00:00"
+  },
+  {
+    "check": "Restart preserves sessions, contacts, calendar, files and registration policy",
+    "at": "2026-11-17T11:24:12.151843+00:00"
+  }
+]

@@ -21,7 +21,16 @@
       }
     ],
     "allowJs": true,
-    "incremental": true
+    "incremental": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@platform/*": [
+        "./src/platform/*"
+      ]
+    }
   },
   "include": [
     "next-env.d.ts",
@@ -31,6 +40,14 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "upstream-scripts/**",
+    "vitest.config.ts",
+    "vitest.setup.ts"
   ]
 }

@@ -1,0 +1,22 @@
+[
+  {
+    "check": "Existing operator and actually registered user can log in",
+    "at": "2026-11-17T11:27:18.125379+00:00"
+  },
+  {
+    "check": "Sustained signup/login after 1 seconds: soak17949148370@example.com",
+    "at": "2026-11-17T11:27:19.474702+00:00"
+  },
+  {
+    "check": "Sustained signup/login after 601 seconds: soak17949148371@example.com",
+    "at": "2026-11-17T11:37:19.113539+00:00"
+  },
+  {
+    "check": "Sustained signup/login after 1201 seconds: soak17949148372@example.com",
+    "at": "2026-11-17T11:47:19.409092+00:00"
+  },
+  {
+    "check": "Sustained signup/login after 1801 seconds: soak17949148373@example.com",
+    "at": "2026-11-17T11:57:19.525742+00:00"
+  }
+]

@@ -1,0 +1,7 @@
+{
+  "scope": "local isolated browser download",
+  "validZip": true,
+  "format": "mbox ZIP",
+  "messages": 40,
+  "folders": 3
+}

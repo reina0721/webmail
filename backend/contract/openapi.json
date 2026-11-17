@@ -6,9 +6,81 @@
     "license": {
       "name": ""
     },
-    "version": "0.3.0-alpha.2"
+    "version": "0.4.0-alpha.1"
   },
   "paths": {
+    "/api/push/action": {
+      "post": {
+        "tags": [
+          "push"
+        ],
+        "operationId": "action",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/push/preview": {
+      "get": {
+        "tags": [
+          "push"
+        ],
+        "operationId": "preview",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "emailId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "login",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/account": {
       "get": {
         "tags": [
@@ -240,6 +312,134 @@
           },
           "403": {
             "description": "Denied"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/automatic-mail": {
+      "get": {
+        "tags": [
+          "gateway"
+        ],
+        "operationId": "admin_records",
+        "parameters": [
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/client-policy": {
+      "get": {
+        "tags": [
+          "pim"
+        ],
+        "operationId": "admin_client_policy",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientPolicy"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "pim"
+        ],
+        "operationId": "save_client_policy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientPolicy"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/admin/directory": {
+      "get": {
+        "tags": [
+          "pim"
+        ],
+        "operationId": "directory_policy",
+        "parameters": [
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "pim"
+        ],
+        "operationId": "save_directory_policy",
+        "parameters": [
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryPolicyInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
           }
         }
       }
@@ -500,6 +700,9 @@
           },
           "403": {
             "description": "Denied"
+          },
+          "429": {
+            "description": "Temporary upstream upload quota or request limit"
           }
         }
       }
@@ -807,6 +1010,242 @@
         }
       }
     },
+    "/api/v1/client/account": {
+      "post": {
+        "tags": [
+          "pim"
+        ],
+        "operationId": "personal_account",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/account-archive": {
+      "get": {
+        "tags": [
+          "client_archive"
+        ],
+        "operationId": "load_account_archive",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "client_archive"
+        ],
+        "operationId": "save_account_archive",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArchiveInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "client_archive"
+        ],
+        "operationId": "delete_account_archive",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/automatic-mail": {
+      "get": {
+        "tags": [
+          "gateway"
+        ],
+        "operationId": "personal_records",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/calendar-feed": {
+      "post": {
+        "tags": [
+          "calendar_feed"
+        ],
+        "operationId": "feed",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "iCalendar feed",
+            "content": {
+              "text/calendar": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/policy": {
+      "get": {
+        "tags": [
+          "pim"
+        ],
+        "operationId": "client_policy",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/preferences": {
+      "get": {
+        "tags": [
+          "pim"
+        ],
+        "operationId": "native_preferences",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "pim"
+        ],
+        "operationId": "save_native_preferences",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/submissions": {
+      "get": {
+        "tags": [
+          "pim"
+        ],
+        "operationId": "submission_records",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/submissions/{id}/reconcile": {
+      "post": {
+        "tags": [
+          "pim"
+        ],
+        "operationId": "reconcile_submission",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/drafts": {
       "post": {
         "tags": [
@@ -904,6 +1343,42 @@
           },
           "403": {
             "description": "Denied"
+          }
+        }
+      }
+    },
+    "/api/v1/files/{account}/{id}/content": {
+      "get": {
+        "tags": [
+          "pim"
+        ],
+        "operationId": "content",
+        "parameters": [
+          {
+            "name": "account",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
           }
         }
       }
@@ -1417,6 +1892,163 @@
                 "schema": {}
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/jmap": {
+      "post": {
+        "tags": [
+          "pim"
+        ],
+        "operationId": "call",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "429": {
+            "description": "Upstream rejected the request before execution; retry after backoff"
+          }
+        }
+      }
+    },
+    "/api/v1/jmap/download/{account}/{blob}/{name}": {
+      "get": {
+        "tags": [
+          "pim"
+        ],
+        "operationId": "raw_download",
+        "parameters": [
+          {
+            "name": "account",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "blob",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jmap/events": {
+      "get": {
+        "tags": [
+          "pim"
+        ],
+        "operationId": "native_events",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jmap/session": {
+      "get": {
+        "tags": [
+          "pim"
+        ],
+        "operationId": "pim_session",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jmap/upload/{account}": {
+      "post": {
+        "tags": [
+          "pim"
+        ],
+        "operationId": "raw_upload",
+        "parameters": [
+          {
+            "name": "account",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "413": {
+            "description": "Server upload size exceeded"
+          },
+          "429": {
+            "description": "Temporary upstream upload quota or request limit; retain the file for retry"
           }
         }
       }
@@ -1993,6 +2625,50 @@
   },
   "components": {
     "schemas": {
+      "ActionInput": {
+        "type": "object",
+        "required": [
+          "action",
+          "accountId",
+          "emailId",
+          "login"
+        ],
+        "properties": {
+          "accountId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "archiveMode": {
+            "type": "string"
+          },
+          "emailId": {
+            "type": "string"
+          },
+          "login": {
+            "type": "string"
+          },
+          "timeZone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "ArchiveInput": {
+        "type": "object",
+        "required": [
+          "envelope"
+        ],
+        "properties": {
+          "envelope": {
+            "$ref": "#/components/schemas/Envelope"
+          }
+        }
+      },
       "Attachment": {
         "type": "object",
         "required": [
@@ -2080,6 +2756,29 @@
             "format": "uuid"
           }
         }
+      },
+      "ClientPolicy": {
+        "type": "object",
+        "properties": {
+          "externalContentPolicy": {
+            "type": "string"
+          },
+          "mailLayout": {
+            "type": "string"
+          },
+          "sendDelaySeconds": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "sharingEnabled": {
+            "type": "boolean"
+          },
+          "sharingWriteEnabled": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
       },
       "ConfigurationInput": {
         "type": "object",
@@ -2196,6 +2895,17 @@
           }
         }
       },
+      "DirectoryPolicyInput": {
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
       "DiscoveryInput": {
         "type": "object",
         "required": [
@@ -2254,6 +2964,12 @@
               "type": "string"
             }
           },
+          "html": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "type": [
               "string",
@@ -2289,6 +3005,55 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "Envelope": {
+        "type": "object",
+        "required": [
+          "version",
+          "iterations",
+          "salt",
+          "iv",
+          "ciphertext"
+        ],
+        "properties": {
+          "ciphertext": {
+            "type": "string"
+          },
+          "iterations": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "iv": {
+            "type": "string"
+          },
+          "salt": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "FeedInput": {
+        "type": "object",
+        "properties": {
+          "feedId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -2609,23 +3374,23 @@
         "type": "object",
         "required": [
           "enabled",
-          "quota_bytes",
-          "hourly_recipients",
-          "daily_recipients"
+          "quotaBytes",
+          "hourlyRecipients",
+          "dailyRecipients"
         ],
         "properties": {
-          "daily_recipients": {
+          "dailyRecipients": {
             "type": "integer",
             "format": "int64"
           },
           "enabled": {
             "type": "boolean"
           },
-          "hourly_recipients": {
+          "hourlyRecipients": {
             "type": "integer",
             "format": "int64"
           },
-          "quota_bytes": {
+          "quotaBytes": {
             "type": "integer",
             "format": "int64"
           }

@@ -236,9 +236,19 @@ pub(crate) async fn discover(
         base: base.clone(),
     };
     let domains = upstream
-        .call(&key, "x:Domain/get", json!({"properties":["id","name"]}))
+        .call(
+            &key,
+            "x:Domain/get",
+            json!({"properties":["id","name","description"]}),
+        )
         .await?;
-    let domains = domains["list"].as_array().cloned().unwrap_or_default();
+    let domains = domains["list"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|row| !gateway::internal_domain(row))
+        .cloned()
+        .collect::<Vec<_>>();
     let selected = input.domain.as_deref().and_then(|name| {
         domains.iter().find(|d| {
             d["name"]

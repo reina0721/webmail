@@ -210,6 +210,8 @@ pub(super) struct Draft {
     bcc: Vec<String>,
     subject: String,
     text: String,
+    #[serde(default)]
+    html: Option<String>,
     attachments: Vec<Attachment>,
     in_reply_to: Option<Vec<String>>,
     references: Option<Vec<String>>,
@@ -222,6 +224,7 @@ fn valid_email(email: &str) -> bool {
 async fn draft(app: &App, me: &Identity, input: &Draft) -> Result<String> {
     if input.subject.chars().count() > 998
         || input.text.len() > 1024 * 1024
+        || input.html.as_ref().is_some_and(|s| s.len() > 1024 * 1024)
         || input.to.len() + input.cc.len() + input.bcc.len() > 50
         || input
             .to
@@ -266,6 +269,11 @@ async fn draft(app: &App, me: &Identity, input: &Draft) -> Result<String> {
     let address_list =
         |items: &Vec<String>| items.iter().map(|e| json!({"email":e})).collect::<Vec<_>>();
     let mut email = json!({"mailboxIds":mailbox_ids,"keywords":{"$draft":true},"from":[{"email":me.email}],"to":address_list(&input.to),"cc":address_list(&input.cc),"bcc":address_list(&input.bcc),"subject":input.subject,"textBody":[{"partId":"text","type":"text/plain"}],"bodyValues":{"text":{"value":input.text,"isEncodingProblem":false,"isTruncated":false}},"attachments":attachments});
+    if let Some(html) = &input.html {
+        email["htmlBody"] = json!([{"partId":"html","type":"text/html"}]);
+        email["bodyValues"]["html"] =
+            json!({"value":safe_html(html),"isEncodingProblem":false,"isTruncated":false});
+    }
     if let Some(v) = &input.in_reply_to {
         email["inReplyTo"] = json!(v);
     }
@@ -462,7 +470,10 @@ pub(super) async fn send(
             ))
         }
         Err(error) => {
-            let status = if matches!(error, stalwart::UpstreamError::ObjectRejected) {
+            let status = if matches!(
+                error,
+                stalwart::UpstreamError::ObjectRejected | stalwart::UpstreamError::RateLimited
+            ) {
                 "failed"
             } else {
                 "unknown"
@@ -534,7 +545,7 @@ fn template(url: &str, account: &str, blob: &str, name: &str, kind: &str) -> Str
         .replace("{name}", &urlencoding::encode(name))
         .replace("{type}", &urlencoding::encode(kind))
 }
-fn checked_url(app: &App, url: &str) -> Result<reqwest::Url> {
+pub(super) fn checked_url(app: &App, url: &str) -> Result<reqwest::Url> {
     let url = reqwest::Url::parse(url)
         .map_err(|_| Error(StatusCode::BAD_GATEWAY, "resource_url_invalid"))?;
     let base = reqwest::Url::parse(&app.upstream.base).map_err(|_| internal("base_url"))?;
@@ -552,7 +563,7 @@ pub(super) struct UploadView {
     content_type: String,
     size: usize,
 }
-#[utoipa::path(post,path="/api/v1/attachments",responses((status=200,body=UploadView),(status=401,description="Session required"),(status=403,description="Denied")))]
+#[utoipa::path(post,path="/api/v1/attachments",responses((status=200,body=UploadView),(status=401,description="Session required"),(status=403,description="Denied"),(status=429,description="Temporary upstream upload quota or request limit")))]
 pub(super) async fn upload(
     State(app): State<Arc<App>>,
     headers: HeaderMap,
@@ -626,6 +637,9 @@ pub(super) async fn upload(
             .send()
             .await
             .map_err(|_| Error(StatusCode::BAD_GATEWAY, "upload_failed"))?;
+        if let Some(error) = pim::upload_response_error(&response) {
+            return Err(error);
+        }
         if !response.status().is_success() {
             return Err(Error(StatusCode::BAD_GATEWAY, "upload_failed"));
         }
@@ -745,7 +759,10 @@ pub(super) async fn events(State(app): State<Arc<App>>, headers: HeaderMap) -> R
         .as_str()
         .ok_or(Error(StatusCode::BAD_GATEWAY, "events_not_supported"))?;
     let target = target
-        .replace("{types}", "Email,Mailbox,EmailSubmission")
+        .replace(
+            "{types}",
+            "Email,Mailbox,EmailSubmission,Calendar,CalendarEvent,AddressBook,ContactCard,FileNode",
+        )
         .replace("{closeafter}", "no")
         .replace("{ping}", "30");
     let url = checked_url(&app, &target)?;

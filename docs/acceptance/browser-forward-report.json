@@ -1,0 +1,18 @@
+{
+  "revision": "working-tree-5602285-native-v39",
+  "attachmentBytes": 95,
+  "attachmentSha256": "8de3a81aa017af4db1d59b898229838faddb59b647cbeea58470352a9c5aa26e",
+  "bodyRetained": true,
+  "from": [
+    {
+      "email": "operator@example.com",
+      "name": "operator"
+    }
+  ],
+  "to": [
+    {
+      "email": "sakura@example.com",
+      "name": "春野 Sakura"
+    }
+  ]
+}

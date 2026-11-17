@@ -1,0 +1,14 @@
+{
+  "offlineOutboxDeliveredOnce": true,
+  "bodyIntact": true,
+  "offlineStarAndReadReplayed": true,
+  "environment": "local Docker / isolated official Stalwart",
+  "revision": "working-tree-5602285-native-v29",
+  "at": "2026-11-17T07:18:25.359570+00:00",
+  "offlineCalendarReload": true,
+  "offlineContactsNavigationAndDetails": true,
+  "offlineFilesNavigationAndFolderMetadata": true,
+  "onlineRecoveryClearsOfflineAndConnectionBanner": true,
+  "crossModuleRevision": "working-tree-5602285-native-v33",
+  "updatedAt": "2026-11-17T07:56:20.975322+00:00"
+}

@@ -1,13 +1,18 @@
 mod account;
 mod bootstrap;
+mod calendar_feed;
+mod client_archive;
 mod config;
 mod connections;
 mod crypto;
 mod db;
+mod gateway;
 mod installation;
 mod logging;
 mod mail;
+mod pim;
 mod policy;
+mod push;
 mod readiness;
 mod registration;
 mod stalwart;
@@ -89,6 +94,8 @@ impl From<stalwart::UpstreamError> for Error {
     fn from(e: stalwart::UpstreamError) -> Self {
         if matches!(e, stalwart::UpstreamError::Authentication) {
             Self(StatusCode::UNAUTHORIZED, "credentials_invalid")
+        } else if matches!(e, stalwart::UpstreamError::RateLimited) {
+            Self(StatusCode::TOO_MANY_REQUESTS, "upstream_rate_limited")
         } else {
             Self(StatusCode::BAD_GATEWAY, "mail_service_unavailable")
         }
@@ -170,18 +177,47 @@ fn client_ip(headers: &HeaderMap, peer: std::net::SocketAddr) -> std::net::IpAdd
     }
     peer.ip()
 }
+fn account_cookie_kind(kind: &str, email: &str) -> String {
+    format!("{kind}_{}", hex::encode(email.as_bytes()))
+}
+fn selected_cookie_kind(app: &App, headers: &HeaderMap, kind: &str) -> String {
+    if let Some(email) = headers
+        .get("x-mail-account")
+        .and_then(|v| v.to_str().ok())
+        .filter(|s| s.len() <= 254)
+    {
+        let candidate = account_cookie_kind(kind, email);
+        if cookie(
+            headers,
+            &app.cookie_name(&account_cookie_kind("session", email)),
+        )
+        .is_some()
+        {
+            return candidate;
+        }
+    }
+    kind.to_string()
+}
 async fn identity(app: &App, headers: &HeaderMap, write: bool) -> Result<Identity> {
     identify(app, headers, write, true).await
 }
 async fn identify(app: &App, headers: &HeaderMap, write: bool, touch: bool) -> Result<Identity> {
-    let sid = cookie(headers, &app.cookie_name("session"))
-        .ok_or(Error(StatusCode::UNAUTHORIZED, "session_required"))?;
+    let sid = cookie(
+        headers,
+        &app.cookie_name(&selected_cookie_kind(app, headers, "session")),
+    )
+    .ok_or(Error(StatusCode::UNAUTHORIZED, "session_required"))?;
     let sid = hash(&sid);
     let row = db::query(db::Statement::MainIdentifySelectSessions)
         .bind(&sid)
         .fetch_optional(&app.db)
         .await?
         .ok_or(Error(StatusCode::UNAUTHORIZED, "session_expired"))?;
+    if let Some(email) = headers.get("x-mail-account").and_then(|v| v.to_str().ok())
+        && email != row.get::<String, _>("email")
+    {
+        return Err(Error(StatusCode::UNAUTHORIZED, "account_session_required"));
+    }
     if write {
         same_origin(app, headers)?;
         let csrf = headers
@@ -236,6 +272,10 @@ async fn login(
         return Err(Error(StatusCode::SERVICE_UNAVAILABLE, "setup_required"));
     }
     same_origin(&app, &headers)?;
+    let linked = headers.get("x-mail-link").and_then(|v| v.to_str().ok()) == Some("1");
+    if linked {
+        identity(&app, &headers, true).await?;
+    }
     policy::rate(
         &app,
         &format!("login-ip:{}", hash(&client_ip(&headers, peer).to_string())),
@@ -300,12 +340,17 @@ async fn login(
             _ => Error(StatusCode::UNAUTHORIZED, "credentials_invalid"),
         });
     }
+    account::repair_generated_display_name(&app, key, &email).await;
     let mut response = StatusCode::NO_CONTENT.into_response();
     response.headers_mut().append(
         "set-cookie",
         HeaderValue::from_str(&format!(
             "{}={id}; Path=/{}; HttpOnly; SameSite=Strict; Max-Age=28800",
-            app.cookie_name("session"),
+            app.cookie_name(&if linked {
+                account_cookie_kind("session", &email)
+            } else {
+                "session".into()
+            }),
             app.cookie_security()
         ))
         .map_err(|_| internal("cookie"))?,
@@ -314,7 +359,11 @@ async fn login(
         "set-cookie",
         HeaderValue::from_str(&format!(
             "{}={csrf}; Path=/{}; SameSite=Strict; Max-Age=28800",
-            app.cookie_name("csrf"),
+            app.cookie_name(&if linked {
+                account_cookie_kind("csrf", &email)
+            } else {
+                "csrf".into()
+            }),
             app.cookie_security()
         ))
         .map_err(|_| internal("cookie"))?,
@@ -340,22 +389,45 @@ async fn session(State(app): State<Arc<App>>, headers: HeaderMap) -> Result<Json
 async fn logout(State(app): State<Arc<App>>, headers: HeaderMap) -> Result<Response> {
     let me = identity(&app, &headers, true).await?;
     let app = connections::for_user(&app, me.user).await?;
+    let selected_kind = selected_cookie_kind(&app, &headers, "session");
+    let mut sessions = vec![me.session.clone()];
+    let mut clear_primary = false;
+    if selected_kind != "session" {
+        let mut primary_headers = headers.clone();
+        primary_headers.remove("x-mail-account");
+        if let Ok(primary) = identify(&app, &primary_headers, false, false).await
+            && primary.user == me.user
+            && primary.session != me.session
+        {
+            sessions.push(primary.session);
+            clear_primary = true;
+        }
+    }
     let mut tx = db::begin(&app.db).await?;
-    db::query(db::Statement::MainLogoutUpdateSessions)
-        .bind(&me.session)
-        .execute(&mut *tx)
-        .await?;
-    db::query(db::Statement::MainLogoutInsertCredentialRevocations)
-        .bind(&me.session)
-        .execute(&mut *tx)
-        .await?;
+    for session in sessions {
+        db::query(db::Statement::MainLogoutUpdateSessions)
+            .bind(&session)
+            .execute(&mut *tx)
+            .await?;
+        db::query(db::Statement::MainLogoutInsertCredentialRevocations)
+            .bind(&session)
+            .execute(&mut *tx)
+            .await?;
+    }
     tx.commit().await?;
     account::JOB_NOTIFY.notify_one();
     let mut response = StatusCode::NO_CONTENT.into_response();
-    for (kind, http_only) in [("session", "; HttpOnly"), ("csrf", "")] {
+    let mut kinds = vec![
+        (selected_kind, "; HttpOnly"),
+        (selected_cookie_kind(&app, &headers, "csrf"), ""),
+    ];
+    if clear_primary {
+        kinds.extend([("session".into(), "; HttpOnly"), ("csrf".into(), "")]);
+    }
+    for (kind, http_only) in kinds {
         let value = format!(
             "{}=; Path=/{}{http_only}; SameSite=Strict; Max-Age=0",
-            app.cookie_name(kind),
+            app.cookie_name(&kind),
             app.cookie_security()
         );
         response.headers_mut().append(
@@ -556,6 +628,13 @@ async fn response_policy(
     let mut response = next.run(request).await;
     tracing::info!(request_id=%request_id,method=%method,status=response.status().as_u16(),"request_complete");
     let headers = response.headers_mut();
+    // Next's generateBuildId uses this same revision. The upstream offline
+    // worker needs it even while an older worker still controls the tab.
+    if let Ok(value) =
+        HeaderValue::from_str(option_env!("MAIL_WEB_REVISION").unwrap_or("development"))
+    {
+        headers.insert("x-bulwark-build", value);
+    }
     if private {
         headers.insert("cache-control", HeaderValue::from_static("no-store"));
     }
@@ -568,16 +647,46 @@ async fn response_policy(
         headers.insert("x-request-id", value);
     }
     if !headers.contains_key("content-security-policy") {
-        headers.insert("content-security-policy",HeaderValue::from_static("default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-src 'self' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'self'"));
+        headers.insert("content-security-policy",HeaderValue::from_static("default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://challenges.cloudflare.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob:; font-src 'self' data:; frame-src 'self' blob: https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com https://notifications.relay.bulwarkmail.org; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'self'"));
     }
     response
+}
+async fn native_spa(uri: axum::http::Uri) -> Response {
+    let module = uri
+        .path()
+        .trim_start_matches('/')
+        .split('/')
+        .next()
+        .unwrap_or("");
+    if ![
+        "mail", "calendar", "contacts", "files", "settings", "console", "popout",
+    ]
+    .contains(&module)
+    {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let root = std::env::var("STATIC_DIR").unwrap_or_else(|_| "frontend/apps/web/out".into());
+    let path = std::path::Path::new(&root).join(module).join("index.html");
+    match tokio::fs::read(path).await {
+        Ok(bytes) => (
+            [
+                ("content-type", "text/html; charset=utf-8"),
+                ("cache-control", "no-cache"),
+            ],
+            bytes,
+        )
+            .into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 #[utoipa::path(get,path="/api/v1/health/ready",responses((status=200,body=Value),(status=204,description="Completed")))]
 async fn health(State(app): State<Arc<App>>) -> Result<Json<Value>> {
     db::query(db::Statement::MainHealthSelectValue)
         .execute(&app.db)
         .await?;
-    Ok(Json(json!({"status":"ok"})))
+    Ok(Json(
+        json!({"status":"ok","version":env!("CARGO_PKG_VERSION"),"revision":option_env!("MAIL_WEB_REVISION").unwrap_or("development")}),
+    ))
 }
 
 #[derive(utoipa::OpenApi)]
@@ -646,7 +755,31 @@ async fn health(State(app): State<Arc<App>>) -> Result<Json<Value>> {
         mail::submission_status,
         mail::upload,
         mail::download,
-        mail::events
+        mail::events,
+        calendar_feed::feed,
+        client_archive::load,
+        client_archive::save,
+        client_archive::remove,
+        pim::directory_policy,
+        pim::save_directory_policy,
+        pim::client_policy,
+        pim::admin_client_policy,
+        pim::save_client_policy,
+        pim::session,
+        pim::call,
+        pim::raw_upload,
+        pim::raw_download,
+        pim::native_events,
+        pim::preferences,
+        pim::save_preferences,
+        pim::personal_account,
+        pim::submission_records,
+        pim::reconcile_submission,
+        pim::content,
+        gateway::personal_records,
+        gateway::admin_records,
+        push::preview,
+        push::action
     ),
     components(schemas(Login, SessionView))
 )]
@@ -780,7 +913,13 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|a| a == "--healthcheck") {
         reqwest::Client::new()
-            .get("http://127.0.0.1:8080/api/v1/health/ready")
+            .get(format!(
+                "http://127.0.0.1:{}/api/v1/health/ready",
+                std::env::var("BIND_ADDR")
+                    .ok()
+                    .and_then(|s| s.rsplit(':').next().map(str::to_owned))
+                    .unwrap_or_else(|| "8080".into())
+            ))
             .timeout(std::time::Duration::from_secs(3))
             .send()
             .await?
@@ -878,6 +1017,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         origin,
         upstream: Stalwart {
             http: reqwest::Client::builder()
+                .connect_timeout(std::time::Duration::from_secs(5))
                 .timeout(std::time::Duration::from_secs(15))
                 .redirect(reqwest::redirect::Policy::none())
                 .build()?,
@@ -911,6 +1051,10 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         .merge(readiness::routes())
         .merge(account::routes())
         .merge(mail::routes())
+        .merge(pim::routes())
+        .merge(gateway::routes())
+        .merge(client_archive::routes())
+        .merge(calendar_feed::routes())
         .merge(installation::routes())
         .route("/health/ready", get(health))
         .route("/auth/login", post(login))
@@ -920,6 +1064,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         .route("/messages", get(messages))
         .route("/messages/{id}", get(message).patch(update_message));
     let routes = Router::new()
+        .merge(push::routes())
         .route("/internal/mta-hook", post(policy::hook))
         .route("/internal/mta-hook/{service}", post(policy::service_hook))
         .nest("/api/v1", api)
@@ -927,11 +1072,14 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             ServeDir::new(
                 std::env::var("STATIC_DIR").unwrap_or_else(|_| "frontend/apps/web/out".into()),
             )
-            .append_index_html_on_directories(true),
+            .append_index_html_on_directories(true)
+            .fallback(get(native_spa)),
         )
         .layer(axum::extract::DefaultBodyLimit::max(32 * 1024 * 1024))
         .layer(axum::middleware::from_fn(response_policy))
         .with_state(app.clone());
+    gateway::start(app.clone()).await?;
+    tokio::spawn(pim::compact_submission_records(app.clone()));
     tokio::spawn(readiness::worker(app.clone()));
     tokio::spawn(installation::initialize::activate_pending(app));
     let listener = tokio::net::TcpListener::bind(

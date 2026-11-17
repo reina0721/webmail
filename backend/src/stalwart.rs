@@ -13,6 +13,8 @@ pub enum UpstreamError {
     Transport(#[from] reqwest::Error),
     #[error("upstream authentication failed")]
     Authentication,
+    #[error("upstream rate limited")]
+    RateLimited,
     #[error("upstream rejected operation")]
     Rejected,
     #[error("upstream confirmed object rejection")]
@@ -33,6 +35,9 @@ impl Stalwart {
             .basic_auth(email, Some(password))
             .send()
             .await?;
+        if response.status() == 429 {
+            return Err(UpstreamError::RateLimited);
+        }
         if matches!(response.status().as_u16(), 401 | 403) {
             return Err(UpstreamError::Authentication);
         }
@@ -48,6 +53,9 @@ impl Stalwart {
             .bearer_auth(key)
             .send()
             .await?;
+        if response.status() == 429 {
+            return Err(UpstreamError::RateLimited);
+        }
         if response.status() == 401 || response.status() == 403 {
             return Err(UpstreamError::Authentication);
         }
@@ -90,6 +98,8 @@ impl Stalwart {
     ) -> Result<Value, UpstreamError> {
         let using = if method.starts_with("x:") {
             json!(["urn:ietf:params:jmap:core", "urn:stalwart:jmap"])
+        } else if method.starts_with("Blob/") {
+            json!(["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:blob"])
         } else {
             json!([
                 "urn:ietf:params:jmap:core",
@@ -101,6 +111,9 @@ impl Stalwart {
             .json(&json!({"using":using,"methodCalls":[[method,args,"c"]]}))
             .send()
             .await?;
+        if response.status() == 429 {
+            return Err(UpstreamError::RateLimited);
+        }
         if response.status() == 401 || response.status() == 403 {
             return Err(UpstreamError::Authentication);
         }
@@ -142,5 +155,62 @@ impl Stalwart {
             }
         }
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::{
+        Router,
+        http::StatusCode,
+        routing::{get, post},
+    };
+    #[tokio::test]
+    async fn preserves_explicit_upstream_throttling_and_temporary_upload_quota() {
+        let app = Router::new()
+            .route(
+                "/jmap/session",
+                get(|| async { StatusCode::TOO_MANY_REQUESTS }),
+            )
+            .route("/jmap/", post(|| async { StatusCode::TOO_MANY_REQUESTS }))
+            .route(
+                "/upload",
+                get(|| async {
+                    (
+                        StatusCode::TOO_MANY_REQUESTS,
+                        [("ratelimit-policy", "\"blob-upload-bytes\";q=50000000")],
+                    )
+                }),
+            );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let upstream = Stalwart {
+            http: Client::new(),
+            base: format!("http://{address}"),
+        };
+        assert!(matches!(
+            upstream.session("synthetic").await,
+            Err(UpstreamError::RateLimited)
+        ));
+        assert!(matches!(
+            upstream.password_session("synthetic", "synthetic").await,
+            Err(UpstreamError::RateLimited)
+        ));
+        assert!(matches!(
+            upstream.call("synthetic", "Email/get", json!({})).await,
+            Err(UpstreamError::RateLimited)
+        ));
+        let response = upstream
+            .http
+            .get(format!("http://{address}/upload"))
+            .send()
+            .await
+            .unwrap();
+        let error = crate::pim::upload_response_error(&response).unwrap();
+        assert_eq!(error.0, StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(error.1, "upload_quota_exceeded");
+        server.abort();
     }
 }

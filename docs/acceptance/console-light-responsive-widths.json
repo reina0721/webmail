@@ -1,0 +1,247 @@
+[
+  {
+    "page": "overview",
+    "width": 390,
+    "inner": 390,
+    "pageWidth": 390,
+    "theme": "light"
+  },
+  {
+    "page": "overview",
+    "width": 768,
+    "inner": 768,
+    "pageWidth": 768,
+    "theme": "light"
+  },
+  {
+    "page": "overview",
+    "width": 1024,
+    "inner": 1024,
+    "pageWidth": 1024,
+    "theme": "light"
+  },
+  {
+    "page": "overview",
+    "width": 1440,
+    "inner": 1440,
+    "pageWidth": 1440,
+    "theme": "light"
+  },
+  {
+    "page": "overview",
+    "width": 1920,
+    "inner": 1920,
+    "pageWidth": 1920,
+    "theme": "light"
+  },
+  {
+    "page": "users",
+    "width": 390,
+    "inner": 390,
+    "pageWidth": 390,
+    "theme": "light"
+  },
+  {
+    "page": "users",
+    "width": 768,
+    "inner": 768,
+    "pageWidth": 768,
+    "theme": "light"
+  },
+  {
+    "page": "users",
+    "width": 1024,
+    "inner": 1024,
+    "pageWidth": 1024,
+    "theme": "light"
+  },
+  {
+    "page": "users",
+    "width": 1440,
+    "inner": 1440,
+    "pageWidth": 1440,
+    "theme": "light"
+  },
+  {
+    "page": "users",
+    "width": 1920,
+    "inner": 1920,
+    "pageWidth": 1920,
+    "theme": "light"
+  },
+  {
+    "page": "services",
+    "width": 390,
+    "inner": 390,
+    "pageWidth": 390,
+    "theme": "light"
+  },
+  {
+    "page": "services",
+    "width": 768,
+    "inner": 768,
+    "pageWidth": 768,
+    "theme": "light"
+  },
+  {
+    "page": "services",
+    "width": 1024,
+    "inner": 1024,
+    "pageWidth": 1024,
+    "theme": "light"
+  },
+  {
+    "page": "services",
+    "width": 1440,
+    "inner": 1440,
+    "pageWidth": 1440,
+    "theme": "light"
+  },
+  {
+    "page": "services",
+    "width": 1920,
+    "inner": 1920,
+    "pageWidth": 1920,
+    "theme": "light"
+  },
+  {
+    "page": "registration",
+    "width": 390,
+    "inner": 390,
+    "pageWidth": 390,
+    "theme": "light"
+  },
+  {
+    "page": "registration",
+    "width": 768,
+    "inner": 768,
+    "pageWidth": 768,
+    "theme": "light"
+  },
+  {
+    "page": "registration",
+    "width": 1024,
+    "inner": 1024,
+    "pageWidth": 1024,
+    "theme": "light"
+  },
+  {
+    "page": "registration",
+    "width": 1440,
+    "inner": 1440,
+    "pageWidth": 1440,
+    "theme": "light"
+  },
+  {
+    "page": "registration",
+    "width": 1920,
+    "inner": 1920,
+    "pageWidth": 1920,
+    "theme": "light"
+  },
+  {
+    "page": "site",
+    "width": 390,
+    "inner": 390,
+    "pageWidth": 390,
+    "theme": "light"
+  },
+  {
+    "page": "site",
+    "width": 768,
+    "inner": 768,
+    "pageWidth": 768,
+    "theme": "light"
+  },
+  {
+    "page": "site",
+    "width": 1024,
+    "inner": 1024,
+    "pageWidth": 1024,
+    "theme": "light"
+  },
+  {
+    "page": "site",
+    "width": 1440,
+    "inner": 1440,
+    "pageWidth": 1440,
+    "theme": "light"
+  },
+  {
+    "page": "site",
+    "width": 1920,
+    "inner": 1920,
+    "pageWidth": 1920,
+    "theme": "light"
+  },
+  {
+    "page": "activity",
+    "width": 390,
+    "inner": 390,
+    "pageWidth": 390,
+    "theme": "light"
+  },
+  {
+    "page": "activity",
+    "width": 768,
+    "inner": 768,
+    "pageWidth": 768,
+    "theme": "light"
+  },
+  {
+    "page": "activity",
+    "width": 1024,
+    "inner": 1024,
+    "pageWidth": 1024,
+    "theme": "light"
+  },
+  {
+    "page": "activity",
+    "width": 1440,
+    "inner": 1440,
+    "pageWidth": 1440,
+    "theme": "light"
+  },
+  {
+    "page": "activity",
+    "width": 1920,
+    "inner": 1920,
+    "pageWidth": 1920,
+    "theme": "light"
+  },
+  {
+    "page": "setup",
+    "width": 390,
+    "inner": 390,
+    "pageWidth": 390,
+    "theme": "light"
+  },
+  {
+    "page": "setup",
+    "width": 768,
+    "inner": 768,
+    "pageWidth": 768,
+    "theme": "light"
+  },
+  {
+    "page": "setup",
+    "width": 1024,
+    "inner": 1024,
+    "pageWidth": 1024,
+    "theme": "light"
+  },
+  {
+    "page": "setup",
+    "width": 1440,
+    "inner": 1440,
+    "pageWidth": 1440,
+    "theme": "light"
+  },
+  {
+    "page": "setup",
+    "width": 1920,
+    "inner": 1920,
+    "pageWidth": 1920,
+    "theme": "light"
+  }
+]

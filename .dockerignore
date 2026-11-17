@@ -2,6 +2,8 @@
 **/node_modules
 **/.next
 **/out
+**/*.tsbuildinfo
+frontend/apps/web/next-env.d.ts
 target
 data
 secrets
@@ -13,3 +15,7 @@ tests/runtime
 frontend/packages/config
 
 /config
+
+.cache
+
+.pnpm-store

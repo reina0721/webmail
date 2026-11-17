@@ -84,7 +84,7 @@ struct Address {
     address: String,
 }
 
-async fn reserve(app: &App, login: &str, event: &str, count: i64) -> Result<bool> {
+pub(crate) async fn reserve(app: &App, login: &str, event: &str, count: i64) -> Result<bool> {
     let mut tx = db::begin(&app.db).await?;
     let normalized = login.to_lowercase();
     let rows = db::query(db::Statement::PolicyReserveSelectPlatformUsers)

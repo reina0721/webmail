@@ -1,0 +1,28 @@
+{
+  "name": "@mail-web/ui",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.tsx",
+    "./theme": "./src/theme.tsx",
+    "./*": "./src/index.tsx",
+    "./tokens.css": "./src/tokens.css",
+    "./motion.css": "./src/motion.css",
+    "./native-controls": "./src/native-controls.tsx",
+    "./client.css": "./src/client.css"
+  },
+  "dependencies": {
+    "@mui/material": "^9.5.0",
+    "@mui/icons-material": "^9.5.0",
+    "@mui/material-nextjs": "^9.5.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@emotion/cache": "^11.14.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "sideEffects": [
+    "**/*.css"
+  ]
+}

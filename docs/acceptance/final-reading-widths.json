@@ -1,0 +1,27 @@
+[
+  {
+    "width": 390,
+    "inner": 390,
+    "pageWidth": 390
+  },
+  {
+    "width": 768,
+    "inner": 768,
+    "pageWidth": 768
+  },
+  {
+    "width": 1024,
+    "inner": 1024,
+    "pageWidth": 1024
+  },
+  {
+    "width": 1440,
+    "inner": 1440,
+    "pageWidth": 1440
+  },
+  {
+    "width": 1920,
+    "inner": 1920,
+    "pageWidth": 1920
+  }
+]

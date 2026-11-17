@@ -1,11 +1,11 @@
-Mail Web v0.3.0-alpha.2
+Mail Web v0.4.0-alpha.1
 
-Adds multiple Stalwart connections and domain-specific operations. Existing locally enrolled mailbox login is retained: adding an upstream never imports or grants access to its users. Local account mappings select the single upstream for sessions, messages, drafts, attachments, credentials, reconciliation, Hooks and recipient counters.
+完整替换原邮件与运营界面：以 Bulwark `7cdedb60cc157cfeaf19623732b1135da6d3dc28` 的客户端、布局及交互为基线，导入完整邮件、日历、联系人、文件、编辑器、搜索、规则、导入导出和离线模块。独立 MUI 封装统一粉白/深色主题、浮层、键盘与动效，移除旧 HeroUI 页面和历史全局样式。
 
-Setup runs after deployment. Additional connections use temporary administrator authorization and independent resumable initialization, reusing the site's existing operator and Turnstile. Domain bindings, registration policies and readiness are separate from site settings. Legacy accounts, sessions, counters and human receipts migrate to the default connection without changing upstream accounts.
+管理员功能统一到 `/console/`，首次安装为 `/console/setup/`；旧管理与配置地址自动跳转。个人身份、签名、设备与阅读/写信偏好仍属于个人设置。注册开放策略、配置验证和实时健康分离，过期探测及短暂依赖故障不会改写管理员的开放策略。
 
-Account entry pages are more compact. Registration offers explicit domain choice; recovery stays bound to the existing account. Profile, capacity, capabilities, devices and app-password loading fail independently. The shared switch uses HeroUI's native track/thumb geometry.
+保留 Rust/Axum 与既有数据。安全 JMAP 传输由后端选择上游、验证账号并限制方法；关联账号分别校验，缓存和状态隔离。普通写信、SMTP、日历邀请及自动邮件共用配额和持久幂等。Sieve 转发/自动回复通过独立网关适配，兼容未经修改的官方 Stalwart。
 
-Validation passed in the [complete release workflow](https://github.com/reina0721/mail-web/actions/runs/42097795715), including 29 backend tests, two disposable real Stalwart servers with equal remote IDs, real JMAP/SMTP counters and published-asset installation/restore. The existing webmail1 deployment was updated through the artifact-only CLI. Configuration, local account/limits, counters, encryption key and prior human receipts were preserved; existing registration remains enabled.
+`sh deploy/test-env.sh up --build --verify` 自动构建、初始化两台隔离官方 Stalwart、启动收信服务并执行质量、真实业务、故障、升级、备份恢复及至少 30 分钟持续注册。凭据自动生成，私有运行数据不进入源码包。发布包包含对应修改源码和许可证。
 
-Production retains its original connection and domain. No test accounts/domains were created, no normal mailbox limits or other applications' Hooks changed, and no production outage test was run. Actual setup screenshots use the installation capability; ordinary operator sign-in was not retested or reset. New domains still need their own real human/mail checks before manual enablement. See acceptance.json for evidence scope and remaining coverage.
+实际逐项结果、运行版本及截图见 [重构报告](rebuild-test-report.md)、[功能对照表](feature-parity.md) 和 [上游复用记录](upstream/README.md)。验收范围为本机 Docker 与隔离邮件环境；不代表公网域名、生产 Turnstile 或反垃圾信誉。当前内嵌浏览器未显示系统通知权限和打印窗口，两项系统界面没有计为已观察通过。旧生产版本的记录保留在 acceptance.json，不替代本次重构证据。

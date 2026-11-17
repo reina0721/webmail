@@ -1,0 +1,12 @@
+{
+  "environment": "local Docker / isolated official Stalwart",
+  "revision": "working-tree-5602285-native-v38",
+  "cancelledUiImported": 37,
+  "partialServerCount": 37,
+  "expectedFinalCount": 80,
+  "completed": true,
+  "finalServerCount": 80,
+  "uniqueMessageIds": 80,
+  "refreshCheckpoint": 37,
+  "verifiedAt": "2026-11-17T09:12:44.383522+00:00"
+}

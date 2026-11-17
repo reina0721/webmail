@@ -1,0 +1,53 @@
+Bcc: copy-a8b11383@receiver.example.net
+Received: from mx.probe.example.com (mailweb-gateway-probe-stalwart-1.mailweb-gateway-probe_default. [192.168.48.3])
+        by 96e8d564cfff (Mailpit) with SMTP
+        for <copy-a8b11383@receiver.example.net>; Tue, 17 Nov 2026 03:51:46 +0000 (UTC)
+DKIM-Signature: v=1; a=ed25519-sha256; s=mw-proof; d=owner.proof.probe.example.com; c=relaxed/relaxed; r=y;
+	h=Message-ID:Subject:To:From:Date:MIME-Version:Content-Type; t=1794887506; bh=
+	tj6HzlsS6coiYv0nq+DkhPDojTIHISJHksg9n+d/XYE=; b=jdybIdReDNL5MPnT+WIGHtB6bX/
+	p/hiETE0eULJJ0lxRnmj6Yqt57nOsneMUP4sHTMQOwISFGJrInPzHpnUNDw==;
+Received: from localhost (localhost [127.0.0.1])
+	by mx.probe.example.com (Stalwart SMTP) with LMTP id 4BB853472801200;
+	Tue, 17 Nov 2026 03:51:46 +0000
+Received: from zero.zero (unknown [192.168.48.1])
+	by mx.probe.example.com (Stalwart SMTP) with ESMTP id 4BB85346FC01200;
+	Tue, 17 Nov 2026 03:51:46 +0000
+Authentication-Results: mx.probe.example.com;
+	spf=none (mx.probe.example.com: no SPF records found for postmaster@zero.zero) smtp.helo=zero.zero;
+	spf=none (mx.probe.example.com: no SPF records found for sender-a8b11383@outside.example.net) smtp.mailfrom=sender-a8b11383@outside.example.net;
+	iprev=permerror (dns record not found) policy.iprev=192.168.48.1;
+	dmarc=fail (policy not aligned) header.from=outside.example.net policy.dmarc=reject
+Received-SPF: none (mx.probe.example.com: no SPF records found for sender-a8b11383@outside.example.net)
+	receiver=mx.probe.example.com; client-ip=192.168.48.1; envelope-from="sender-a8b11383@outside.example.net"; helo=zero.zero;
+X-Spam-Result: ARC_NA (0.00),
+	DKIM2_NA (0.00),
+	DKIM_NA (0.00),
+	FROM_EQ_ENV_FROM (0.00),
+	FROM_NO_DN (0.00),
+	MID_RHS_MATCH_ENV_FROM (0.00),
+	RCPT_COUNT_ONE (0.00),
+	SINGLE_SHORT_PART (0.00),
+	SPF_NA (0.00),
+	TO_DN_NONE (0.00),
+	TO_MATCH_ENVRCPT_ALL (0.00),
+	RCVD_COUNT_ZERO (0.10),
+	RCVD_NO_TLS_LAST (0.10),
+	MID_RHS_MATCH_FROM (1.00),
+	MISSING_DATE (1.00),
+	RBL_SEM (1.00),
+	RCPT_LOCAL_IN_SUBJECT (2.00),
+	RDNS_NONE (2.00),
+	DMARC_POLICY_REJECT (4.00),
+	RBL_BARRACUDA (4.00),
+	RBL_BLOCKLISTDE (4.00),
+	RBL_SPAMCOP (4.00)
+X-Spam-Score: spam, score=23.20
+Return-Path: <owner@probe.example.com>
+Date: Tue, 17 Nov 2026 03:51:46 +0000
+From: sender-a8b11383@outside.example.net
+To: owner@probe.example.com
+Subject: Gateway ownership a8b11383
+Message-ID: <a8b11383@outside.example.net>
+
+Probe content
+

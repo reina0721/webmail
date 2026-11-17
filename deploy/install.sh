@@ -3,7 +3,7 @@ set -eu
 umask 077
 root=${MAIL_WEB_ROOT:-}
 version=latest
-repository=${MAIL_WEB_REPOSITORY:-reina0721/mail-web}
+repository=${MAIL_WEB_REPOSITORY:-reina0721/webmail}
 while test "$#" -gt 0; do
  case "$1" in
   --dir) root=${2:?installation directory required}; shift 2 ;;

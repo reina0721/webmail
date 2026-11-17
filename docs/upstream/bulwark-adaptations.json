@@ -1,0 +1,545 @@
+{
+  "commit": "7cdedb60cc157cfeaf19623732b1135da6d3dc28",
+  "files": [
+    {
+      "local": "frontend/apps/web/src/components/mail/mail-app.tsx",
+      "upstream": "components/mail/mail-app.tsx",
+      "sha256": "2b9e4ff35b908cddd17abde2e6f0a86c5d2e5819b2f050f0a89efa486a93ef12"
+    },
+    {
+      "local": "frontend/apps/web/src/components/ui/context-menu.tsx",
+      "upstream": "components/ui/context-menu.tsx",
+      "sha256": "00e17829f34b72a806098edca8d56ccd27a64baa2d394b1fcdee3132cce0bb96"
+    },
+    {
+      "local": "frontend/apps/web/src/components/ui/button.tsx",
+      "upstream": "components/ui/button.tsx",
+      "sha256": "2599e2b7c2aef269d0da86b87de4fb5b59547d45b6af778827b181249738d90d"
+    },
+    {
+      "local": "frontend/apps/web/src/components/ui/dialog.tsx",
+      "upstream": "components/ui/dialog.tsx",
+      "sha256": "73595b2d92554579d0e879a848e6a7016c0a2e2544e447fe4bfce24c5925c842"
+    },
+    {
+      "local": "frontend/apps/web/src/components/ui/input.tsx",
+      "upstream": "components/ui/input.tsx",
+      "sha256": "3be418e886f225ea49f665f6866a6bee6cc8d228cc6c97e6b26cfc930d5e4ff6"
+    },
+    {
+      "local": "frontend/apps/web/src/components/settings/account-settings.tsx",
+      "upstream": "components/settings/account-settings.tsx",
+      "sha256": "e7a745209f6159b9564755810f4f6998b8b526ff9a4dc9ee007c5076a186feda"
+    },
+    {
+      "local": "frontend/apps/web/src/components/settings/share-collection-dialog.tsx",
+      "upstream": "components/settings/share-collection-dialog.tsx",
+      "sha256": "05cfbe827a62884781ecac884bc146d9bdb4b5966189fc51263481cb3a061264"
+    },
+    {
+      "local": "frontend/apps/web/src/components/files/file-browser.tsx",
+      "upstream": "components/files/file-browser.tsx",
+      "sha256": "f4950c6e4442c1dd3aaa459eb897bffdc71109b16fe54ccac461a3c829df4c96"
+    },
+    {
+      "local": "frontend/apps/web/src/components/layout/mv-top-bar.tsx",
+      "upstream": "components/layout/mv-top-bar.tsx",
+      "sha256": "51bd3d493feec2d15f6c32e445708c51cdb8bd7a4b691dbfa849aaa18d4bc7df"
+    },
+    {
+      "local": "frontend/apps/web/src/components/layout/navigation-rail.tsx",
+      "upstream": "components/layout/navigation-rail.tsx",
+      "sha256": "6cb9993d067deebdd6473ff371a4669c66cb2b0037eaa6abb200f369f81eb6f2"
+    },
+    {
+      "local": "frontend/apps/web/src/components/calendar/calendar-month-view.tsx",
+      "upstream": "components/calendar/calendar-month-view.tsx",
+      "sha256": "4c14571eb8ea766245cdff142b7874e78d80c7ca621db0884ded6adb55b336ec"
+    },
+    {
+      "local": "frontend/apps/web/src/components/email/rich-text-editor.tsx",
+      "upstream": "components/email/rich-text-editor.tsx",
+      "sha256": "881e8f6af9e6c1c18a9121bec0d9a0941847c5e3280db54567f0bdfc55ff5994"
+    },
+    {
+      "local": "frontend/apps/web/src/components/email/email-viewer.tsx",
+      "upstream": "components/email/email-viewer.tsx",
+      "sha256": "ee4398282095109520faae892c12dedfad47a882c4c59a250390619c0e716e83"
+    },
+    {
+      "local": "frontend/apps/web/src/components/email/schedule-send-dialog.tsx",
+      "upstream": "components/email/schedule-send-dialog.tsx",
+      "sha256": "88e3468b3e0bc344380f067b15acdbde7a295ce72501d8ea80d4f0c1a253be83"
+    },
+    {
+      "local": "frontend/apps/web/src/components/email/thread-conversation-view.tsx",
+      "upstream": "components/email/thread-conversation-view.tsx",
+      "sha256": "4f1cff83dac63aa66f060f0a081a2f9dbb928e4d66444b0331319f08cb4b5a73"
+    },
+    {
+      "local": "frontend/apps/web/src/components/email/email-composer.tsx",
+      "upstream": "components/email/email-composer.tsx",
+      "sha256": "e10bb17fb74c6f1261a7717afc7b7c109acc6035361f4ddc6d1d166634ea9a87"
+    },
+    {
+      "local": "frontend/apps/web/src/components/mail-transfer/mail-import-dialog.tsx",
+      "upstream": "components/mail-transfer/mail-import-dialog.tsx",
+      "sha256": "58a13d5d959cb4dbb3d0a354762d85328d65b5d8a80f0cce074f215a674b34e5"
+    },
+    {
+      "local": "frontend/apps/web/src/components/mail-transfer/mail-export-dialog.tsx",
+      "upstream": "components/mail-transfer/mail-export-dialog.tsx",
+      "sha256": "ce044e93e4057608d42f3c12d77154481d9ff9adec84ac88cab04e258830c588"
+    },
+    {
+      "local": "frontend/apps/web/src/components/mail-transfer/__tests__/mail-export-dialog.test.tsx",
+      "upstream": "components/mail-transfer/__tests__/mail-export-dialog.test.tsx",
+      "sha256": "edb14bac10f63f162624dc162a7d8f8da59e6e3599ee7f662e84820784fe34a6"
+    },
+    {
+      "local": "frontend/apps/web/src/components/email/__tests__/email-hover-actions-rtl-room.test.tsx",
+      "upstream": "components/email/__tests__/email-hover-actions-rtl-room.test.tsx",
+      "sha256": "8db7ddab949cadd62a76f4bc546c7b99f22004c77fb8e22d33a523fb2b02936a"
+    },
+    {
+      "local": "frontend/apps/web/src/components/email/__tests__/composer-send-pending-attachments.test.tsx",
+      "upstream": "components/email/__tests__/composer-send-pending-attachments.test.tsx",
+      "sha256": "d6a2d59f4e42ec6a85cb1cfbed8f971a725d5ed9f2b8ddc8837d58fe97099bca"
+    },
+    {
+      "local": "frontend/apps/web/src/components/email/__tests__/composer-attach-from-files.test.tsx",
+      "upstream": "components/email/__tests__/composer-attach-from-files.test.tsx",
+      "sha256": "a968d6160db8e84c23a05113ded1834581c88bcadb8a11397221a1c4f3b1eb72"
+    },
+    {
+      "local": "frontend/apps/web/src/components/email/__tests__/schedule-send-dialog.test.tsx",
+      "upstream": "components/email/__tests__/schedule-send-dialog.test.tsx",
+      "sha256": "953532291c42044b45f3d401c748e374e1aff711bbd998cc1491b680c0fa0fe3"
+    },
+    {
+      "local": "frontend/apps/web/src/components/email/__tests__/blocked-content-banner.test.tsx",
+      "upstream": "components/email/__tests__/blocked-content-banner.test.tsx",
+      "sha256": "1ae8f363e3184cd0191de1448d000cfe95b1eac67709e87be556b8cfa62f4e54"
+    },
+    {
+      "local": "frontend/apps/web/src/components/email/__tests__/more-actions-menu.test.tsx",
+      "upstream": "components/email/__tests__/more-actions-menu.test.tsx",
+      "sha256": "a3fadcf5e0df864a6aa0d8a723ff81dee6b426e8a6de943814a0321ca7b76c3a"
+    },
+    {
+      "local": "frontend/apps/web/src/components/email/__tests__/composer-upload-timeout.test.tsx",
+      "upstream": "components/email/__tests__/composer-upload-timeout.test.tsx",
+      "sha256": "bd6fabf9b65a81620dd3008b097bc59527edd0bfc8381d531601f18aef119145"
+    },
+    {
+      "local": "frontend/apps/web/src/components/email/__tests__/composer-save-pending-attachments.test.tsx",
+      "upstream": "components/email/__tests__/composer-save-pending-attachments.test.tsx",
+      "sha256": "e1ad03e03acc71df8462f8c02a0299a7b9b0ebc718b899ad3851f9e7cc07d6a1"
+    },
+    {
+      "local": "frontend/apps/web/src/components/email/structured-mail/__tests__/structured-mail-cards.test.tsx",
+      "upstream": "components/email/structured-mail/__tests__/structured-mail-cards.test.tsx",
+      "sha256": "fe5dc50b13160f03c6e66086fe945166d9c140f45689a1797997da0f9ae8b388"
+    },
+    {
+      "local": "frontend/apps/web/src/components/calendar/__tests__/recurrence-scope-dialog.test.tsx",
+      "upstream": "components/calendar/__tests__/recurrence-scope-dialog.test.tsx",
+      "sha256": "c331d496ab509a158308d30be1e256c5b1735b4f18331ce60a45ee0e2e2eeedf"
+    },
+    {
+      "local": "frontend/apps/web/src/components/calendar/__tests__/toast-beside-sheet-ux-p2-pim.test.tsx",
+      "upstream": "components/calendar/__tests__/toast-beside-sheet-ux-p2-pim.test.tsx",
+      "sha256": "fb92a44a7ea58e8da3deab92faf67078e3a7e279c52cd8b70d27b5225ed4c2c9"
+    },
+    {
+      "local": "frontend/apps/web/src/components/calendar/__tests__/calendar-month-view-resize-anchor.test.tsx",
+      "upstream": "components/calendar/__tests__/calendar-month-view-resize-anchor.test.tsx",
+      "sha256": "fc713d13d67c29886764a095c348f5639922827914182c28ddd68ee041c0f014"
+    },
+    {
+      "local": "frontend/apps/web/src/components/command-palette/__tests__/mail-palette-commands.test.ts",
+      "upstream": "components/command-palette/__tests__/mail-palette-commands.test.ts",
+      "sha256": "d032668bce4539b03fe0e22eff29dbd5b6777d25ad08d2e5029fd64bbb49e815"
+    },
+    {
+      "local": "frontend/apps/web/src/components/contacts/__tests__/contact-form.test.tsx",
+      "upstream": "components/contacts/__tests__/contact-form.test.tsx",
+      "sha256": "fbed2f8077b38c1370d1c218b21af30fdaefd98b0dcca44a94f0b6b0b8b6c1a4"
+    },
+    {
+      "local": "frontend/apps/web/src/components/layout/__tests__/rtl-icon-flips.test.ts",
+      "upstream": "components/layout/__tests__/rtl-icon-flips.test.ts",
+      "sha256": "32dc737168c98bb7105407be2d4a4e3a07f612a7bdc2535833bb48d79b890aa3"
+    },
+    {
+      "local": "frontend/apps/web/src/components/layout/__tests__/shell-strings.test.tsx",
+      "upstream": "components/layout/__tests__/shell-strings.test.tsx",
+      "sha256": "35978b6e5e0c02d75886da587db088c42135a9783f83a49cc3141caf6080de3c"
+    },
+    {
+      "local": "frontend/apps/web/src/components/layout/__tests__/navigation-rail-window-controls.test.tsx",
+      "upstream": "components/layout/__tests__/navigation-rail-window-controls.test.tsx",
+      "sha256": "2f43cb1ab56f2797e0c20d27416ba4648e58f70cd317851e2e21591f28591880"
+    },
+    {
+      "local": "frontend/apps/web/src/components/files/__tests__/ux-p3-pim-files-focus.test.tsx",
+      "upstream": "components/files/__tests__/ux-p3-pim-files-focus.test.tsx",
+      "sha256": "58c3862625c412de1e75913454f92afe0f3bd65963e3307d46a27c83fb8092c2"
+    },
+    {
+      "local": "frontend/apps/web/src/components/settings/__tests__/no-native-dialogs.test.ts",
+      "upstream": "components/settings/__tests__/no-native-dialogs.test.ts",
+      "sha256": "0e61d5d5facef355aa30f931e668ba379c756b988bac5ac8b10e64b8e718bebc"
+    },
+    {
+      "local": "frontend/apps/web/src/components/settings/__tests__/keyword-settings.test.tsx",
+      "upstream": "components/settings/__tests__/keyword-settings.test.tsx",
+      "sha256": "4d8bee3f200c13df5397b8215ee725d244401eda03346ef9fa04888264b151bb"
+    },
+    {
+      "local": "frontend/apps/web/src/components/settings/__tests__/settings-editors-unsaved.test.tsx",
+      "upstream": "components/settings/__tests__/settings-editors-unsaved.test.tsx",
+      "sha256": "8c0acdf3176c3909df0cd3134c598b02cd4802371aecc328b7cfb4d2f353be78"
+    },
+    {
+      "local": "frontend/apps/web/src/components/settings/__tests__/settings-search-anchors.test.tsx",
+      "upstream": "components/settings/__tests__/settings-search-anchors.test.tsx",
+      "sha256": "480144e936a92ff38c7fb6f0679606bbc4d9cc886b01ebb6b8fa53d34861f3e8"
+    },
+    {
+      "local": "frontend/apps/web/src/components/settings/__tests__/desktop-telemetry-settings.test.tsx",
+      "upstream": "components/settings/__tests__/desktop-telemetry-settings.test.tsx",
+      "sha256": "23571bc09b4ad3d3fc5202268bf2bcc83e39992d1a9e4cbcb4ff451c9a85d977"
+    },
+    {
+      "local": "frontend/apps/web/src/components/settings/__tests__/about-data-settings.test.tsx",
+      "upstream": "components/settings/__tests__/about-data-settings.test.tsx",
+      "sha256": "02a1a3d0073b34d3bd21e6daf121996b6aeef7dcfdcd7d7827d52039ad378c55"
+    },
+    {
+      "local": "frontend/apps/web/src/components/settings/__tests__/settings-section.test.tsx",
+      "upstream": "components/settings/__tests__/settings-section.test.tsx",
+      "sha256": "f8ecfc4bcd26ea4ce5dda8396be0a67e95bd4b5867ae07847ea661297c6e1eee"
+    },
+    {
+      "local": "frontend/apps/web/src/components/ui/__tests__/icon-button.test.tsx",
+      "upstream": "components/ui/__tests__/icon-button.test.tsx",
+      "sha256": "fdb7dc0adf43eeff214555b57d39fc1a59d0e2a9cc5d73e7932a2fbaf7b33b2e"
+    },
+    {
+      "local": "frontend/apps/web/src/components/ui/__tests__/dialog.test.tsx",
+      "upstream": "components/ui/__tests__/dialog.test.tsx",
+      "sha256": "b188214501384d534e33fd3593cceec29297e8493088e55f75758a5054f95eda"
+    },
+    {
+      "local": "frontend/apps/web/src/components/ui/__tests__/toolbar.test.tsx",
+      "upstream": "components/ui/__tests__/toolbar.test.tsx",
+      "sha256": "11295b46068244168d42fe537cd678b1d192baf38a493cc56a2cfeb88a29bd41"
+    },
+    {
+      "local": "frontend/apps/web/src/components/ui/__tests__/button.test.tsx",
+      "upstream": "components/ui/__tests__/button.test.tsx",
+      "sha256": "1f3430251274670391e0ae5d287a3d87f702d7b64ba7d251cab5c9fdac39b082"
+    },
+    {
+      "local": "frontend/apps/web/src/components/mail/__tests__/compose-plugin-hooks.test.tsx",
+      "upstream": "components/mail/__tests__/compose-plugin-hooks.test.tsx",
+      "sha256": "0f3d6366fcb6b6712240cb5c47d12b0ef13dd760a6bbbf2204463abb942a71cd"
+    },
+    {
+      "local": "frontend/apps/web/src/lib/utils.ts",
+      "upstream": "lib/utils.ts",
+      "sha256": "fca8e10d9dd32b4deca743602c111be5c22e1c1ec9bb1d0637ac8efc12c3ac29"
+    },
+    {
+      "local": "frontend/apps/web/src/lib/account-archive-client.ts",
+      "upstream": "lib/account-archive-client.ts",
+      "sha256": "9543c6c6392aef02d19be1c07ba7dfcc8328fb891ee0d3a1c58cf5b3b78aa7ac"
+    },
+    {
+      "local": "frontend/apps/web/src/lib/browser-navigation.ts",
+      "upstream": "lib/browser-navigation.ts",
+      "sha256": "22af200e206330e365b197d15c4052c665d66c78096208f054288aba7f4fe511"
+    },
+    {
+      "local": "frontend/apps/web/src/lib/web-push.ts",
+      "upstream": "lib/web-push.ts",
+      "sha256": "403923092203b88221d1fb1ef7cd85dcff7239fa0d1914358c09ccb8da81ceca"
+    },
+    {
+      "local": "frontend/apps/web/src/lib/web-push-errors.ts",
+      "upstream": "lib/web-push-errors.ts",
+      "sha256": "84bda1faf18977db745e64e4c7e674a169f1d6a6c50367370f6703a66bfda08b"
+    },
+    {
+      "local": "frontend/apps/web/src/lib/jmap/client.ts",
+      "upstream": "lib/jmap/client.ts",
+      "sha256": "ffcf30f74f6c93c50344ce0b098006cc521ccd5e24acd2a501304f3fd27e0caa"
+    },
+    {
+      "local": "frontend/apps/web/src/lib/jmap/client-interface.ts",
+      "upstream": "lib/jmap/client-interface.ts",
+      "sha256": "9e7180a36fd4bc06cd24dd8622a565d6be210adc7db2f031e36b98f4f010b236"
+    },
+    {
+      "local": "frontend/apps/web/src/lib/__tests__/sw-offline-shell.test.ts",
+      "upstream": "lib/__tests__/sw-offline-shell.test.ts",
+      "sha256": "d6c723433555370716da1b2a16d8746fb14f83cbc215e02c9440d862eb397ba4"
+    },
+    {
+      "local": "frontend/apps/web/src/lib/__tests__/jmap-metadata-requests.test.ts",
+      "upstream": "lib/__tests__/jmap-metadata-requests.test.ts",
+      "sha256": "debf69af65f0e9722cf34ccd22a2be7f9ad32ce4e87b92dab1895c4b634a3c9b"
+    },
+    {
+      "local": "frontend/apps/web/src/lib/__tests__/web-push.test.ts",
+      "upstream": "lib/__tests__/web-push.test.ts",
+      "sha256": "cc6a235f4bfdd7f82398921226e3f6816468c75c23e42ef934e320370c1d4ab4"
+    },
+    {
+      "local": "frontend/apps/web/src/lib/__tests__/sw-build-caches.test.ts",
+      "upstream": "lib/__tests__/sw-build-caches.test.ts",
+      "sha256": "1bfb6573ca9a019bec2a3a6f2778cc1ee66d03e984ebdca6f418719c8bf1f702"
+    },
+    {
+      "local": "frontend/apps/web/src/lib/offline/shell.ts",
+      "upstream": "lib/offline/shell.ts",
+      "sha256": "b6361a488a6536988f6d6e1e871c1185e937a9c1d6960ebfd14858baed67b0bd"
+    },
+    {
+      "local": "frontend/apps/web/src/lib/offline/offline-mode.ts",
+      "upstream": "lib/offline/offline-mode.ts",
+      "sha256": "98007fcbb7f68144770f9fe117a1dd5ae9b35cad049166783d376d0589fefa7a"
+    },
+    {
+      "local": "frontend/apps/web/src/lib/offline/state.ts",
+      "upstream": "lib/offline/state.ts",
+      "sha256": "caf0216bcde02d729de72585e993e8304bb13b54272a74c93dce2a3f00b0359a"
+    },
+    {
+      "local": "frontend/apps/web/src/lib/offline/device-wipe.ts",
+      "upstream": "lib/offline/device-wipe.ts",
+      "sha256": "706791f9a804552f2cc3d3116a0120b8fc6d494806780d53d11682bc8063926c"
+    },
+    {
+      "local": "frontend/apps/web/src/lib/mail-export/sinks.ts",
+      "upstream": "lib/mail-export/sinks.ts",
+      "sha256": "fd964b8f539f2aa8ad312b12f44a5e939e5b94b8453592aa43bbbcb4957058b3"
+    },
+    {
+      "local": "frontend/apps/web/src/lib/pwa-notify/page-actions.ts",
+      "upstream": "lib/pwa-notify/page-actions.ts",
+      "sha256": "9e49292856dc822de5376ae4eafd76d3df8807e836a42ae3c5fa5e614d596876"
+    },
+    {
+      "local": "frontend/apps/web/src/lib/store/engine/transport.ts",
+      "upstream": "lib/store/engine/transport.ts",
+      "sha256": "577a25ec33277b0c9dee38742fa07f44ec9c286a1f5ed103c946198e17c970b3"
+    },
+    {
+      "local": "frontend/apps/web/src/stores/contact-store.ts",
+      "upstream": "stores/contact-store.ts",
+      "sha256": "1106618146275359e16d24d83943cd4bc4c87f183c9cac1552ca6e2edd17a61c"
+    },
+    {
+      "local": "frontend/apps/web/src/stores/auth-store.ts",
+      "upstream": "stores/auth-store.ts",
+      "sha256": "c1c93646a1e3e513b804b712dd558001531cd3ea115171be176a55fa7167fdc8"
+    },
+    {
+      "local": "frontend/apps/web/src/stores/account-security-store.ts",
+      "upstream": "stores/account-security-store.ts",
+      "sha256": "8344e8f9f21327160d3ca00fb3f753aad3f6270cc73dd8b3441b9660b4de9d28"
+    },
+    {
+      "local": "frontend/apps/web/src/stores/__tests__/keyword-palette-fill.test.ts",
+      "upstream": "stores/__tests__/keyword-palette-fill.test.ts",
+      "sha256": "2a25d681654023c346cb7eb735d1afe39dc191b20e4b07b049a103da709b7bf0"
+    },
+    {
+      "local": "frontend/apps/web/src/hooks/use-config.ts",
+      "upstream": "hooks/use-config.ts",
+      "sha256": "696cce9fe713c4d7b50f3c6ded953f4b460a8ef5478c6c812c4bfbe605fbb293"
+    },
+    {
+      "local": "frontend/apps/web/src/i18n/navigation.ts",
+      "upstream": "i18n/navigation.ts",
+      "sha256": "3d76edfa25258f3ca4b7ca6f861a4fc47eccedb532923233c0fb989000d71a92"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/nb/common.json",
+      "upstream": "locales/nb/common.json",
+      "sha256": "411884f1e18612047148db55071eaae97994e10113de19f2f9619ca2d987f411"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/fr/common.json",
+      "upstream": "locales/fr/common.json",
+      "sha256": "3cc5dc2d39ba8494bd1ad2c295fac0ef00a73e803d75829e0224741b97b0bbfd"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/ro/common.json",
+      "upstream": "locales/ro/common.json",
+      "sha256": "7d3e1619a0cf5eb8c195a1066277017103f69e0fdc46d3a0ac03cf50d40001fb"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/zh-TW/common.json",
+      "upstream": "locales/zh-TW/common.json",
+      "sha256": "48c239b3b562876e738481692f4342c0df96e3723d4eadd2cdb4a0bcdc86c3ad"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/el/common.json",
+      "upstream": "locales/el/common.json",
+      "sha256": "98bf7e23aebd857260a4837a737c6b9872e5b63e08c717549f3f1e497c93c2da"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/lv/common.json",
+      "upstream": "locales/lv/common.json",
+      "sha256": "2f07870971ffbf00bfd34af7307cb047fb8fd9b47dc822c1ee2d0250301da8f4"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/tr/common.json",
+      "upstream": "locales/tr/common.json",
+      "sha256": "d18e84929e9f911b7c5c6c1f2eda85080ef57d1048321109ebb64c965a42a4c2"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/ko/common.json",
+      "upstream": "locales/ko/common.json",
+      "sha256": "a0f7afbbea21130d6c64cae7541ade9c27fe1256619e9f118770d1b2ca15e066"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/uk/common.json",
+      "upstream": "locales/uk/common.json",
+      "sha256": "cb69698f142b484da3bcb5380dc45b999f5215fdc141802983018e9febd7c943"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/sk/common.json",
+      "upstream": "locales/sk/common.json",
+      "sha256": "2b28288bf0739f234b41b0d61857f8619a18d99226bf196cf1f3322be2dc4c4e"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/hu/common.json",
+      "upstream": "locales/hu/common.json",
+      "sha256": "5a5ec2af66813bb89901ffe52fb784b36c0d5c1d2e6016a9551b0de125ae004a"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/ar/common.json",
+      "upstream": "locales/ar/common.json",
+      "sha256": "665cccd3d506d63e0ab9b003b47459b170f679581de2d69a704d1a8e0518270f"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/cs/common.json",
+      "upstream": "locales/cs/common.json",
+      "sha256": "9d0f735df575f75999f99c7164586eb7f72edb84a7b8426276535fc773c2c3d7"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/es/common.json",
+      "upstream": "locales/es/common.json",
+      "sha256": "fa89ed45a03761dc1468b6a5b5465889f3b684e51df1ec5e3b9be9fff5991871"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/fa/common.json",
+      "upstream": "locales/fa/common.json",
+      "sha256": "4e76c1e960df73b72f9d76f9383926bbc49ad49aa91c02e854df1928ea9f970d"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/ja/common.json",
+      "upstream": "locales/ja/common.json",
+      "sha256": "2335f5a2e366779dcbc8477e14de40b675da040b90153324abdcbb07fbd5d6d5"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/ru/common.json",
+      "upstream": "locales/ru/common.json",
+      "sha256": "49f1fcf6f8f540e685771e94860f84c21b0d172aad5a409e58121797e5857bb5"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/nn/common.json",
+      "upstream": "locales/nn/common.json",
+      "sha256": "3fab2ad41bf35e0e6b689da793a6c978a03e077856294ab1e22444b48abf9b0a"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/de/common.json",
+      "upstream": "locales/de/common.json",
+      "sha256": "ab8eccf08c44b2b51fd804e899cd17f47fbe7d49101772b2f01486320d02387b"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/et/common.json",
+      "upstream": "locales/et/common.json",
+      "sha256": "d100ec8d1883597e88ed490091b9b9a4793a7240ad19169a2c519c9c320459cd"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/mn/common.json",
+      "upstream": "locales/mn/common.json",
+      "sha256": "aa561ee82999e3a4ae79c63adda8ccbf33b1e50c70a6e47a12826c6fa735ece8"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/nl/common.json",
+      "upstream": "locales/nl/common.json",
+      "sha256": "c9e5a198ef7298561d07f5153d1a428ef9b3b3a1aa17fada14ddc097e23f3ec3"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/pt/common.json",
+      "upstream": "locales/pt/common.json",
+      "sha256": "8b4c61ec1f7401f23b6664d85c2614bdb1a2581ff109c58bb94148f4e02d6a38"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/en/common.json",
+      "upstream": "locales/en/common.json",
+      "sha256": "c74cc98c75f18dd869ca3443fa8bddbbb54b20c0cbb9935a28f6babb498db7ba"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/vi/common.json",
+      "upstream": "locales/vi/common.json",
+      "sha256": "bbb709ee078d3ffcb59ae56c086448f69110dfb764970862f2293287928ea809"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/he/common.json",
+      "upstream": "locales/he/common.json",
+      "sha256": "2302bbd05f8f96d28dfa749414780db08f57956b4f218c3b1ee91c300eab653f"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/da/common.json",
+      "upstream": "locales/da/common.json",
+      "sha256": "80fb03bc71fdc4cd97a86e57d03ba2a2b5ab23a1c7a9a0c7af76698138e9b7e8"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/ca/common.json",
+      "upstream": "locales/ca/common.json",
+      "sha256": "882a10390e67b86beb6e9be30849c60d7591b8966ab6c98059b96ad8fac47a00"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/it/common.json",
+      "upstream": "locales/it/common.json",
+      "sha256": "e86d55089674ead4cf55112d8a6591ecd3f5a79dd6e6266470c8a2c17dc0a4c6"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/th/common.json",
+      "upstream": "locales/th/common.json",
+      "sha256": "be7daaeffb89ccdb13c57fc574cf955a2221ef18e8ea56f0638eb7ece694fcc0"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/zh/common.json",
+      "upstream": "locales/zh/common.json",
+      "sha256": "5380ce1414f5b49fb2f13ba3ef7cb4ac54ccca940207c05a5eb9746bea151406"
+    },
+    {
+      "local": "frontend/apps/web/src/locales/pl/common.json",
+      "upstream": "locales/pl/common.json",
+      "sha256": "7f60796d2fd6994d09194897bfb75cc1a2129ae68d25e813d83de96f9a0e6b68"
+    },
+    {
+      "local": "frontend/apps/web/src/app/bulwark-globals.css",
+      "upstream": "app/globals.css",
+      "sha256": "b25e79d3973d2f96ab57e39025c48afc67edf59e65fa92eae874ac9bafeb2884"
+    },
+    {
+      "local": "frontend/apps/web/upstream-scripts/build-store-worker.mjs",
+      "upstream": "scripts/build-store-worker.mjs",
+      "sha256": "9fbec442758ce65455bbde775a5e0faee454d94820a43d5b53ded75cc99f4fa3"
+    },
+    {
+      "local": "frontend/apps/web/upstream-scripts/build-pst-worker.mjs",
+      "upstream": "scripts/build-pst-worker.mjs",
+      "sha256": "0ff180d6ebb099b5c0a9d0e99a00e40a20f68bab56c57974cc0293d336abec65"
+    }
+  ]
+}

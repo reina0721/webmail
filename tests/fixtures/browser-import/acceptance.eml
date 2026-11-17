@@ -1,0 +1,10 @@
+From: Sakura <sakura@example.com>
+To: import@example.com
+Subject: Browser EML import acceptance
+Message-ID: <browser-eml-import@isolated.example.com>
+Date: Tue, 17 Nov 2026 06:00:00 +0000
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+MIME-Version: 1.0
+
+本机隔离环境邮件导入验收：EML。此内容不会发送到外部。

@@ -289,6 +289,14 @@ pub(super) async fn save_config(
     Json(input): Json<ConfigurationInput>,
 ) -> Result<Json<Value>> {
     authorize(&app, &headers, true).await?;
+    if input.turnstile_site_key.starts_with("1x000000")
+        && std::env::var("MAIL_WEB_TEST_MODE").as_deref() != Ok("true")
+    {
+        return Err(Error(
+            StatusCode::BAD_REQUEST,
+            "verification_test_keys_forbidden",
+        ));
+    }
     let _lock = CONFIG_LOCK.lock().await;
     if initialize::active(&app).await? {
         return Err(Error(StatusCode::CONFLICT, "initialization_running"));
@@ -353,16 +361,17 @@ pub(super) async fn save_config(
         .call(
             &provisioning_key,
             "x:Domain/get",
-            json!({"properties":["id","name"]}),
+            json!({"properties":["id","name","description"]}),
         )
         .await?;
     let domain_id = domains["list"]
         .as_array()
         .and_then(|items| {
             items.iter().find(|item| {
-                item["name"]
-                    .as_str()
-                    .is_some_and(|name| name.eq_ignore_ascii_case(&domain))
+                !gateway::internal_domain(item)
+                    && item["name"]
+                        .as_str()
+                        .is_some_and(|name| name.eq_ignore_ascii_case(&domain))
             })
         })
         .and_then(|item| item["id"].as_str())

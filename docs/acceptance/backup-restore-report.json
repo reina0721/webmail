@@ -1,0 +1,12 @@
+{
+  "scope": "local isolated Docker restore, not public production",
+  "project": "mailweb-restore-1794914808",
+  "passed": true,
+  "checks": [
+    "consistent online SQLite backup",
+    "separate restored mail stores and network",
+    "real primary and second-server login/JMAP",
+    "accounts, registration strategy, defaults, preferences, PIM IDs and quota match snapshot"
+  ],
+  "at": "1794914808"
+}

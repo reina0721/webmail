@@ -1,0 +1,12 @@
+{
+  "candidate": "working-tree-5602285-native-v44",
+  "algorithm": "SHA-256 of ordered source path, NUL, and SHA-256 bytes; docs and runtime excluded",
+  "files": 4565,
+  "sourceFingerprint": "5ce8205132559b11cd97a08a99d861850c799b68ff7ab8fc83e94473f154de28",
+  "recordedAt": "2026-11-17T11:34:45.244775+00:00",
+  "applicationInputFingerprint": "bbaec466d907158b261cd685fcf6de84a4ffecdaf979f347e495d8912ee8c235",
+  "applicationInputFiles": 4508,
+  "supplementalTests": "Official Turnstile negative/duplicate/success and production-mode test-key rejection added to the independent restore regression after the candidate build; application inputs unchanged.",
+  "deliverySourceFingerprint": "853230cd93e79cea8ede2d924f4186ee8ae45276734eef9109e75bbe2e27bc92",
+  "deliverySourceFiles": 4566
+}

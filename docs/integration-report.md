@@ -1,3 +1,5 @@
+> 历史记录：本文描述此前实现或后端回归，不能作为本次完整客户端重构的交付证明。当前逐项状态见 [功能对照表](feature-parity.md)。
+
 # Integration evidence
 
 Validated on 2026-11-04 against a dedicated Stalwart 1.0.1 container and the real

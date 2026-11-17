@@ -1,0 +1,32 @@
+{
+  "candidate": "working-tree-5602285-native-v44",
+  "environment": "local Docker and official Stalwart; real in-app browser",
+  "readReceiptRequestHeader": "sakura@example.com",
+  "priorityHeader": "1 (Highest)",
+  "serverSubmissionEnvelope": {
+    "mailFrom": {
+      "email": "sakura@example.com",
+      "parameters": {
+        "HOLDFOR": "6",
+        "RET": "HDRS"
+      }
+    },
+    "rcptTo": [
+      {
+        "email": "receipt-check@recovery.example.net",
+        "parameters": {
+          "NOTIFY": "SUCCESS,FAILURE,DELAY"
+        }
+      }
+    ]
+  },
+  "smtpDeliveredMessages": 1,
+  "headerAndEnvelopeVerified": true,
+  "actualReadReceiptReturned": true,
+  "note": "Browser recipient explicitly sent the MDN; sender mailbox contains exactly one valid multipart/report MDN. Official Stalwart also returned a matching successful DSN for the external test recipient.",
+  "at": "2026-11-17T11:39:15.902533+00:00",
+  "returnedReadReceiptCount": 1,
+  "returnedMdnContentType": "multipart/report",
+  "returnedMdnDisposition": "manual-action/MDN-sent-manually; displayed",
+  "actualMatchingDeliveryNotificationReturned": true
+}

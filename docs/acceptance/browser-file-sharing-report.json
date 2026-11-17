@@ -1,0 +1,18 @@
+{
+  "revision": "working-tree-5602285-native-v40",
+  "folderId": "b",
+  "ownerAccountId": "e",
+  "readOnlyRights": {
+    "mayAddChildren": false,
+    "mayDelete": false,
+    "mayModifyContent": false,
+    "mayRead": true,
+    "mayRename": false,
+    "maySetMetadata": false,
+    "mayShare": false
+  },
+  "writeRejected": "forbidden",
+  "otherServiceDoesNotAdvertiseShare": true,
+  "revoked": true,
+  "afterRevokeStatus": 403
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "check": "Both official Stalwarts deliver real Sieve redirects and forged-From null-sender vacations through the gateway; each owner uses exactly two shared quota units",
+    "at": "2026-11-17T11:25:30.308958+00:00"
+  },
+  {
+    "check": "A failing gateway management probe does not close registration or prevent actual signup/login; after the dependency recovers rule creation resumes without reconfiguring the app",
+    "at": "2026-11-17T11:25:30.789411+00:00"
+  },
+  {
+    "check": "A real upstream relay refusal leaves encrypted durable messages; restarting only the isolated app preserves them, and recovery delivers them without counting twice",
+    "at": "2026-11-17T11:25:32.461477+00:00"
+  },
+  {
+    "check": "Automatic mail stops at the shared quota, remains retryable upstream, and resumes after an API quota change without reconfiguration or double counting; second-server counters stay isolated",
+    "at": "2026-11-17T11:25:33.039554+00:00"
+  },
+  {
+    "check": "Disabling the owning mailbox blocks automatic sends even when the vacation From names someone else; re-enabling resumes the same queued messages",
+    "at": "2026-11-17T11:25:34.006215+00:00"
+  },
+  {
+    "check": "Personal automatic-mail records are account-isolated and the unified console exposes the selected service queue",
+    "at": "2026-11-17T11:25:34.036281+00:00"
+  }
+]

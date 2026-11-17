@@ -1,0 +1,13 @@
+@keyframes content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mail-dialog-enter { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: no-preference) { .MuiDialog-paper { animation: mail-dialog-enter 140ms cubic-bezier(.2,.8,.2,1); } }

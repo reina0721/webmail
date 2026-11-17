@@ -1,2 +1,2 @@
-import {OperationsSurface} from '../../surfaces/operations';
-export default function Page(){return <OperationsSurface/>;}
+import {ConsoleRedirect} from "@/native/redirect";
+export default function Page(){return <ConsoleRedirect />;}

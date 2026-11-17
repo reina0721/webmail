@@ -1,8 +1,18 @@
 # Mail Web
 
-通用、可自行部署的 Webmail 与运营面板。Next.js 静态界面由 Rust/Axum 提供，SQLite 保存平台数据，现有 Stalwart 保存邮件。**项目不预设邮件域名或运营品牌**：部署后在安装面板填写自己的站点名称、域名和 Stalwart 连接信息。公开注册默认关闭。
+通用、可自行部署的 Webmail 与管理控制台。Next.js 静态界面由 Rust/Axum 提供，SQLite 保存平台数据，现有 Stalwart 保存邮件。**项目不预设邮件域名或运营品牌**：部署后在安装面板填写自己的站点名称、域名和 Stalwart 连接信息。公开注册默认关闭。
 
-当前发布通道为开发预览。构建、隔离集成测试和真实部署验收分别记录，不将构建成功当作邮件投递或注册服务验收。
+当前发布通道为开发预览。最新重构的逐项状态见 [功能对照表](docs/feature-parity.md)，上游复用与许可证见 [来源清单](docs/upstream/README.md)。未通过全部门禁前不把工作树构建标为完成交付。构建、隔离集成测试和真实部署验收分别记录，不将构建成功当作邮件投递或注册服务验收。
+
+## 本机隔离环境
+
+```sh
+sh deploy/test-env.sh up --build --verify
+```
+
+脚本创建独立的 Compose 项目、两台真实 Stalwart 和 Mailpit，通过应用初始化 API 配置域名、身份、Hook、运营邮箱和 Cloudflare 官方测试密钥；不会修改其他业务容器。`status`、`logs`、`verify`、`down` 使用同一个脚本。热更新入口为 `sh deploy/dev.sh up`，返回生产构建使用 `sh deploy/dev.sh down`。
+
+完整验收包含 Docker 内类型/构建/测试、真实业务、旧版故障回归、独立备份恢复和至少 30 分钟持续注册。未完成的产品功能会令最终发布矩阵门禁失败；当前重构状态和阻塞见 [重构报告](docs/rebuild-test-report.md) 与 [未完成项](docs/rebuild-blockers.md)。本机结果不代表公网域名、反垃圾信誉或生产 Turnstile 已验收。
 
 ## 1. 部署方式与准备
 
@@ -22,7 +32,7 @@
 INSTALL_DIR="$HOME/apps/mail-web"
 VERSION=v0.3.0-alpha.2
 mkdir -p "$INSTALL_DIR"
-curl -fSL "https://raw.githubusercontent.com/reina0721/mail-web/$VERSION/deploy/install.sh" -o "$INSTALL_DIR/install.sh"
+curl -fSL "https://raw.githubusercontent.com/reina0721/webmail/$VERSION/deploy/install.sh" -o "$INSTALL_DIR/install.sh"
 sh "$INSTALL_DIR/install.sh" \
   --dir "$INSTALL_DIR" \
   --version "$VERSION" \
@@ -34,7 +44,7 @@ sh "$INSTALL_DIR/install.sh" \
 
 要直接通过指定 IP 和端口使用 HTTP，需要自行选择监听 IP，并显式传入 `--allow-http`。HTTP 不加密登录信息、邮件或 Cookie；管理配置应使用后文的 SSH 通道，正式用户入口建议配置 HTTPS。不能把 HTTP 登录描述为加密访问。
 
-安装结束会显示当前安装的 `/setup/` 链接及管理令牌。该链接属于管理能力，请保密。令牌保存在本安装的 `secrets/setup.key`，不会进入镜像或 Git。再次获取或轮换：
+安装结束会显示当前安装的 `/console/setup/` 链接及管理令牌。该链接属于管理能力，请保密。令牌保存在本安装的 `secrets/setup.key`，不会进入镜像或 Git。再次获取或轮换：
 
 ```sh
 sh "$INSTALL_DIR/deploy/mail-web.sh" setup
@@ -47,7 +57,7 @@ sh "$INSTALL_DIR/deploy/mail-web.sh" rotate-setup-token
 
 先阅读 [Stalwart 逐项配置教程](docs/stalwart-setup.md)：每个字段都列出用途、必填条件、完整菜单路径、创建步骤、复制哪个值、最低权限和排错方法。可选择“仅使用已有邮箱”或“开放注册与找回密码”两条路线。面板中的“查看配置教程”直接链接到对应章节。
 
-访问安装器给出的地址，或 `/setup/`，输入管理令牌。已登录的运营身份也可从账号菜单进入“站点配置”。
+访问安装器给出的地址，或 `/console/setup/`，输入管理令牌。已登录的运营身份也可从账号菜单进入“站点配置”。
 
 推荐使用默认的**自动配置**：输入 Stalwart 管理员账号密码或 API 密钥 → 点击“验证授权并读取域名” → 选择已有域名或新建域名 → 绑定已有普通运营邮箱或设置新运营邮箱 → 检查预览 → 点击一次“自动配置”。专用服务身份、发件账号、API 密钥、Hook 及所有内部 ID 均由程序创建和填写。
 
@@ -79,7 +89,7 @@ sh "$INSTALL_DIR/deploy/mail-web.sh" rotate-setup-token
 
 运营后台通过域名选择器分别管理账号、注册策略与任务。每个域名单独完成本站检查，手动开启注册；一个连接故障不改变其他连接的策略。详见[多服务接入教程](docs/stalwart-setup.md#multiple-services)。
 
-**保留原登录规则：先在 Webmail 登记或绑定，再使用对应服务器的完整邮箱地址和原密码登录。** 添加服务或域名不会自动导入上游用户；没有本地记录的账号仍不能登录。一个会话操作一个邮箱；不提供跨账号合并收件箱。已有账号不能通过改绑域名迁移到另一台服务器。
+**保留原登录规则：先在 Webmail 登记或绑定，再使用对应服务器的完整邮箱地址和原密码登录。** 添加服务或域名不会自动导入上游用户；没有本地记录的账号仍不能登录。原生客户端可逐个验证并关联本站账号，邮件状态与设置按账号隔离；统一收件箱的完整验收状态见功能对照表。已有账号不能通过改绑域名迁移到另一台服务器。
 
 旧站点升级自动迁移为默认连接和默认域名，保留本地账号、运营身份、会话和计数。更新前 CLI 自动创建一致性快照；迁移或检查失败时不清空重建数据。新安装的默认模板只包含容器、监听等基础设施参数，旧环境变量兼容读取。
 
@@ -194,7 +204,7 @@ cargo fmt --all -- --check
 cargo test --locked --workspace
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo run --locked -p mail-web -- --openapi > backend/contract/openapi.json
-pnpm --dir frontend exec openapi-typescript ../backend/contract/openapi.json -o apps/web/src/lib/generated-api.ts
+pnpm --dir frontend exec openapi-typescript ../backend/contract/openapi.json -o apps/web/src/platform/lib/generated-api.ts
 ```
 
 API 契约从 Rust/Utoipa 生成，生成文件不手改。GitHub Actions 完成检查与隔离 Stalwart 测试后，版本标签或带 `[release-preview]` 的 main 提交会发布：`mail-web-linux-amd64.tar.gz`、`SHA256SUMS` 和 `release-manifest.json`。维护者应更新 `release-version.txt` 为新的唯一版本，不覆盖已发布版本。稳定版仍受 `docs/acceptance.json` 门禁约束。

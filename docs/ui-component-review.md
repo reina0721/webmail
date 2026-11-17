@@ -1,3 +1,5 @@
+> 历史记录：本文描述此前实现或后端回归，不能作为本次完整客户端重构的交付证明。当前逐项状态见 [功能对照表](feature-parity.md)。
+
 # Shared component review — 2026-11-04
 
 The inventory follows every package export, including nonvisual utilities. Third-party interaction remains owned by HeroUI / React Aria. The samples at `/ui-elements/` are isolated; they do not call production APIs.

@@ -2,3 +2,18 @@
 *.sh text eol=lf
 *.yaml text eol=lf
 *.yml text eol=lf
+
+# Preserve pinned upstream hashes and signed/protocol fixture bytes on checkout.
+frontend/apps/web/src/** -text
+frontend/apps/web/public/** -text
+frontend/apps/web/vendor/** -text
+frontend/apps/web/upstream-scripts/** -text
+docs/upstream/bulwark.patch -text -whitespace
+*.eml -text -whitespace
+*.mbox -text -whitespace
+*.vcf -text
+*.ics -text
+# Upstream license and generated vendor formatting are retained verbatim.
+LICENSE -whitespace
+frontend/apps/web/vendor/** -whitespace
+frontend/apps/web/public/sqlite3mc/** -whitespace

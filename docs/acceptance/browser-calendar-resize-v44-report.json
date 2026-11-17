@@ -1,0 +1,51 @@
+{
+  "revision": "v44",
+  "scope": "real in-app browser; no full-page capture during geometry checks",
+  "steps": [
+    {
+      "width": 390,
+      "focusWeekTop": 164.5,
+      "grid": "月, 2026年11月",
+      "inner": 390,
+      "pageWidth": 390,
+      "scrollerTop": 135,
+      "title": "月, 2026年11月"
+    },
+    {
+      "width": 768,
+      "focusWeekTop": 89,
+      "grid": "月, 2026年11月",
+      "inner": 768,
+      "pageWidth": 768,
+      "scrollerTop": 57,
+      "title": "2026年11月"
+    },
+    {
+      "width": 1024,
+      "focusWeekTop": 89,
+      "grid": "月, 2026年11月",
+      "inner": 1024,
+      "pageWidth": 1024,
+      "scrollerTop": 57,
+      "title": "2026年11月"
+    },
+    {
+      "width": 1440,
+      "focusWeekTop": 89,
+      "grid": "月, 2026年11月",
+      "inner": 1440,
+      "pageWidth": 1440,
+      "scrollerTop": 57,
+      "title": "2026年11月"
+    },
+    {
+      "width": 1920,
+      "focusWeekTop": 89,
+      "grid": "月, 2026年11月",
+      "inner": 1920,
+      "pageWidth": 1920,
+      "scrollerTop": 57,
+      "title": "2026年11月"
+    }
+  ]
+}

@@ -1,3 +1,5 @@
+> 历史记录：本文描述此前实现或后端回归，不能作为本次完整客户端重构的交付证明。当前逐项状态见 [功能对照表](feature-parity.md)。
+
 # Mail and operations UI verification
 
 This records browser verification of the redesigned frontend using the production static export and isolated example data. It does **not** certify live login, upstream Stalwart operations, message delivery, or deployment readiness.

@@ -88,10 +88,32 @@ fn local_part(input: &str) -> bool {
         )
 }
 pub(crate) async fn captcha(app: &App, token: &str) -> Result<()> {
+    if token.len() < 16 || token.len() > 4096 {
+        return Err(Error(StatusCode::BAD_REQUEST, "captcha_invalid"));
+    }
     if app.services.turnstile_secret.is_empty() {
         return Err(Error(
             StatusCode::SERVICE_UNAVAILABLE,
             "verification_not_configured",
+        ));
+    }
+    let isolated_test = std::env::var("MAIL_WEB_TEST_MODE").as_deref() == Ok("true")
+        && std::env::var("ALLOW_INSECURE_TEST_UPSTREAM").as_deref() == Ok("true")
+        && [
+            "1x0000000000000000000000000000000AA",
+            "2x0000000000000000000000000000000AA",
+            "3x0000000000000000000000000000000AA",
+        ]
+        .contains(&app.services.turnstile_secret.as_str())
+        && app.services.turnstile_site_key == "1x00000000000000000000AA";
+    if (app.services.turnstile_secret.starts_with("1x000000")
+        || app.services.turnstile_secret.starts_with("2x000000")
+        || app.services.turnstile_secret.starts_with("3x000000"))
+        && !isolated_test
+    {
+        return Err(Error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "verification_test_keys_forbidden",
         ));
     }
     let response: Value = app
@@ -111,7 +133,14 @@ pub(crate) async fn captcha(app: &App, token: &str) -> Result<()> {
     let hostname = reqwest::Url::parse(&app.origin)
         .ok()
         .and_then(|u| u.host_str().map(str::to_owned));
-    if response["success"] != true || response["hostname"].as_str() != hostname.as_deref() {
+    if response["success"] != true
+        || response["hostname"].as_str()
+            != if isolated_test {
+                Some("example.com")
+            } else {
+                hostname.as_deref()
+            }
+    {
         return Err(Error(StatusCode::BAD_REQUEST, "captcha_invalid"));
     }
     Ok(())
@@ -209,8 +238,14 @@ pub(super) async fn challenge(
     }
     if input.purpose == "registration" {
         let p = settings(&app).await?;
-        if p["enabled"] != true || !readiness::ready(&app).await? {
+        if p["enabled"] != true {
             return Err(Error(StatusCode::FORBIDDEN, "registration_closed"));
+        }
+        if !readiness::ready(&app).await? {
+            return Err(Error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "registration_configuration_required",
+            ));
         }
     }
     captcha(&app, &input.turnstile_token).await?;
@@ -337,8 +372,14 @@ pub(super) async fn register(
         .ok_or(Error(StatusCode::BAD_REQUEST, "verification_required"))?;
     let app = connections::for_domain(&app, &domain).await?;
     let p = settings(&app).await?;
-    if p["enabled"] != true || !readiness::ready(&app).await? {
+    if p["enabled"] != true {
         return Err(Error(StatusCode::FORBIDDEN, "registration_closed"));
+    }
+    if !readiness::ready(&app).await? {
+        return Err(Error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "registration_configuration_required",
+        ));
     }
     if !local_part(&input.name) || !(12..=128).contains(&input.password.chars().count()) {
         return Err(Error(StatusCode::BAD_REQUEST, "registration_input_invalid"));
@@ -480,6 +521,14 @@ pub(super) async fn register(
         .execute(&app.db)
         .await?;
     policy::sync_scope(&app).await?;
+    if gateway::configuration(&app, false).await?.is_some()
+        && let Err(error) = gateway::provision::ensure_user(&app, user).await
+    {
+        // A new mailbox has no active automatic-send rules and its ordinary
+        // protocol credential cannot write them. Provision their private proof
+        // asynchronously; a probe outage must not make registration unavailable.
+        tracing::warn!(user_id=%user,code=error.1,"automatic_gateway_owner_sync_pending");
+    }
     let mut activation = json!({});
     activation[&upstream_id] = json!({"permissions":account::user_permissions(true)});
     app.upstream

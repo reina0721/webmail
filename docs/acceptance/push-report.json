@@ -1,0 +1,18 @@
+[
+  {
+    "check": "A service-worker preview reads the named linked mailbox while another account is primary, returns the correct native deep-link owner and exposes no upstream credential",
+    "at": "2026-11-17T11:25:35.704369+00:00"
+  },
+  {
+    "check": "Closed-page notification actions mark the correct mailbox message read and archive it into native year/month folders, then restore the original message state",
+    "at": "2026-11-17T11:25:35.845983+00:00"
+  },
+  {
+    "check": "Cross-origin wakeups/actions, missing sessions, invalid IDs and stale login fingerprints are rejected",
+    "at": "2026-11-17T11:25:35.871566+00:00"
+  },
+  {
+    "check": "A real repeated JMAP account ID on two official Stalwarts is ambiguous without its verified login label; the label resolves the correct server and mailbox",
+    "at": "2026-11-17T11:25:36.064998+00:00"
+  }
+]

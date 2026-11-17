@@ -1,0 +1,38 @@
+[
+  {
+    "check": "A real uploaded vCard parses and imports into the selected address book",
+    "at": "2026-11-17T11:25:25.536666+00:00"
+  },
+  {
+    "check": "A real ICS attachment parses and imports a recurring event",
+    "at": "2026-11-17T11:25:25.608446+00:00"
+  },
+  {
+    "check": "Real Mailbox sharing exposes only the selected collection, rejects protected writes and revokes subsequent account access",
+    "at": "2026-11-17T11:25:25.812888+00:00"
+  },
+  {
+    "check": "Real Calendar sharing exposes only the selected collection, rejects protected writes and revokes subsequent account access",
+    "at": "2026-11-17T11:25:25.923940+00:00"
+  },
+  {
+    "check": "Real AddressBook sharing exposes only the selected collection, rejects protected writes and revokes subsequent account access",
+    "at": "2026-11-17T11:25:26.040891+00:00"
+  },
+  {
+    "check": "File copy creates a separate durable node in the destination folder",
+    "at": "2026-11-17T11:25:26.102610+00:00"
+  },
+  {
+    "check": "Directory sharing grants inherited read-only file access and revocation removes it",
+    "at": "2026-11-17T11:25:26.242053+00:00"
+  },
+  {
+    "check": "Calendar invitation, update and cancellation reach the real SMTP receiver and share the external-recipient counter",
+    "at": "2026-11-17T11:25:27.106278+00:00"
+  },
+  {
+    "check": "Same-server calendar invitation persists for the attendee and RSVP updates the organizer event",
+    "at": "2026-11-17T11:25:27.483526+00:00"
+  }
+]

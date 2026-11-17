@@ -1,0 +1,39 @@
+{
+  "revision": "v42",
+  "beforeUsage": {
+    "dailyRecipientsLimit": 500,
+    "dailyRecipientsUsed": 1,
+    "hourlyRecipientsLimit": 100,
+    "hourlyRecipientsUsed": 1,
+    "quotaBytes": 1073741824,
+    "usedBytes": 2227
+  },
+  "completed": true,
+  "retryButton": true,
+  "retryWithoutFilePicker": true,
+  "draftPreserved": true,
+  "attachmentBytes": 95,
+  "draftId": "qaaaaae",
+  "customSchedule": {
+    "emailId": "uaaaaaf",
+    "id": "d",
+    "sendAt": "2026-11-19T21:45:01Z",
+    "undoStatus": "pending"
+  },
+  "customScheduleVerified": true,
+  "scheduleRevision": "v42",
+  "officialSecondRounding": 1.0,
+  "sentMimeVerified": true,
+  "smtpMessageId": "XuWvXCYCUVkubPyioPYLQC",
+  "smtpDeliveredMessages": 1,
+  "afterUsage": {
+    "dailyRecipientsLimit": 500,
+    "dailyRecipientsUsed": 4,
+    "hourlyRecipientsLimit": 100,
+    "hourlyRecipientsUsed": 4,
+    "quotaBytes": 1073741824,
+    "usedBytes": 2273
+  },
+  "acceptedSubmissionsCounted": 3,
+  "canceledSchedules": 2
+}

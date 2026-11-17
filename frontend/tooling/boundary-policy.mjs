@@ -1,15 +1,22 @@
+import {readFileSync} from 'node:fs';
+// Imported business modules retain the upstream's internal conventions. The host and
+// the Material boundary remain checked; corresponding source hashes are checked separately.
+const upstreamManifest=JSON.parse(readFileSync(new URL('../../docs/upstream/bulwark-manifest.json',import.meta.url),'utf8'));
+const upstreamSources=new Set(upstreamManifest.files.map(file=>file.local.replace(/^frontend\//,'')));
 const testPathPattern = /(?:^|\/)\b(?:e2e|test|tests|__tests__)\b(?:\/|$)|\.(?:test|spec)\.[^.]+$/;
 
 export function findSourcePolicyViolations({ content, extension, localPath }) {
   const violations = [];
-  const isUiAdapter = localPath.startsWith('packages/ui-adapter/');
+  if(upstreamSources.has(localPath))return violations;
+  const isUiAdapter = localPath.startsWith('packages/ui-adapter/') || localPath.startsWith('packages/material-ui/');
   const isTest = testPathPattern.test(localPath);
   const isMotionKeyframeAuthority = [
     'packages/design-system/src/motion.css',
+    'packages/material-ui/src/motion.css',
     'packages/surface-foundation/src/styles.css',
   ].includes(localPath);
   const isHostMotionBoundary =
-    localPath.startsWith('apps/web/src/host/') ||
+    localPath.startsWith('apps/web/src/host/') || localPath.startsWith('apps/web/src/platform/host/') ||
     // ViewportReveal（Surface reveal recipe 实现）随 ownership 提升到 surface-foundation，
     // 是 IntersectionObserver 的唯一合法实现位置之一（Observer 生命周期语义不变）。
     localPath === 'packages/surface-foundation/src/viewport-reveal.tsx';
@@ -74,13 +81,13 @@ export function findSourcePolicyViolations({ content, extension, localPath }) {
     violations.push(['Style governance', '禁止 !important']);
   }
 
-  if (extension === '.tsx' && /#[0-9a-fA-F]{3,8}\b|rgba?\(/.test(content)) {
+  if (extension === '.tsx' && !localPath.startsWith('packages/material-ui/') && /#[0-9a-fA-F]{3,8}\b|rgba?\(/.test(content)) {
     violations.push(['Token governance', '组件中禁止硬编码颜色']);
   }
 
   if (
     extension === '.css' &&
-    localPath !== 'packages/design-system/src/tokens.css' &&
+    localPath !== 'packages/design-system/src/tokens.css' && localPath !== 'packages/material-ui/src/tokens.css' && localPath !== 'packages/material-ui/src/client.css' &&
     /#[0-9a-fA-F]{3,8}\b|rgba?\(/.test(content)
   ) {
     violations.push(['Token governance', '硬编码颜色只能由 Design Token 权威文件声明']);
@@ -128,6 +135,10 @@ export function findSourcePolicyViolations({ content, extension, localPath }) {
 
 export function findImportPolicyViolations({ localPath, specifier, workspace }) {
   const violations = [];
+  if(specifier.startsWith('@mui/')&&!localPath.startsWith('packages/material-ui/')) violations.push(['Material boundary','Material UI 必须通过 @mail-web/ui 使用']);
+
+  if(upstreamSources.has(localPath))return violations;
+
   const legacyArchitecturePackagePrefix = `@community-go/${'ad' + 'min-'}`;
 
   if (specifier.startsWith(legacyArchitecturePackagePrefix)) {
@@ -142,7 +153,7 @@ export function findImportPolicyViolations({ localPath, specifier, workspace }) 
     specifier === 'zustand/middleware' ||
     specifier === 'zustand/vanilla' ||
     specifier.startsWith('zustand/');
-  if (importsZustand && !localPath.startsWith('packages/state-foundation/')) {
+  if (importsZustand && !localPath.startsWith('packages/state-foundation/') && !localPath.startsWith('apps/web/src/stores/')) {
     violations.push([
       'State foundation',
       'zustand 只能由 packages/state-foundation 直接 import；业务经 @community-go/state-foundation 消费',

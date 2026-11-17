@@ -46,6 +46,58 @@ pub(crate) async fn active(app: &App) -> Result<bool> {
     Ok(journal::read(app)?.is_some_and(|job| job.status == "applying"))
 }
 
+// The same capability list drives preflight and the owned runtime identity.
+// Official Stalwart rejects granting permissions the administrator does not hold.
+fn directory_permissions(automatic_gateway: bool) -> Vec<&'static str> {
+    let mut permissions = vec![
+        "sysAccountGet",
+        "sysAccountCreate",
+        "sysAccountQuery",
+        "sysAccountUpdate",
+        "sysDomainGet",
+        "sysDomainQuery",
+        "sysMtaHookGet",
+        "sysMtaHookUpdate",
+        "sysSharingGet",
+        "sysSharingUpdate",
+        "sysActionCreate",
+        "actionReloadSettings",
+    ];
+    if automatic_gateway {
+        permissions.extend([
+            "sysDomainCreate",
+            "sysDkimSignatureGet",
+            "sysDkimSignatureQuery",
+            "sysDkimSignatureCreate",
+            "sysMtaRouteGet",
+            "sysMtaRouteCreate",
+            "sysMtaRouteUpdate",
+            "sysMtaOutboundStrategyGet",
+            "sysMtaOutboundStrategyUpdate",
+            "sysSieveUserInterpreterGet",
+            "sysSieveUserInterpreterUpdate",
+            "sysMtaStageAuthGet",
+            "sysMtaStageAuthUpdate",
+            "sysMtaStageDataGet",
+            "sysMtaStageDataUpdate",
+            "impersonate",
+            "jmapSieveScriptCreate",
+            "jmapSieveScriptUpdate",
+            "jmapSieveScriptDestroy",
+            "jmapVacationResponseUpdate",
+        ]);
+    }
+    permissions
+}
+fn required_permissions(new_domain: bool, automatic_gateway: bool) -> Vec<&'static str> {
+    let mut permissions = directory_permissions(automatic_gateway);
+    permissions.push("sysMtaHookCreate");
+    if new_domain && !permissions.contains(&"sysDomainCreate") {
+        permissions.push("sysDomainCreate");
+    }
+    permissions
+}
+
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Grant {
@@ -106,20 +158,10 @@ impl Grant {
         Ok(())
     }
     fn missing_permissions(&self, new_domain: bool) -> Vec<&'static str> {
-        [
-            "sysAccountGet",
-            "sysAccountCreate",
-            "sysAccountUpdate",
-            "sysDomainGet",
-            "sysMtaHookGet",
-            "sysMtaHookCreate",
-            "sysActionCreate",
-            "actionReloadSettings",
-        ]
-        .into_iter()
-        .chain(new_domain.then_some("sysDomainCreate"))
-        .filter(|permission| !self.permissions.iter().any(|p| p == permission))
-        .collect()
+        required_permissions(new_domain, gateway::provision::enabled())
+            .into_iter()
+            .filter(|permission| !self.permissions.iter().any(|p| p == permission))
+            .collect()
     }
     pub async fn call(&self, app: &App, method: &str, args: Value) -> Result<Value> {
         let upstream = Stalwart {
@@ -237,7 +279,11 @@ pub(crate) async fn authorize_temporary(
     input.inspect(&app).await?;
     let missing = input.missing_permissions(false);
     let domains = input
-        .call(&app, "x:Domain/get", json!({"properties":["id","name"]}))
+        .call(
+            &app,
+            "x:Domain/get",
+            json!({"properties":["id","name","description"]}),
+        )
         .await?;
     // Reading both directories catches missing management rights before resource creation.
     input
@@ -270,7 +316,7 @@ pub(crate) async fn authorize_temporary(
         }
     });
     Ok(Json(
-        json!({"ticket":ticket,"domains":domains["list"],"cloudflareAccounts":accounts,"missingPermissions":missing,"expiresInSeconds":600}),
+        json!({"ticket":ticket,"domains":domains["list"].as_array().into_iter().flatten().filter(|row| !gateway::internal_domain(row)).collect::<Vec<_>>(),"cloudflareAccounts":accounts,"missingPermissions":missing,"expiresInSeconds":600}),
     ))
 }
 #[derive(Deserialize)]
@@ -308,7 +354,7 @@ pub(crate) async fn preflight(
     }
     provision::validate(&app, &access, &input.spec).await?;
     Ok(Json(
-        json!({"resources":["邮箱域名（已有则复用）","本安装专用目录服务身份与 API 密钥","验证码发件邮箱与 API 密钥","本安装专用 MTA Hook 与共享密钥","运营邮箱及策略作用范围"],"turnstile":!input.spec.cloudflare_account.is_empty(),"changesDns":false,"opensRegistration":false}),
+        json!({"resources":["邮箱域名（已有则复用）","本安装专用目录服务身份与 API 密钥","验证码发件邮箱与 API 密钥","本安装专用 MTA Hook 与共享密钥","运营邮箱及策略作用范围",if input.spec.directory_queries{"启用同服务器用户目录（影响此 Stalwart 全部用户）"}else{"保留上游用户目录开关"}],"turnstile":!input.spec.cloudflare_account.is_empty(),"changesDns":false,"opensRegistration":false}),
     ))
 }
 #[utoipa::path(get,tag="installation",path="/api/v1/installation/initialize/job",params(("serviceId"=Option<String>,Query,description="Stable local connection ID; omitted uses the default connection")),responses((status=200,body=Value)))]
@@ -366,8 +412,15 @@ pub(crate) async fn start(
             if job.status == "completed" && job.base == access.base {
                 let mut extended = job.spec.clone();
                 extended.cloudflare_account = input.spec.cloudflare_account.clone();
-                if job.spec.cloudflare_account.is_empty()
-                    && !input.spec.cloudflare_account.is_empty()
+                extended.directory_queries = input.spec.directory_queries;
+                if ((job.spec.cloudflare_account.is_empty()
+                    && !input.spec.cloudflare_account.is_empty())
+                    || (!job.spec.directory_queries && input.spec.directory_queries)
+                    || (gateway::provision::enabled()
+                        && !job
+                            .completed
+                            .iter()
+                            .any(|s| s == gateway::provision::POLICY_VERSION)))
                     && extended == input.spec
                 {
                     job.owner = who.clone();
@@ -558,6 +611,24 @@ mod tests {
         GRANTS.lock().await.get_mut(&ticket).unwrap().expires = db::now() - 1;
         assert!(grant(&ticket, "owner-a").await.is_err());
         assert!(!GRANTS.lock().await.contains_key(&ticket));
+    }
+    #[test]
+    fn initialization_preflight_covers_grants_and_scopes_gateway_permissions() {
+        for gateway in [false, true] {
+            for new_domain in [false, true] {
+                let required = required_permissions(new_domain, gateway);
+                for permission in directory_permissions(gateway) {
+                    assert!(
+                        required.contains(&permission),
+                        "unvalidated grant: {permission}"
+                    );
+                }
+                assert!(required.contains(&"sysMtaHookCreate"));
+                assert_eq!(required.contains(&"sysDomainCreate"), gateway || new_domain);
+                assert_eq!(required.contains(&"impersonate"), gateway);
+                assert_eq!(required.contains(&"sysMtaRouteUpdate"), gateway);
+            }
+        }
     }
     #[test]
     fn sources_reject_credentials_and_unrelated_paths() {

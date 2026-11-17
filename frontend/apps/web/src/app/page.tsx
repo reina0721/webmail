@@ -1,2 +1,2 @@
-import {Workspace} from '../features/workspace';
-export default function Page(){return <Workspace surface="mail"/>;}
+import {NativeWorkspace} from "@/native/workspace";
+export default function Page(){return <NativeWorkspace surface="mail"/>;}

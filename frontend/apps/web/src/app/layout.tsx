@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import './styles.css';
-import {Providers} from '../host/providers';
+import './bulwark-globals.css';
+import '@mail-web/ui/client.css';
+import {NativeProviders as Providers} from '@/native/providers';
 export const metadata = { title: 'Mail Web', description: '邮箱工作台' };
-export default function Layout({children}:{children:ReactNode}) { return <html lang="zh-CN"><body className="bg-surface text-ink"><Providers>{children}</Providers></body></html>; }
+export default function Layout({children}:{children:ReactNode}) { return <html lang="zh-CN"><body className="bg-background text-foreground"><Providers>{children}</Providers></body></html>; }

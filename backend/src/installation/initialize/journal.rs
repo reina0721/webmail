@@ -9,6 +9,8 @@ pub(crate) struct Spec {
     #[serde(default)]
     pub create_domain: bool,
     #[serde(default)]
+    pub directory_queries: bool,
+    #[serde(default)]
     pub operator_mode: String,
     #[serde(default)]
     pub operator_email: String,

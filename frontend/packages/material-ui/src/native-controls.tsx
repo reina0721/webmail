@@ -1,0 +1,26 @@
+'use client';
+import {useId,useCallback,forwardRef,type ButtonHTMLAttributes,type InputHTMLAttributes} from 'react';
+import {Button as MuiButton,InputBase} from '@mui/material';
+export type NativeButtonSize='xs'|'sm'|'md'|'lg'|'icon'|'icon-sm'|'icon-lg';
+export interface NativeButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>{variant?:'default'|'ghost'|'outline'|'destructive';size?:NativeButtonSize}
+export const NativeButton=forwardRef<HTMLButtonElement,NativeButtonProps>(function NativeButton({variant='default',size='md',className='',color:_,...props},ref){
+ const icon=size.startsWith('icon');const height={xs:32,sm:36,md:40,lg:44,icon:40,'icon-sm':32,'icon-lg':44}[size];
+ return <MuiButton disableRipple {...props} ref={ref} variant={variant==='outline'?'outlined':variant==='ghost'?'text':'contained'} color={variant==='destructive'?'error':'primary'} className={'mail-button '+(!/\b(?:absolute|fixed|sticky)\b/.test(className)?'relative ':'')+'large-targets:after:absolute large-targets:after:top-1/2 large-targets:after:left-1/2 large-targets:after:size-full large-targets:after:min-h-11 large-targets:after:min-w-11 large-targets:after:-translate-x-1/2 large-targets:after:-translate-y-1/2 '+className} sx={{minWidth:icon?height:0,width:icon?height:undefined,height,padding:icon?0:undefined,lineHeight:1.35,flexShrink:0,fontSize:13,gap:0.75,'& svg':{width:18,height:18},...(variant==='ghost'?{color:'inherit'}:{})}}/>;
+});
+export const NativeInput=forwardRef<HTMLInputElement,InputHTMLAttributes<HTMLInputElement>>(function NativeInput({className='',style,...props},ref){return <InputBase inputRef={ref} disabled={props.disabled} className="mail-input" inputProps={{...props,className,style}} sx={{border:'1px solid',borderColor:'divider',borderRadius:'8px',padding:0,fontSize:14,minWidth:0,minHeight:className.includes('h-8')?32:40,height:className.includes('h-8')?32:40,width:'100%','&:focus-within':{borderColor:'primary.main',boxShadow:'0 0 0 3px rgb(220 84 127 / .10)'},'& input':{padding:'7px 11px',boxSizing:'border-box',height:'100%'}}}/>;});
+
+import {Dialog as MuiDialog,DialogTitle,DialogContent,DialogActions,IconButton,Paper,useMediaQuery} from '@mui/material';
+import type {ReactNode,RefObject,FormEvent,HTMLAttributes} from 'react';
+export interface NativeDialogProps{isOpen:boolean;onClose:()=>void;title:ReactNode;description?:ReactNode;children?:ReactNode;footer?:ReactNode;role?:'dialog'|'alertdialog';size?:'sm'|'md'|'lg'|'full-on-phone';icon?:ReactNode;showClose?:boolean;preventOutsideClose?:boolean;dirty?:boolean;initialFocus?:RefObject<HTMLElement|null>;onSubmit?:(e:FormEvent<HTMLFormElement>)=>void;className?:string;bodyClassName?:string;testId?:string;inPage?:boolean;closeLabel?:string}
+export function NativeDialog({isOpen,onClose,title,description,children,footer,role='dialog',size='md',icon,showClose=true,preventOutsideClose=false,dirty=false,initialFocus,onSubmit,className,bodyClassName,testId,closeLabel='关闭'}:NativeDialogProps){
+ const phone=useMediaQuery('(max-width:599px)');const label=useId();const descriptionId=useId();
+ const focusPanel=useCallback((panel:HTMLDivElement|null)=>{
+  if(!panel)return;
+  const first=panel.querySelector<HTMLElement>('input:not([disabled]):not([type="hidden"]):not([tabindex="-1"]),textarea:not([disabled]):not([tabindex="-1"]),select:not([disabled]):not([tabindex="-1"]),[contenteditable="true"]');
+  (initialFocus?.current??first??panel.querySelector<HTMLElement>('button:not([disabled])'))?.focus();
+ },[initialFocus]);
+ if(!isOpen)return null;
+ const content=<><DialogTitle id={label+'-heading'} aria-labelledby={label} sx={{display:'flex',alignItems:'center',gap:1.5,padding:'20px 24px',fontSize:17,fontWeight:700}}>{icon}<span id={label}>{title}</span>{showClose&&<IconButton disableRipple aria-label={closeLabel} onClick={onClose} size="small" sx={{ml:'auto',width:44,height:44}}>×</IconButton>}</DialogTitle><DialogContent className={bodyClassName} sx={{padding:'8px 24px 24px',minWidth:0}}>{description&&<p id={descriptionId} style={{marginBottom:16,opacity:.7}}>{description}</p>}{children}</DialogContent>{footer&&<DialogActions sx={{padding:'16px 24px',gap:1,borderTop:'1px solid',borderColor:'divider'}}>{footer}</DialogActions>}</>;
+ return <MuiDialog transitionDuration={0} open={isOpen} onClose={(_,reason)=>{if(reason==='backdropClick'&&(preventOutsideClose||dirty))return;onClose();}} fullScreen={size==='full-on-phone'&&phone} fullWidth maxWidth={size==='lg'||size==='full-on-phone'?'md':size==='sm'?'xs':'sm'} aria-labelledby={label} aria-describedby={description?descriptionId:undefined} slotProps={{paper:{role,ref:focusPanel,className,'data-testid':testId} as HTMLAttributes<HTMLDivElement>,transition:{onEntered:()=>initialFocus?.current?.focus()}}}>{onSubmit?<form onSubmit={onSubmit} style={{display:'flex',flexDirection:'column',minHeight:0}}>{content}</form>:content}</MuiDialog>;
+}
+export const NativeMenuPanel=forwardRef<HTMLDivElement,HTMLAttributes<HTMLDivElement>>(function NativeMenuPanel(props,ref){return <Paper {...props} ref={ref} elevation={0} sx={{border:'1px solid',borderColor:'divider',borderRadius:'10px',boxShadow:'0 12px 48px rgb(65 35 55 / .12)',fontSize:13}}/>;});

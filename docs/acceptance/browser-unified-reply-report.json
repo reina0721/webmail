@@ -1,0 +1,16 @@
+{
+  "revision": "working-tree-5602285-native-v40",
+  "from": [
+    {
+      "email": "browser2984df18d3@example.com",
+      "name": "browser2984df18d3"
+    }
+  ],
+  "to": [
+    {
+      "email": "sakura@example.com",
+      "name": "Sakura"
+    }
+  ],
+  "bodyVerified": true
+}

@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "elapsedSeconds": 1802.5967472689954,
+  "successfulRegistrations": 4,
+  "beforeBuild": {
+    "buildId": "working-tree-5602285-native-v44",
+    "revision": "working-tree-5602285-native-v44",
+    "version": "v0.4.0-alpha.1"
+  },
+  "afterBuild": {
+    "buildId": "working-tree-5602285-native-v44",
+    "revision": "working-tree-5602285-native-v44",
+    "version": "v0.4.0-alpha.1"
+  }
+}

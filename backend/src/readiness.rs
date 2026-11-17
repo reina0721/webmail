@@ -93,9 +93,9 @@ pub async fn ready(app: &App) -> Result<bool> {
         .fetch_optional(&app.db)
         .await?;
     Ok(row.is_some_and(|r| {
-        r.get::<bool, _>("automatic_ok")
-            && r.get::<i64, _>("human_verified_at") > 0
-            && r.get::<i64, _>("checked_at") > db::now() - 360_000
+        // Enrollment is durable and config-bound. Probe failures describe health,
+        // not the administrator's intent to accept new registrations.
+        r.get::<i64, _>("human_verified_at") > 0
     }))
 }
 pub async fn view(app: &App) -> Result<Value> {
@@ -103,19 +103,24 @@ pub async fn view(app: &App) -> Result<Value> {
         .bind(fingerprint(app))
         .fetch_optional(&app.db)
         .await?;
-    let (items, checked, human) = if let Some(row) = row {
-        (
-            serde_json::from_str::<Value>(&row.get::<String, _>("report")).unwrap_or(json!([])),
-            row.get::<i64, _>("checked_at"),
-            row.get::<i64, _>("human_verified_at"),
-        )
-    } else {
-        (json!([]), 0, 0)
-    };
+    let (items, checked, human, automatic_ok, last_success, failures, started) =
+        if let Some(row) = row {
+            (
+                serde_json::from_str::<Value>(&row.get::<String, _>("report")).unwrap_or(json!([])),
+                row.get::<i64, _>("checked_at"),
+                row.get::<i64, _>("human_verified_at"),
+                row.get::<bool, _>("automatic_ok"),
+                row.get::<i64, _>("last_success_at"),
+                row.get::<i64, _>("consecutive_failures"),
+                row.get::<i64, _>("started_at"),
+            )
+        } else {
+            (json!([]), 0, 0, false, 0, 0, 0)
+        };
     let ready = ready(app).await?;
     let requested = registration::settings(app).await?["enabled"] == true;
     Ok(
-        json!({"serviceId":app.service_id,"domainId":app.domain_id,"ready":ready,"requestedEnabled":requested,"effectiveEnabled":requested&&ready,"items":items,"checkedAt":checked,"humanVerifiedAt":human,"manualDeclaration":app.services.policy_verified,"releaseVersion":env!("CARGO_PKG_VERSION"),"protocolScope":"版本协议回归与本站检查分开展示；本站未执行生产停机或 SMTP/JMAP 压力测试"}),
+        json!({"serviceId":app.service_id,"domainId":app.domain_id,"ready":ready,"healthy":automatic_ok&&checked>db::now()-360_000,"stale":checked<=db::now()-360_000,"lastSuccessAt":last_success,"consecutiveFailures":failures,"startedAt":started,"requestedEnabled":requested,"effectiveEnabled":requested&&ready,"items":items,"checkedAt":checked,"humanVerifiedAt":human,"manualDeclaration":app.services.policy_verified,"releaseVersion":env!("CARGO_PKG_VERSION"),"protocolScope":"版本协议回归与本站检查分开展示；本站未执行生产停机或 SMTP/JMAP 压力测试"}),
     )
 }
 #[utoipa::path(get,path="/api/v1/installation/readiness",params(("domainId"=Option<String>,Query,description="Stable local domain ID; omitted uses the migrated default domain")),responses((status=200,body=Value)))]
@@ -209,6 +214,11 @@ fn hook_scope_matches(enable: &Value, expected: &str) -> bool {
 pub async fn check(app: &App) -> Result<()> {
     let _guard = check_lock(app).await;
     let revision = fingerprint(app);
+    db::query(db::Statement::ReadinessStart)
+        .bind(&revision)
+        .bind(db::now())
+        .execute(&app.db)
+        .await?;
     let s = &app.services;
     let mut items = Vec::new();
     macro_rules! item {($key:expr,$label:expr,$result:expr)=>{{let result:Result<()>=$result;items.push(json!({"id":$key,"label":$label,"status":if result.is_ok(){"passed"}else{"failed"},"reason":result.err().map(|e|e.1),"repairUrl":"/setup/"}));}};}
@@ -381,7 +391,9 @@ pub async fn worker(app: Arc<App>) {
                             if context.service_id != "default" {
                                 installation::initialize::activate_pending(context.clone()).await;
                             }
-                            let _ = check(&context).await;
+                            if let Err(error) = check(&context).await {
+                                tracing::warn!(domain=%id, code=error.1, "registration health check failed");
+                            }
                         }
                         tokio::select! {_=SHUTDOWN.cancelled()=>break,_=tokio::time::sleep(std::time::Duration::from_secs(300))=>{}}
                     }
@@ -486,6 +498,19 @@ mod tests {
         changed.services.policy_verified = false;
         assert_eq!(revision, fingerprint(&changed));
         assert!(ready(&changed).await.unwrap());
+        // A completed enrollment must survive stale health probes and transient failures.
+        sqlx::query(
+            "UPDATE registration_readiness SET checked_at=?,automatic_ok=0 WHERE fingerprint=?",
+        )
+        .bind(db::now() - 86_400_000)
+        .bind(&revision)
+        .execute(&app.db)
+        .await
+        .unwrap();
+        assert!(
+            ready(&app).await.unwrap(),
+            "health cache expiry must not close registration"
+        );
         changed.services.turnstile_secret = "rotated".into();
         assert!(!ready(&changed).await.unwrap());
         db::query(db::Statement::ReadinessWrite)
@@ -496,7 +521,7 @@ mod tests {
             .execute(&app.db)
             .await
             .unwrap();
-        assert!(!ready(&app).await.unwrap());
+        assert!(ready(&app).await.unwrap());
     }
 
     #[tokio::test]
@@ -640,7 +665,7 @@ pub(crate) async fn link(
         .execute(&app.db)
         .await?;
     Ok(Json(
-        json!({"url":format!("{}/setup/check/#check={ticket}",app.origin),"expiresInSeconds":600}),
+        json!({"url":format!("{}/console/verification/#check={ticket}",app.origin),"expiresInSeconds":600}),
     ))
 }
 #[derive(Deserialize)]

@@ -1,8 +1,29 @@
 use super::*;
 pub(super) static JOB_NOTIFY: tokio::sync::Notify = tokio::sync::Notify::const_new();
+// Provisioning markers prove ownership while account creation is unresolved.
+// After a verified login, they must not become the user's public sender name.
+fn is_generated_display_name(name: &str) -> bool {
+    let Some(value) = name.strip_prefix("mail-web:") else {
+        return false;
+    };
+    let value = value.strip_suffix(":operator").unwrap_or(value);
+    Uuid::parse_str(value).is_ok()
+}
+pub(super) async fn repair_generated_display_name(app: &App, key: &str, email: &str) {
+    let result = async {
+        let settings = app.upstream.call(key, "x:AccountSettings/get", json!({"ids":["singleton"]})).await?;
+        if settings["list"][0]["description"].as_str().is_some_and(is_generated_display_name) {
+            app.upstream.call(key, "x:AccountSettings/set", json!({"update":{"singleton":{"description":email.split('@').next().unwrap_or(email)}}})).await?;
+        }
+        Ok::<(), stalwart::UpstreamError>(())
+    }.await;
+    if result.is_err() {
+        tracing::warn!("generated_display_name_repair_pending_next_login");
+    }
+}
+
 pub fn user_permissions(active: bool) -> Value {
-    // Mail-only first release. In particular, Sieve redirects, vacation replies,
-    // calendar invitations and alias sign-ins must not open alternate send paths.
+    // Personal-account capabilities. Native mail and scheduling share the enforced MTA policy.
     const ALLOWED: &[&str] = &[
         "authenticate",
         "emailSend",
@@ -44,7 +65,65 @@ pub fn user_permissions(active: bool) -> Value {
         "pop3Stat",
         "pop3Retr",
         "pop3Dele",
+        "jmapCalendarEventNotificationUpdate",
+        "jmapCalendarEventNotificationCreate",
+        "jmapCalendarEventNotificationQueryChanges",
+        "jmapCalendarEventNotificationQuery",
+        "jmapCalendarEventNotificationChanges",
+        "jmapShareNotificationDestroy",
+        "jmapShareNotificationUpdate",
+        "jmapShareNotificationCreate",
+        "jmapShareNotificationQueryChanges",
+        "jmapShareNotificationQuery",
+        "jmapShareNotificationChanges",
+        "jmapShareNotificationGet",
+        "jmapCalendarGet",
+        "jmapCalendarChanges",
+        "jmapCalendarCreate",
+        "jmapCalendarUpdate",
+        "jmapCalendarDestroy",
+        "jmapCalendarEventGet",
+        "jmapCalendarEventQuery",
+        "jmapCalendarEventChanges",
+        "jmapCalendarEventQueryChanges",
+        "jmapCalendarEventCreate",
+        "jmapCalendarEventUpdate",
+        "jmapCalendarEventDestroy",
+        "jmapCalendarEventParse",
+        "jmapCalendarEventNotificationGet",
+        "jmapCalendarEventNotificationDestroy",
+        "jmapParticipantIdentityGet",
+        "calendarSchedulingReceive",
+        "calendarSchedulingSend",
+        "jmapAddressBookGet",
+        "jmapAddressBookChanges",
+        "jmapAddressBookCreate",
+        "jmapAddressBookUpdate",
+        "jmapAddressBookDestroy",
+        "jmapContactCardGet",
+        "jmapContactCardQuery",
+        "jmapContactCardChanges",
+        "jmapContactCardQueryChanges",
+        "jmapContactCardCreate",
+        "jmapContactCardUpdate",
+        "jmapContactCardDestroy",
+        "jmapContactCardParse",
+        "jmapFileNodeGet",
+        "jmapFileNodeQuery",
+        "jmapFileNodeChanges",
+        "jmapFileNodeQueryChanges",
+        "jmapFileNodeCreate",
+        "jmapFileNodeUpdate",
+        "jmapFileNodeDestroy",
+        "jmapFileNodeCopy",
+        "jmapPrincipalGet",
+        "jmapPrincipalQuery",
+        "jmapPrincipalGetAvailability",
         "jmapCoreEcho",
+        "jmapPushSubscriptionGet",
+        "jmapPushSubscriptionCreate",
+        "jmapPushSubscriptionUpdate",
+        "jmapPushSubscriptionDestroy",
         "jmapBlobGet",
         "jmapBlobCopy",
         "jmapBlobLookup",
@@ -67,6 +146,16 @@ pub fn user_permissions(active: bool) -> Value {
         "jmapEmailSubmissionUpdate",
         "jmapEmailSubmissionDestroy",
         "jmapIdentityGet",
+        "jmapIdentityCreate",
+        "jmapIdentityUpdate",
+        "jmapIdentityDestroy",
+        "jmapSieveScriptGet",
+        "jmapSieveScriptQuery",
+        "jmapSieveScriptValidate",
+        "jmapVacationResponseGet",
+        "jmapParticipantIdentityCreate",
+        "jmapParticipantIdentityUpdate",
+        "jmapParticipantIdentityDestroy",
         "jmapIdentityChanges",
         "jmapMailboxGet",
         "jmapMailboxChanges",
@@ -83,6 +172,7 @@ pub fn user_permissions(active: bool) -> Value {
         "jmapQuotaQuery",
         "jmapQuotaQueryChanges",
         "sysAccountSettingsGet",
+        "sysAccountSettingsUpdate",
         "sysAccountPasswordGet",
         "sysAccountPasswordUpdate",
         "sysApiKeyGet",
@@ -107,7 +197,8 @@ pub async fn initialize_permission_policy(app: &App) -> std::result::Result<(), 
     let version: Option<String> = db::scalar(db::Statement::AccountInitializePolicyVersion)
         .fetch_optional(&mut *tx)
         .await?;
-    if version.as_deref() != Some("1") {
+    let policy_version = format!("3:{}", hash(&user_permissions(true).to_string()));
+    if version.as_deref() != Some(policy_version.as_str()) {
         let users = db::query(db::Statement::AccountInitializePolicyUsers)
             .fetch_all(&mut *tx)
             .await?;
@@ -122,6 +213,7 @@ pub async fn initialize_permission_policy(app: &App) -> std::result::Result<(), 
                 .await?;
         }
         db::query(db::Statement::AccountInitializePolicyCommit)
+            .bind(&policy_version)
             .execute(&mut *tx)
             .await?;
     }
@@ -170,7 +262,7 @@ pub async fn audit_event(
         .await?;
     Ok(())
 }
-async fn operator(app: &App, headers: &HeaderMap, write: bool) -> Result<Identity> {
+pub(super) async fn operator(app: &App, headers: &HeaderMap, write: bool) -> Result<Identity> {
     let me = identity(app, headers, write).await?;
     if !me.operator {
         return Err(Error(StatusCode::FORBIDDEN, "operator_required"));
@@ -204,8 +296,22 @@ pub(crate) async fn usage(State(app): State<Arc<App>>, headers: HeaderMap) -> Re
             json!({"ids":[me.account],"properties":["id","quotas","usedDiskQuota"]}),
         )
         .await?;
+    let limits = db::query(db::Statement::AccountUsageLimits)
+        .bind(me.user)
+        .fetch_one(&app.db)
+        .await?;
+    let hour: i64 = db::scalar(db::Statement::PolicyReserveSelectOutboundReservations)
+        .bind(me.user)
+        .bind(db::now() - 3600000)
+        .fetch_one(&app.db)
+        .await?;
+    let day: i64 = db::scalar(db::Statement::PolicyReserveSelectOutboundReservations2)
+        .bind(me.user)
+        .bind(db::now() - 86400000)
+        .fetch_one(&app.db)
+        .await?;
     Ok(Json(
-        json!({"usedBytes":metadata["list"][0]["usedDiskQuota"].as_u64(),"quotaBytes":metadata["list"][0]["quotas"]["maxDiskQuota"].as_u64()}),
+        json!({"usedBytes":metadata["list"][0]["usedDiskQuota"].as_u64(),"quotaBytes":metadata["list"][0]["quotas"]["maxDiskQuota"].as_u64(),"hourlyRecipientsUsed":hour,"dailyRecipientsUsed":day,"hourlyRecipientsLimit":limits.get::<i64,_>("hourly_recipients"),"dailyRecipientsLimit":limits.get::<i64,_>("daily_recipients")}),
     ))
 }
 #[utoipa::path(get,path="/api/v1/account/capabilities",responses((status=200,body=Value)))]
@@ -271,6 +377,15 @@ pub(super) async fn update_profile(
             .is_some_and(|value| !matches!(value, "system" | "light" | "dark"))
     {
         return Err(Error(StatusCode::BAD_REQUEST, "profile_invalid"));
+    }
+    if let Some(name) = &input.display_name {
+        app.upstream
+            .call(
+                &me.key,
+                "x:AccountSettings/set",
+                json!({"update":{"singleton":{"description":name}}}),
+            )
+            .await?;
     }
     let mut tx = db::begin(&app.db).await?;
     let old = db::query(db::Statement::AccountProfileSelectPlatformUsers)
@@ -459,10 +574,14 @@ pub(super) async fn users(
     ))
 }
 #[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub(super) struct UserInput {
     enabled: bool,
+    #[serde(alias = "quota_bytes")]
     quota_bytes: i64,
+    #[serde(alias = "hourly_recipients")]
     hourly_recipients: i64,
+    #[serde(alias = "daily_recipients")]
     daily_recipients: i64,
 }
 #[utoipa::path(patch,path="/api/v1/admin/users/{id}",params(("id"=String,Path)),request_body=UserInput,responses((status=202,description="Policy queued for durable synchronization"),(status=401,description="Session required"),(status=403,description="Denied")))]
@@ -768,6 +887,25 @@ pub(super) async fn retry_tasks(
         .rows_affected();
     tx.commit().await?;
     JOB_NOTIFY.notify_one();
+    let automatic = gateway::retry(&app).await?;
     audit_event(&app, me.user, "task.retry", me.user, "queued").await?;
-    Ok(Json(json!({"queued":policy+credentials})))
+    Ok(Json(json!({"queued":policy+credentials+automatic})))
+}
+
+#[cfg(test)]
+mod generated_name_tests {
+    use super::*;
+    #[test]
+    fn only_exact_provisioning_markers_are_repaired() {
+        let id = Uuid::new_v4();
+        assert!(is_generated_display_name(&format!("mail-web:{id}")));
+        assert!(is_generated_display_name(&format!(
+            "mail-web:{id}:operator"
+        )));
+        assert!(!is_generated_display_name("Sakura"));
+        assert!(!is_generated_display_name("mail-web:custom name"));
+        assert!(!is_generated_display_name(&format!(
+            "mail-web:{id}:notification"
+        )));
+    }
 }

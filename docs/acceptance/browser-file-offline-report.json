@@ -1,0 +1,17 @@
+{
+  "build": "working-tree-5602285-native-v43",
+  "environment": "local isolated Docker; official Stalwart",
+  "at": "2026-11-17T10:35:36.069993+00:00",
+  "browser": "in-app real browser",
+  "file": "browser-file (copy).txt",
+  "bytes": 110,
+  "cacheReadyObserved": true,
+  "appStoppedThenReloaded": true,
+  "bodyPreview": true,
+  "offlineDownloadByteIdentical": true,
+  "appRestoredAndOfflineBannerGone": true,
+  "screenshots": [
+    "offline-file-kept-ready-final-1920.jpg",
+    "offline-file-body-final-1920.jpg"
+  ]
+}

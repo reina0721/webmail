@@ -19,6 +19,33 @@ pub async fn connect(path: &Path) -> Result<SqlitePool, Box<dyn std::error::Erro
         .max_connections(4)
         .connect_with(options)
         .await?;
+    // Capture an online, consistent snapshot before the new binary changes existing data.
+    let has_migrations: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='_sqlx_migrations'",
+    )
+    .fetch_one(&pool)
+    .await?;
+    if has_migrations > 0 {
+        let previous: i64 = sqlx::query_scalar(
+            "SELECT coalesce(max(version),0) FROM _sqlx_migrations WHERE success=1",
+        )
+        .fetch_one(&pool)
+        .await?;
+        let target = sqlx::migrate!("./migrations/sqlite")
+            .iter()
+            .map(|m| m.version)
+            .max()
+            .unwrap_or(0);
+        if previous > 0 && previous < target {
+            let name = format!(
+                "{}.before-v{}-{}.sqlite",
+                path.file_name().and_then(|n| n.to_str()).unwrap_or("mail"),
+                target,
+                uuid::Uuid::new_v4()
+            );
+            snapshot(&pool, &path.with_file_name(name)).await?;
+        }
+    }
     // Table rebuild migrations run on one startup connection before serving requests.
     // Foreign-key enforcement is restored even when migration fails.
     let mut connection = pool.acquire().await?;
@@ -93,6 +120,34 @@ mod tests {
         sqlx::query("INSERT INTO outbound_reservations(event_id,user_id,recipient_count) VALUES ('event',?,3)").bind(user).execute(&pool).await.unwrap();
         pool.close().await;
         let upgraded = connect(&path).await.unwrap();
+        let before = std::fs::read_dir(&root)
+            .unwrap()
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .find(|p| {
+                p.file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .contains(".before-v")
+            })
+            .unwrap();
+        let snapshot = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(SqliteConnectOptions::new().filename(before).read_only(true))
+            .await
+            .unwrap();
+        let backup_version: i64 = sqlx::query_scalar("SELECT max(version) FROM _sqlx_migrations")
+            .fetch_one(&snapshot)
+            .await
+            .unwrap();
+        assert_eq!(backup_version, 7);
+        let backup_count: i64 = sqlx::query_scalar(
+            "SELECT recipient_count FROM outbound_reservations WHERE event_id='event'",
+        )
+        .fetch_one(&snapshot)
+        .await
+        .unwrap();
+        assert_eq!(backup_count, 3);
+        snapshot.close().await;
         use sqlx::Row;
         let row = sqlx::query("SELECT * FROM platform_users WHERE id=?")
             .bind(user)
@@ -167,6 +222,42 @@ mod tests {
 pub type Pool = SqlitePool;
 #[derive(Clone, Copy)]
 pub enum Statement {
+    GatewayServiceGet,
+    GatewayServices,
+    GatewayServicePut,
+    GatewayProofs,
+    GatewayProofPut,
+    GatewayProofRenameUnprovisioned,
+    GatewayProofUpstream,
+    GatewayProofReset,
+    GatewayUsers,
+    GatewaySpoolGet,
+    GatewaySpoolInsert,
+    GatewaySpoolDue,
+    GatewaySpoolClaim,
+    GatewaySpoolFinish,
+    GatewaySpoolRecover,
+    GatewaySpoolList,
+    GatewaySpoolRetry,
+    GatewaySpoolCompact,
+
+    NativeSubmissionCompact,
+    NativeSubmissionGet,
+    NativeSubmissionStart,
+    NativeSubmissionComplete,
+    NativeSubmissionUnknown,
+    NativeSubmissionRateLimited,
+    NativeSubmissionList,
+    NativeSubmissionCheck,
+    NativeSubmissionUnresolved,
+    ClientPolicyGet,
+    ClientPolicyPut,
+    ClientArchiveGet,
+    ClientArchivePut,
+    ClientArchiveDelete,
+    ClientPreferencesGet,
+    ClientPreferencesPut,
+    AccountUsageLimits,
     ConnectionDomain,
     ConnectionUserDomain,
     ConnectionSeedService,
@@ -187,6 +278,7 @@ pub enum Statement {
     ConnectionPrepare,
     ReadinessTicketDomain,
     ReadinessGet,
+    ReadinessStart,
     ReadinessWrite,
     ReadinessLink,
     ReadinessInteraction,
@@ -291,6 +383,101 @@ pub enum Statement {
 impl Statement {
     fn sql(self) -> &'static str {
         match self {
+            Self::NativeSubmissionCompact => {
+                "UPDATE native_submissions SET response=NULL WHERE status='complete' AND response IS NOT NULL AND created_at<?"
+            }
+            Self::NativeSubmissionGet => {
+                "SELECT fingerprint,status,response,context,outcome FROM native_submissions WHERE user_id=? AND request_id=?"
+            }
+            Self::NativeSubmissionStart => {
+                "INSERT INTO native_submissions(user_id,request_id,fingerprint,status,created_at,context,semantic_hash) VALUES(?,?,?,'pending',?,?,?) ON CONFLICT DO NOTHING"
+            }
+            Self::NativeSubmissionComplete => {
+                "UPDATE native_submissions SET status='complete',response=? WHERE user_id=? AND request_id=?"
+            }
+            Self::NativeSubmissionUnresolved => {
+                "SELECT request_id FROM native_submissions WHERE user_id=? AND semantic_hash=? AND status IN ('pending','unknown') AND (outcome IS NULL OR json_extract(outcome,'$.state')<>'accepted') LIMIT 1"
+            }
+            Self::NativeSubmissionList => {
+                "SELECT request_id,status,created_at,checked_at,outcome FROM native_submissions WHERE user_id=? ORDER BY created_at DESC LIMIT 100"
+            }
+            Self::NativeSubmissionCheck => {
+                "UPDATE native_submissions SET outcome=?,checked_at=? WHERE user_id=? AND request_id=?"
+            }
+            Self::NativeSubmissionUnknown => {
+                "UPDATE native_submissions SET status='unknown' WHERE user_id=? AND request_id=?"
+            }
+            Self::NativeSubmissionRateLimited => {
+                "DELETE FROM native_submissions WHERE user_id=? AND request_id=? AND status='pending'"
+            }
+            Self::AccountUsageLimits => {
+                "SELECT hourly_recipients,daily_recipients FROM platform_users WHERE id=?"
+            }
+            Self::ClientPolicyGet => {
+                "SELECT value FROM platform_settings WHERE key='native-client-policy-v1'"
+            }
+            Self::ClientPolicyPut => {
+                "INSERT INTO platform_settings(key,value) VALUES('native-client-policy-v1',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value"
+            }
+            Self::GatewayServiceGet => {
+                "SELECT configuration,status FROM automatic_gateway_services WHERE service_id=?"
+            }
+            Self::GatewayServices => {
+                "SELECT service_id,configuration,status FROM automatic_gateway_services"
+            }
+            Self::GatewayServicePut => {
+                "INSERT INTO automatic_gateway_services(service_id,configuration,status,updated_at) VALUES(?,?,?,?) ON CONFLICT(service_id) DO UPDATE SET configuration=excluded.configuration,status=excluded.status,updated_at=excluded.updated_at"
+            }
+            Self::GatewayProofs => "SELECT * FROM automatic_gateway_proofs WHERE service_id=?",
+            Self::GatewayProofRenameUnprovisioned => {
+                "UPDATE automatic_gateway_proofs SET domain=replace(domain,?,?) WHERE service_id=? AND upstream_domain IS NULL AND upstream_signer IS NULL"
+            }
+            Self::GatewayProofPut => {
+                "INSERT OR IGNORE INTO automatic_gateway_proofs(service_id,domain,user_id,owner_email,public_key,private_key) VALUES(?,?,?,?,?,?)"
+            }
+            Self::GatewayProofReset => {
+                "UPDATE automatic_gateway_proofs SET upstream_domain=NULL,upstream_signer=NULL WHERE service_id=? AND domain=?"
+            }
+            Self::GatewayProofUpstream => {
+                "UPDATE automatic_gateway_proofs SET upstream_domain=?,upstream_signer=? WHERE service_id=? AND domain=?"
+            }
+            Self::GatewayUsers => {
+                "SELECT id,email,stalwart_id,status,domain_id FROM platform_users WHERE service_id=? AND status IN ('active','disabled','provisioning','reconcile')"
+            }
+            Self::GatewaySpoolGet => "SELECT status FROM automatic_gateway_spool WHERE id=?",
+            Self::GatewaySpoolInsert => {
+                "INSERT OR IGNORE INTO automatic_gateway_spool(id,service_id,user_id,envelope,status,next_attempt,created_at,updated_at) VALUES(?,?,?,?,'queued',?,?,?)"
+            }
+            Self::GatewaySpoolDue => {
+                "SELECT * FROM automatic_gateway_spool WHERE status='queued' AND next_attempt<=? ORDER BY created_at LIMIT 16"
+            }
+            Self::GatewaySpoolClaim => {
+                "UPDATE automatic_gateway_spool SET status='delivering',attempts=attempts+1,updated_at=? WHERE id=? AND status='queued'"
+            }
+            Self::GatewaySpoolFinish => {
+                "UPDATE automatic_gateway_spool SET status=?,error=?,next_attempt=?,updated_at=? WHERE id=?"
+            }
+            Self::GatewaySpoolRecover => {
+                "UPDATE automatic_gateway_spool SET status='unknown',error='gateway_restarted_during_delivery',updated_at=? WHERE status='delivering'"
+            }
+            Self::GatewaySpoolRetry => {
+                "UPDATE automatic_gateway_spool SET next_attempt=0 WHERE service_id=? AND status='queued'"
+            }
+            Self::GatewaySpoolCompact => {
+                "UPDATE automatic_gateway_spool SET envelope=X'' WHERE status IN ('delivered','rejected') AND updated_at<? AND length(envelope)>0"
+            }
+            Self::GatewaySpoolList => {
+                "SELECT id,user_id,status,attempts,error,created_at,updated_at FROM automatic_gateway_spool WHERE service_id=? ORDER BY created_at DESC LIMIT 100"
+            }
+            Self::ClientArchiveGet => "SELECT envelope FROM client_archives WHERE user_id=?",
+            Self::ClientArchivePut => {
+                "INSERT INTO client_archives(user_id,envelope,updated_at) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET envelope=excluded.envelope,updated_at=excluded.updated_at"
+            }
+            Self::ClientArchiveDelete => "DELETE FROM client_archives WHERE user_id=?",
+            Self::ClientPreferencesGet => "SELECT payload FROM client_preferences WHERE user_id=?",
+            Self::ClientPreferencesPut => {
+                "INSERT INTO client_preferences(user_id,payload,updated_at) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at"
+            }
             Self::ConnectionDomain => {
                 "SELECT d.id,d.service_id,d.name,d.upstream_id,s.origin,s.runtime,s.revision FROM mail_domains d JOIN mail_services s ON s.id=d.service_id WHERE d.id=?"
             }
@@ -336,9 +523,12 @@ impl Statement {
             Self::ConnectionList => {
                 "SELECT d.id,d.service_id,d.name,d.upstream_id,s.name AS service_name,s.origin,s.revision,s.runtime FROM mail_domains d JOIN mail_services s ON s.id=d.service_id ORDER BY s.id,d.name"
             }
+            Self::ReadinessStart => {
+                "INSERT INTO registration_readiness(fingerprint,report,checked_at,automatic_ok,started_at) VALUES (?,'[]',0,0,?) ON CONFLICT(fingerprint) DO UPDATE SET started_at=excluded.started_at"
+            }
             Self::ReadinessGet => "SELECT * FROM registration_readiness WHERE fingerprint=?",
             Self::ReadinessWrite => {
-                "INSERT INTO registration_readiness(fingerprint,report,checked_at,automatic_ok) VALUES (?,?,?,?) ON CONFLICT(fingerprint) DO UPDATE SET report=excluded.report,checked_at=excluded.checked_at,automatic_ok=excluded.automatic_ok"
+                "INSERT INTO registration_readiness(fingerprint,report,checked_at,automatic_ok) VALUES (?,?,?,?) ON CONFLICT(fingerprint) DO UPDATE SET report=excluded.report,checked_at=excluded.checked_at,automatic_ok=excluded.automatic_ok,last_success_at=CASE WHEN excluded.automatic_ok THEN excluded.checked_at ELSE registration_readiness.last_success_at END,consecutive_failures=CASE WHEN excluded.automatic_ok THEN 0 ELSE registration_readiness.consecutive_failures+1 END"
             }
             Self::ReadinessLink => {
                 "INSERT INTO readiness_interactions(ticket_hash,fingerprint,expires_at,domain_id) VALUES (?,?,?,?)"
@@ -377,7 +567,7 @@ impl Statement {
                 "INSERT OR IGNORE INTO credential_jobs(id,kind,user_id,payload) VALUES (?,'account-policy',?,?)"
             }
             Self::AccountInitializePolicyCommit => {
-                "INSERT INTO platform_settings(key,value) VALUES ('mail-user-permissions-v1','1') ON CONFLICT(key) DO UPDATE SET value=excluded.value"
+                "INSERT INTO platform_settings(key,value) VALUES ('mail-user-permissions-v1',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value"
             }
             Self::MainRevokeUserUpdateSessions => {
                 "UPDATE sessions SET revoked_at=? WHERE user_id=?"

@@ -135,7 +135,7 @@ def exercise(mode):
                 with urllib.request.urlopen(req) as response:
                     return json.load(response)["methodResponses"][0][1]
             domain_id = next(d["id"] for d in admin_rpc("x:Domain/get", {"properties": ["id", "name"]})["list"] if d["name"] == "mail.example.com")
-            permissions = {name: True for name in ["sysAccountGet", "sysAccountCreate", "sysAccountUpdate", "sysAccountQuery", "sysDomainGet", "sysDomainCreate", "sysDomainQuery", "sysMtaHookGet", "sysMtaHookCreate", "sysMtaHookUpdate", "sysActionCreate", "actionReloadSettings"]}
+            permissions = {name: True for name in ["sysAccountGet", "sysAccountCreate", "sysAccountUpdate", "sysAccountQuery", "sysDomainGet", "sysDomainCreate", "sysDomainQuery", "sysMtaHookGet", "sysMtaHookCreate", "sysMtaHookUpdate", "sysSharingGet", "sysSharingUpdate", "sysActionCreate", "actionReloadSettings"]}
             account = admin_rpc("x:Account/set", {"create": {"admin": {"@type": "User", "name": "automatic-admin", "domainId": domain_id, "roles": {"@type": "User"}, "permissions": {"@type": "Merge", "enabledPermissions": permissions}, "credentials": {"0": {"@type": "Password", "secret": "Isolated-automation-admin-password"}}}}})
             assert "admin" in account["created"]
             data = json.dumps({"using": ["urn:ietf:params:jmap:core", "urn:stalwart:jmap"], "methodCalls": [["x:ApiKey/set", {"create": {"key": {"description": "isolated automatic setup admin", "permissions": {"@type": "Inherit"}}}}, "k"]]}).encode()

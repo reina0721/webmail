@@ -1,0 +1,78 @@
+[
+  {
+    "check": "HTML and static assets identify the exact offline build across deployment transitions",
+    "at": "2026-11-17T11:24:13.109014+00:00"
+  },
+  {
+    "check": "Native session advertises only same-origin Rust transports",
+    "at": "2026-11-17T11:24:14.472453+00:00"
+  },
+  {
+    "check": "Native method allowlist and account boundary reject directory writes and arbitrary accounts",
+    "at": "2026-11-17T11:24:14.479945+00:00"
+  },
+  {
+    "check": "Personal deleted-item recovery reaches the official server capability response; cross-account queries and history deletion remain forbidden",
+    "at": "2026-11-17T11:24:14.502343+00:00"
+  },
+  {
+    "check": "Native raw upload/download and same-account copy by creating a distinct blob-backed node persist successfully",
+    "at": "2026-11-17T11:24:14.563121+00:00"
+  },
+  {
+    "check": "Native rich email submission reuses the durable idempotent response",
+    "at": "2026-11-17T11:24:14.634423+00:00"
+  },
+  {
+    "check": "Native rich email arrives in the other real user mailbox",
+    "at": "2026-11-17T11:24:14.676991+00:00"
+  },
+  {
+    "check": "Each additional account is password-verified; linking preserves the primary login and operator scope",
+    "at": "2026-11-17T11:24:14.787340+00:00"
+  },
+  {
+    "check": "Preferences are isolated by verified account, not by a browser-supplied upstream URL",
+    "at": "2026-11-17T11:24:14.812931+00:00"
+  },
+  {
+    "check": "Encrypted account-list archive round-trips only for its verified owner; malformed encryption parameters and forged owners are rejected",
+    "at": "2026-11-17T11:24:14.881516+00:00"
+  },
+  {
+    "check": "Remote calendar subscription transport fetches a real public ICS and blocks loopback, cloud metadata, embedded private IPv6 and non-HTTP URLs",
+    "at": "2026-11-17T11:24:16.501325+00:00"
+  },
+  {
+    "check": "A linked operator keeps its own console authorization without granting the ordinary primary login admin scope",
+    "at": "2026-11-17T11:24:16.735658+00:00"
+  },
+  {
+    "check": "Logging out a duplicate primary/linked mailbox revokes both cookies while preserving the other linked account",
+    "at": "2026-11-17T11:24:17.008831+00:00"
+  },
+  {
+    "check": "A 26 MiB file streams, persists and downloads intact while oversized mail attachments remain blocked",
+    "at": "2026-11-17T11:24:17.214968+00:00"
+  },
+  {
+    "check": "Real scheduled submissions are listed, canceled and rescheduled; each accepted external submission uses the shared quota counter",
+    "at": "2026-11-17T11:24:17.330533+00:00"
+  },
+  {
+    "check": "Native real-time headers arrive before browser deadlines, the stream survives idle heartbeats and an actual mailbox change arrives without polling",
+    "at": "2026-11-17T11:24:47.361374+00:00"
+  },
+  {
+    "check": "Console defaults persist and read-only sharing cannot be bypassed with a JMAP path patch or result reference",
+    "at": "2026-11-17T11:24:47.416555+00:00"
+  },
+  {
+    "check": "Native profile saves on Stalwart and personal API keys cannot mint more credentials",
+    "at": "2026-11-17T11:24:48.958709+00:00"
+  },
+  {
+    "check": "Native password changes revoke all devices and require the new credential",
+    "at": "2026-11-17T11:24:49.038785+00:00"
+  }
+]

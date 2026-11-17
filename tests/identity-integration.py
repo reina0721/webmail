@@ -72,8 +72,12 @@ with namespace["database"]() as db:
 scoped_basic = "Basic " + namespace["base64"].b64encode((actor.email + ":" + password).encode()).decode()
 for method in ["SieveScript/get", "VacationResponse/get"]:
     status, data, _ = request(namespace["JMAP"], "POST", {"using": ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:sieve", "urn:ietf:params:jmap:vacationresponse"], "methodCalls": [[method, {"accountId": scoped_account}, "boundary"]]}, {"Authorization": scoped_basic})
-    assert status in (401, 403) or (data["methodResponses"][0][0] == "error" and data["methodResponses"][0][1]["type"] in ("forbidden", "unknownCapability", "unknownMethod")), (method, status)
-print("PASS: new mail-only accounts reject deferred Sieve/vacation entry points")
+    assert status == 200 and data["methodResponses"][0][0] == method, (method, status)
+# Direct upstream filter reads are allowed. Native rule writes use the private, gateway-checked Rust adapter.
+for method,args in [("SieveScript/set",{"create":{"deny":{"name":"cannot-bypass","blobId":"missing"}}}), ("VacationResponse/set",{"update":{"singleton":{"isEnabled":True,"textBody":"quota bypass"}}})]:
+    status,data,_=request(namespace["JMAP"], "POST", {"using":["urn:ietf:params:jmap:core","urn:ietf:params:jmap:sieve","urn:ietf:params:jmap:vacationresponse"],"methodCalls":[[method,{"accountId":scoped_account,**args},"boundary"]]}, {"Authorization":scoped_basic})
+    assert status in (401,403) or (data["methodResponses"][0][0]=="error" and data["methodResponses"][0][1]["type"] in ("forbidden","unknownCapability","unknownMethod")), (method,status,data)
+print("PASS: native Sieve/vacation reads work; direct protocol writes cannot bypass the private gateway adapter")
 
 
 other = Actor(actor.email, password)

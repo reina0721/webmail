@@ -1,0 +1,9 @@
+{
+  "environment": "local Docker / official Stalwart",
+  "title": "浏览器验收 · 拖动与邀请",
+  "attendee": "sakura@example.com",
+  "start": "2026-11-18T15:00:00",
+  "duration": "PT1H30M",
+  "passed": true,
+  "at": "2026-11-17T08:22:02.475603+00:00"
+}

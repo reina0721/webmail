@@ -1,2 +1,2 @@
-import {Installation} from '../../features/installation';
-export default function Page(){return <Installation/>;}
+import {ConsoleRedirect} from "@/native/redirect";
+export default function Page(){return <ConsoleRedirect setup/>;}

@@ -1,0 +1,47 @@
+{
+  "environment": "local isolated Docker, unmodified official Stalwart B",
+  "account": "yuki1794902496@second.example.com",
+  "requestId": "5b89e639-a225-4f2c-8baa-96d3551ff739",
+  "subject": "Accepted response loss e32bfd43bd",
+  "upstreamAcceptedBeforeResponseLoss": true,
+  "journalStatus": "unknown",
+  "sameKeyReplayStatus": 409,
+  "sameSemanticNewKeyStatus": 409,
+  "smtpDeliveredMessages": 1,
+  "reconcileOutcome": {
+    "retrySafe": false,
+    "state": "accepted",
+    "submissions": [
+      {
+        "deliveryStatus": {
+          "native-loss@recovery.example.net": {
+            "delivered": "yes",
+            "displayed": "unknown",
+            "smtpReply": "Code: 250, Enhanced code: 2.1.5, Message: Ok"
+          }
+        },
+        "dsnBlobIds": [],
+        "emailId": "biaaaaak",
+        "envelope": {
+          "mailFrom": {
+            "email": "yuki1794902496@second.example.com",
+            "parameters": null
+          },
+          "rcptTo": [
+            {
+              "email": "native-loss@recovery.example.net",
+              "parameters": null
+            }
+          ]
+        },
+        "id": "i",
+        "identityId": "b",
+        "mdnBlobIds": [],
+        "sendAt": "2026-11-17T11:25:01Z",
+        "threadId": "k",
+        "undoStatus": "final"
+      }
+    ]
+  },
+  "apiReconcileVerified": true
+}

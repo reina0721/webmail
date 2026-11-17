@@ -1,0 +1,282 @@
+[
+  {
+    "route": "/",
+    "width": 390,
+    "bodyWidth": 390,
+    "documentWidth": 390,
+    "heading": "收件箱",
+    "viewport": 390
+  },
+  {
+    "route": "/calendar/",
+    "width": 390,
+    "bodyWidth": 390,
+    "documentWidth": 390,
+    "heading": "日历",
+    "viewport": 390
+  },
+  {
+    "route": "/contacts/",
+    "width": 390,
+    "bodyWidth": 390,
+    "documentWidth": 390,
+    "heading": "联系人",
+    "viewport": 390
+  },
+  {
+    "route": "/files/",
+    "width": 390,
+    "bodyWidth": 390,
+    "documentWidth": 390,
+    "heading": "文件",
+    "viewport": 390
+  },
+  {
+    "route": "/account/",
+    "width": 390,
+    "bodyWidth": 390,
+    "documentWidth": 390,
+    "heading": "个人设置",
+    "viewport": 390
+  },
+  {
+    "route": "/admin/",
+    "width": 390,
+    "bodyWidth": 390,
+    "documentWidth": 390,
+    "heading": "概览",
+    "viewport": 390
+  },
+  {
+    "route": "/setup/",
+    "width": 390,
+    "bodyWidth": 375,
+    "documentWidth": 375,
+    "heading": "邮件服务与域名",
+    "viewport": 390
+  },
+  {
+    "route": "/",
+    "width": 768,
+    "bodyWidth": 768,
+    "documentWidth": 768,
+    "heading": "收件箱",
+    "viewport": 768
+  },
+  {
+    "route": "/calendar/",
+    "width": 768,
+    "bodyWidth": 768,
+    "documentWidth": 768,
+    "heading": "日历",
+    "viewport": 768
+  },
+  {
+    "route": "/contacts/",
+    "width": 768,
+    "bodyWidth": 768,
+    "documentWidth": 768,
+    "heading": "联系人",
+    "viewport": 768
+  },
+  {
+    "route": "/files/",
+    "width": 768,
+    "bodyWidth": 768,
+    "documentWidth": 768,
+    "heading": "文件",
+    "viewport": 768
+  },
+  {
+    "route": "/account/",
+    "width": 768,
+    "bodyWidth": 768,
+    "documentWidth": 768,
+    "heading": "个人设置",
+    "viewport": 768
+  },
+  {
+    "route": "/admin/",
+    "width": 768,
+    "bodyWidth": 753,
+    "documentWidth": 803,
+    "heading": "概览",
+    "viewport": 768
+  },
+  {
+    "route": "/setup/",
+    "width": 768,
+    "bodyWidth": 753,
+    "documentWidth": 753,
+    "heading": "邮件服务与域名",
+    "viewport": 768
+  },
+  {
+    "route": "/",
+    "width": 1024,
+    "bodyWidth": 1024,
+    "documentWidth": 1024,
+    "heading": "收件箱",
+    "viewport": 1024
+  },
+  {
+    "route": "/calendar/",
+    "width": 1024,
+    "bodyWidth": 1024,
+    "documentWidth": 1024,
+    "heading": "日历",
+    "viewport": 1024
+  },
+  {
+    "route": "/contacts/",
+    "width": 1024,
+    "bodyWidth": 1024,
+    "documentWidth": 1024,
+    "heading": "联系人",
+    "viewport": 1024
+  },
+  {
+    "route": "/files/",
+    "width": 1024,
+    "bodyWidth": 1024,
+    "documentWidth": 1024,
+    "heading": "文件",
+    "viewport": 1024
+  },
+  {
+    "route": "/account/",
+    "width": 1024,
+    "bodyWidth": 1024,
+    "documentWidth": 1024,
+    "heading": "个人设置",
+    "viewport": 1024
+  },
+  {
+    "route": "/admin/",
+    "width": 1024,
+    "bodyWidth": 1024,
+    "documentWidth": 1024,
+    "heading": "概览",
+    "viewport": 1024
+  },
+  {
+    "route": "/setup/",
+    "width": 1024,
+    "bodyWidth": 1009,
+    "documentWidth": 1009,
+    "heading": "邮件服务与域名",
+    "viewport": 1024
+  },
+  {
+    "route": "/",
+    "width": 1440,
+    "bodyWidth": 1440,
+    "documentWidth": 1440,
+    "heading": "收件箱",
+    "viewport": 1440
+  },
+  {
+    "route": "/calendar/",
+    "width": 1440,
+    "bodyWidth": 1440,
+    "documentWidth": 1440,
+    "heading": "日历",
+    "viewport": 1440
+  },
+  {
+    "route": "/contacts/",
+    "width": 1440,
+    "bodyWidth": 1440,
+    "documentWidth": 1440,
+    "heading": "联系人",
+    "viewport": 1440
+  },
+  {
+    "route": "/files/",
+    "width": 1440,
+    "bodyWidth": 1440,
+    "documentWidth": 1440,
+    "heading": "文件",
+    "viewport": 1440
+  },
+  {
+    "route": "/account/",
+    "width": 1440,
+    "bodyWidth": 1440,
+    "documentWidth": 1440,
+    "heading": "个人设置",
+    "viewport": 1440
+  },
+  {
+    "route": "/admin/",
+    "width": 1440,
+    "bodyWidth": 1440,
+    "documentWidth": 1440,
+    "heading": "概览",
+    "viewport": 1440
+  },
+  {
+    "route": "/setup/",
+    "width": 1440,
+    "bodyWidth": 1425,
+    "documentWidth": 1425,
+    "heading": "邮件服务与域名",
+    "viewport": 1440
+  },
+  {
+    "route": "/",
+    "width": 1920,
+    "bodyWidth": 1920,
+    "documentWidth": 1920,
+    "heading": "收件箱",
+    "viewport": 1920
+  },
+  {
+    "route": "/calendar/",
+    "width": 1920,
+    "bodyWidth": 1920,
+    "documentWidth": 1920,
+    "heading": "日历",
+    "viewport": 1920
+  },
+  {
+    "route": "/contacts/",
+    "width": 1920,
+    "bodyWidth": 1920,
+    "documentWidth": 1920,
+    "heading": "联系人",
+    "viewport": 1920
+  },
+  {
+    "route": "/files/",
+    "width": 1920,
+    "bodyWidth": 1920,
+    "documentWidth": 1920,
+    "heading": "文件",
+    "viewport": 1920
+  },
+  {
+    "route": "/account/",
+    "width": 1920,
+    "bodyWidth": 1920,
+    "documentWidth": 1920,
+    "heading": "个人设置",
+    "viewport": 1920
+  },
+  {
+    "route": "/admin/",
+    "width": 1920,
+    "bodyWidth": 1920,
+    "documentWidth": 1920,
+    "heading": "概览",
+    "viewport": 1920
+  },
+  {
+    "route": "/setup/",
+    "width": 1920,
+    "bodyWidth": 1905,
+    "documentWidth": 1905,
+    "heading": "邮件服务与域名",
+    "viewport": 1920
+  }
+]

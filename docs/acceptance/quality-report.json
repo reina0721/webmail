@@ -1,0 +1,29 @@
+{
+  "scope": "local isolated Docker, official Stalwart; not public production",
+  "candidate": "working-tree-5602285-native-v44",
+  "frontend": {
+    "files": 1169,
+    "tests": 10789,
+    "passed": true
+  },
+  "rust": {
+    "tests": 45,
+    "passed": true
+  },
+  "checks": [
+    "rustfmt",
+    "Clippy -D warnings",
+    "TypeScript",
+    "production build",
+    "Rust OpenAPI and generated TypeScript equality",
+    "component boundaries: 4246 source files and 20 boundary fixtures",
+    "SQLite persistence/migration boundary",
+    "pinned source hashes and adaptations"
+  ],
+  "sourceLog": ".cache/final-one-command-v44.log",
+  "recordedAt": "2026-11-17T11:33:14.251941+00:00",
+  "formalWorkflowComplete": true,
+  "workflowExitCode": 0,
+  "nodeBoundaryRegressionTests": 6,
+  "releaseEvidenceTests": 4
+}

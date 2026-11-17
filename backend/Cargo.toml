@@ -1,6 +1,6 @@
 [package]
 name = "mail-web"
-version = "0.3.0-alpha.2"
+version = "0.4.0-alpha.1"
 edition = "2024"
 
 [dependencies]
@@ -12,6 +12,7 @@ serde_json = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "gzip"] }
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "sqlite", "uuid", "chrono", "json", "migrate", "macros"] }
 uuid = { version = "1", features = ["v4", "serde"] }
+chrono-tz = "0.10"
 chrono = { version = "0.4", features = ["serde"] }
 aes-gcm = "0.10"
 rand = "0.8"
@@ -30,6 +31,12 @@ html2text = { version = "0.17.4", default-features = false }
 subtle = "2"
 zeroize = "1"
 urlencoding = "2"
+mail-auth = { version = "=0.14.1", default-features = false, features = ["dns-doh", "rust-crypto"] }
+mail-send = { version = "=0.6.2", default-features = false, features = ["ring", "tls12"] }
+smtp-proto = { version = "=0.2.5", features = ["serde"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+rustls-pki-types = { version = "1", features = ["std"] }
+ed25519-dalek = { version = "2", features = ["pkcs8", "pem", "rand_core"] }
 utoipa = { version = "5", features = ["uuid", "chrono"] }
 
 [dev-dependencies]

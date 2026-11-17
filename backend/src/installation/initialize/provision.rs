@@ -61,8 +61,20 @@ pub(super) async fn validate(app: &App, access: &Grant, spec: &Spec) -> Result<(
         .call(app, "x:MtaHook/get", json!({"properties":["id","url"]}))
         .await?;
     let domains = access
-        .call(app, "x:Domain/get", json!({"properties":["id","name"]}))
+        .call(
+            app,
+            "x:Domain/get",
+            json!({"properties":["id","name","description"]}),
+        )
         .await?;
+    if domains["list"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .any(|row| row["name"] == spec.domain && gateway::internal_domain(row))
+    {
+        return Err(Error(StatusCode::BAD_REQUEST, "gateway_domain_reserved"));
+    }
     if !spec.create_domain
         && !domains["list"]
             .as_array()
@@ -155,7 +167,11 @@ async fn domain(app: &App, job: &mut Job, access: &Grant) -> Result<()> {
         return Ok(());
     }
     let value = access
-        .call(app, "x:Domain/get", json!({"properties":["id","name"]}))
+        .call(
+            app,
+            "x:Domain/get",
+            json!({"properties":["id","name","description"]}),
+        )
         .await?;
     let id = if let Some(found) = value["list"]
         .as_array()
@@ -235,6 +251,12 @@ async fn service(
         job.resources.insert(kind.into(), id);
         journal::write(app, job)?;
     }
+    // Reauthorization upgrades only this job's owned service identity; existing keys inherit it.
+    let mut update = json!({});
+    update[job.resource(kind)] = json!({"permissions":permissions});
+    access
+        .call(app, "x:Account/set", json!({"update":update}))
+        .await?;
     if job.secret(kind).is_empty() {
         let upstream = Stalwart {
             http: app.upstream.http.clone(),
@@ -445,7 +467,12 @@ pub(super) async fn run(
     checkpoint(app, job, cancel, "domain").await?;
     domain(app, job, access).await?;
     checkpoint(app, job, cancel, "directory").await?;
-    let management = json!({"@type":"Merge","enabledPermissions":{"sysAccountCreate":true,"sysAccountGet":true,"sysAccountQuery":true,"sysAccountUpdate":true,"sysDomainGet":true,"sysDomainQuery":true,"sysMtaHookGet":true,"sysMtaHookUpdate":true,"sysActionCreate":true,"actionReloadSettings":true}});
+    let enabled: serde_json::Map<String, Value> =
+        directory_permissions(gateway::provision::enabled())
+            .into_iter()
+            .map(|permission| (permission.to_owned(), json!(true)))
+            .collect();
+    let management = json!({"@type":"Merge","enabledPermissions":enabled});
     service(app, job, access, "directory", management).await?;
     checkpoint(app, job, cancel, "notification").await?;
     service(
@@ -498,8 +525,27 @@ pub(super) async fn run(
     };
     checkpoint(app, job, cancel, "operator").await?;
     operator(app, job, access, &runtime).await?;
+    checkpoint(app, job, cancel, "automatic-gateway").await?;
+    gateway::provision::install(&runtime, access).await?;
     checkpoint(app, job, cancel, "scope").await?;
     // Scope activation is deferred until restart and callback authentication.
+    if job.spec.directory_queries {
+        checkpoint(app, job, cancel, "sharing").await?;
+        access
+            .call(
+                app,
+                "x:Sharing/set",
+                json!({"update":{"singleton":{"allowDirectoryQueries":true}}}),
+            )
+            .await?;
+        access
+            .call(
+                app,
+                "x:Action/set",
+                json!({"create":{"reload":{"@type":"ReloadSettings"}}}),
+            )
+            .await?;
+    }
     checkpoint(app, job, cancel, "verify").await?;
     runtime.upstream.session(&services.provisioning_key).await?;
     runtime.upstream.session(&services.notification_key).await?;
@@ -541,6 +587,8 @@ pub(super) async fn run(
             "turnstile",
             "operator",
             "scope",
+            "automatic-gateway",
+            gateway::provision::POLICY_VERSION,
             "verify",
             "apply",
         ]
@@ -576,6 +624,8 @@ pub(super) async fn run(
         "turnstile",
         "operator",
         "scope",
+        "automatic-gateway",
+        gateway::provision::POLICY_VERSION,
         "verify",
         "apply",
     ]

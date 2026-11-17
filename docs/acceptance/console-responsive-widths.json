@@ -1,0 +1,177 @@
+[
+  {
+    "page": "site",
+    "pageWidth": 390,
+    "viewport": 390
+  },
+  {
+    "page": "site",
+    "pageWidth": 768,
+    "viewport": 768
+  },
+  {
+    "page": "site",
+    "pageWidth": 1024,
+    "viewport": 1024
+  },
+  {
+    "page": "site",
+    "pageWidth": 1440,
+    "viewport": 1440
+  },
+  {
+    "page": "site",
+    "pageWidth": 1920,
+    "viewport": 1920
+  },
+  {
+    "page": "services",
+    "pageWidth": 390,
+    "viewport": 390
+  },
+  {
+    "page": "services",
+    "pageWidth": 768,
+    "viewport": 768
+  },
+  {
+    "page": "services",
+    "pageWidth": 1024,
+    "viewport": 1024
+  },
+  {
+    "page": "services",
+    "pageWidth": 1440,
+    "viewport": 1440
+  },
+  {
+    "page": "services",
+    "pageWidth": 1920,
+    "viewport": 1920
+  },
+  {
+    "page": "activity",
+    "pageWidth": 390,
+    "viewport": 390
+  },
+  {
+    "page": "activity",
+    "pageWidth": 768,
+    "viewport": 768
+  },
+  {
+    "page": "activity",
+    "pageWidth": 1024,
+    "viewport": 1024
+  },
+  {
+    "page": "activity",
+    "pageWidth": 1440,
+    "viewport": 1440
+  },
+  {
+    "page": "activity",
+    "pageWidth": 1920,
+    "viewport": 1920
+  },
+  {
+    "page": "registration",
+    "pageWidth": 390,
+    "viewport": 390
+  },
+  {
+    "page": "registration",
+    "pageWidth": 768,
+    "viewport": 768
+  },
+  {
+    "page": "registration",
+    "pageWidth": 1024,
+    "viewport": 1024
+  },
+  {
+    "page": "registration",
+    "pageWidth": 1440,
+    "viewport": 1440
+  },
+  {
+    "page": "registration",
+    "pageWidth": 1920,
+    "viewport": 1920
+  },
+  {
+    "page": "users",
+    "pageWidth": 390,
+    "viewport": 390
+  },
+  {
+    "page": "users",
+    "pageWidth": 768,
+    "viewport": 768
+  },
+  {
+    "page": "users",
+    "pageWidth": 1024,
+    "viewport": 1024
+  },
+  {
+    "page": "users",
+    "pageWidth": 1440,
+    "viewport": 1440
+  },
+  {
+    "page": "users",
+    "pageWidth": 1920,
+    "viewport": 1920
+  },
+  {
+    "page": "overview",
+    "pageWidth": 390,
+    "viewport": 390
+  },
+  {
+    "page": "overview",
+    "pageWidth": 768,
+    "viewport": 768
+  },
+  {
+    "page": "overview",
+    "pageWidth": 1024,
+    "viewport": 1024
+  },
+  {
+    "page": "overview",
+    "pageWidth": 1440,
+    "viewport": 1440
+  },
+  {
+    "page": "overview",
+    "pageWidth": 1920,
+    "viewport": 1920
+  },
+  {
+    "page": "setup",
+    "pageWidth": 390,
+    "viewport": 390
+  },
+  {
+    "page": "setup",
+    "pageWidth": 768,
+    "viewport": 768
+  },
+  {
+    "page": "setup",
+    "pageWidth": 1024,
+    "viewport": 1024
+  },
+  {
+    "page": "setup",
+    "pageWidth": 1440,
+    "viewport": 1440
+  },
+  {
+    "page": "setup",
+    "pageWidth": 1920,
+    "viewport": 1920
+  }
+]

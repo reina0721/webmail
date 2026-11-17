@@ -1,0 +1,25 @@
+{
+  "scope": "local Docker and isolated official Stalwart; not public production",
+  "command": "MAIL_WEB_REVISION=working-tree-5602285-native-v44 sh deploy/test-env.sh up --build --verify",
+  "exitCode": 0,
+  "candidateBuild": {
+    "buildId": "working-tree-5602285-native-v44",
+    "revision": "working-tree-5602285-native-v44",
+    "version": "v0.4.0-alpha.1"
+  },
+  "soakSeconds": 1802.5967472689954,
+  "successfulRegistrations": 4,
+  "serviceChecks": {
+    "core": 12,
+    "native": 19,
+    "PIM": 9,
+    "gateway": 6,
+    "push": 4,
+    "legacy": 30
+  },
+  "backupRestore": true,
+  "applicationSourceUnchangedDuringSoak": true,
+  "supplementaryChecks": "Browser invitation update/cancel, returned MDN/DSN, and independent restored-stack official Turnstile failure/duplicate/success plus production test-key rejection; integrated into future restore regression. No application input changes.",
+  "originalFullLogSha256": "2169f2500f395dfec8ae516871617ea6174c65333ad15e882c4e1750db171310",
+  "at": "2026-11-17T11:58:00.678244+00:00"
+}

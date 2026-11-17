@@ -221,7 +221,7 @@ pub(crate) async fn save(
         .call(
             &input.settings.provisioning_key,
             "x:Domain/get",
-            json!({"properties":["id","name"]}),
+            json!({"properties":["id","name","description"]}),
         )
         .await?;
     let mut bindings = Vec::new();
@@ -235,9 +235,10 @@ pub(crate) async fn save(
             .into_iter()
             .flatten()
             .find(|d| {
-                d["name"]
-                    .as_str()
-                    .is_some_and(|name| name.eq_ignore_ascii_case(&domain))
+                !gateway::internal_domain(d)
+                    && d["name"]
+                        .as_str()
+                        .is_some_and(|name| name.eq_ignore_ascii_case(&domain))
             })
             .and_then(|d| d["id"].as_str())
             .ok_or(Error(StatusCode::BAD_REQUEST, "configured_domain_missing"))?;
@@ -555,7 +556,8 @@ mod tests {
         .unwrap();
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
         assert_eq!(calls_a.load(Ordering::SeqCst), 0);
-        assert_eq!(calls_b.load(Ordering::SeqCst), 1);
+        // Session key creation and the account-name repair read stay on B.
+        assert_eq!(calls_b.load(Ordering::SeqCst), 2);
         let cookie = response
             .headers()
             .get_all("set-cookie")
@@ -572,7 +574,7 @@ mod tests {
             .unwrap();
         assert_eq!(result.0["list"][0]["id"], "inbox-b");
         assert_eq!(calls_a.load(Ordering::SeqCst), 0);
-        assert_eq!(calls_b.load(Ordering::SeqCst), 2);
+        assert_eq!(calls_b.load(Ordering::SeqCst), 3);
         let scoped = for_user(&root, b).await.unwrap();
         assert_eq!(scoped.upstream.base, source_b);
         let default = for_domain(&scoped, "default").await.unwrap();
@@ -595,7 +597,7 @@ mod tests {
             .await
             .is_err()
         );
-        assert_eq!(calls_b.load(Ordering::SeqCst), 2);
+        assert_eq!(calls_b.load(Ordering::SeqCst), 3);
         task_a.abort();
         task_b.abort();
         db.close().await;

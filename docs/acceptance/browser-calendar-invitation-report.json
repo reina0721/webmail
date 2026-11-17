@@ -1,0 +1,20 @@
+{
+  "candidate": "working-tree-5602285-native-v44",
+  "environment": "local Docker, official Stalwart, real in-app browser",
+  "organizer": "operator@example.com",
+  "attendee": "sakura@example.com",
+  "title": "浏览器验收 · 拖动与邀请",
+  "updatedLocation": "本机验收会议室 · 更新",
+  "updatedDescriptionObservedByAttendee": true,
+  "attendeeAcceptedInBrowser": true,
+  "organizerObservedAcceptedReply": true,
+  "organizerCancelledInBrowser": true,
+  "attendeeObservedCancelledAfterReload": true,
+  "screenshots": [
+    "calendar-invitation-updated-final-1440.jpg",
+    "calendar-organizer-rsvp-final-1440.jpg",
+    "calendar-invitation-cancelled-final-1440.jpg"
+  ],
+  "passed": true,
+  "at": "2026-11-17T11:33:53.768587+00:00"
+}

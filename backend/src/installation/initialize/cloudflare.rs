@@ -1,14 +1,5 @@
 use super::*;
-const API: &str = "https://api.cloudflare.com/client/v4";
-async fn request(
-    app: &App,
-    key: &str,
-    method: reqwest::Method,
-    path: &str,
-    body: Option<Value>,
-) -> Result<Value> {
-    request_at(&app.upstream.http, API, key, method, path, body).await
-}
+pub(super) const API: &str = "https://api.cloudflare.com/client/v4";
 async fn request_at(
     client: &reqwest::Client,
     base: &str,
@@ -46,11 +37,12 @@ async fn request_at(
     }
     Ok(value["result"].clone())
 }
-async fn widgets(app: &App, key: &str, endpoint: &str) -> Result<Vec<Value>> {
+async fn widgets(app: &App, key: &str, endpoint: &str, base: &str) -> Result<Vec<Value>> {
     let mut widgets = Vec::new();
     for page in 1..=100 {
-        let result = request(
-            app,
+        let result = request_at(
+            &app.upstream.http,
+            base,
             key,
             reqwest::Method::GET,
             &format!("{endpoint}?per_page=100&page={page}"),
@@ -75,8 +67,12 @@ pub(super) fn account_id(id: &str) -> bool {
     id.len() == 32 && id.bytes().all(|b| b.is_ascii_hexdigit())
 }
 pub(super) async fn accounts(app: &App, key: &str) -> Result<Value> {
-    match request(
-        app,
+    accounts_at(app, key, API).await
+}
+pub(super) async fn accounts_at(app: &App, key: &str, base: &str) -> Result<Value> {
+    match request_at(
+        &app.upstream.http,
+        base,
         key,
         reqwest::Method::GET,
         "/accounts?per_page=50",
@@ -97,14 +93,18 @@ pub(super) async fn accounts(app: &App, key: &str) -> Result<Value> {
     }
 }
 pub(super) async fn validate(app: &App, key: &str, id: &str) -> Result<()> {
+    validate_at(app, key, id, API).await
+}
+pub(super) async fn validate_at(app: &App, key: &str, id: &str, base: &str) -> Result<()> {
     if !account_id(id) || key.is_empty() {
         return Err(Error(
             StatusCode::BAD_REQUEST,
             "cloudflare_account_and_token_required",
         ));
     }
-    request(
-        app,
+    request_at(
+        &app.upstream.http,
+        base,
         key,
         reqwest::Method::GET,
         &format!("/accounts/{id}/challenges/widgets?per_page=1"),
@@ -114,6 +114,15 @@ pub(super) async fn validate(app: &App, key: &str, id: &str) -> Result<()> {
     Ok(())
 }
 pub(super) async fn create(app: &App, job: &mut Job, key: &str) -> Result<()> {
+    create_at(app, job, key, API, &|job| journal::write(app, job)).await
+}
+pub(super) async fn create_at(
+    app: &App,
+    job: &mut Job,
+    key: &str,
+    base: &str,
+    save: &(dyn Fn(&Job) -> Result<()> + Sync),
+) -> Result<()> {
     let account = &job.spec.cloudflare_account;
     if account.is_empty() || !job.resource("turnstile").is_empty() {
         return Ok(());
@@ -125,13 +134,14 @@ pub(super) async fn create(app: &App, job: &mut Job, key: &str) -> Result<()> {
         .ok_or(Error(StatusCode::BAD_REQUEST, "public_origin_invalid"))?;
     let name = job.name("turnstile");
     // Reconcile by a unique per-installation name, exact host and creation snapshot.
-    let items = widgets(app, key, &endpoint).await?;
+    let items = widgets(app, key, &endpoint, base).await?;
     let candidates: Vec<_> = items.iter().filter(|w| w["name"] == name).collect();
     let widget = if candidates.is_empty() {
         job.pending.entry("turnstile".into()).or_default();
-        journal::write(app, job)?;
-        request(
-            app,
+        save(job)?;
+        request_at(
+            &app.upstream.http,
+            base,
             key,
             reqwest::Method::POST,
             &endpoint,
@@ -145,8 +155,9 @@ pub(super) async fn create(app: &App, job: &mut Job, key: &str) -> Result<()> {
         let site = candidates[0]["sitekey"]
             .as_str()
             .ok_or_else(|| internal("turnstile_result_missing"))?;
-        request(
-            app,
+        request_at(
+            &app.upstream.http,
+            base,
             key,
             reqwest::Method::GET,
             &format!("{endpoint}/{site}"),
@@ -165,7 +176,7 @@ pub(super) async fn create(app: &App, job: &mut Job, key: &str) -> Result<()> {
         .ok_or(Error(StatusCode::CONFLICT, "turnstile_secret_unavailable"))?;
     job.resources.insert("turnstile".into(), site.into());
     job.secrets.insert("turnstile".into(), secret.into());
-    journal::write(app, job)
+    save(job)
 }
 
 #[cfg(test)]

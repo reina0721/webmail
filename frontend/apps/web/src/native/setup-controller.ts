@@ -33,6 +33,7 @@ type Job = {
   spec: Spec;
   resources: Record<string, string>;
   completed: string[];
+  skipped?: string[];
 };
 type Status = {
   brand: string;
@@ -257,6 +258,8 @@ export function useAutomaticInstallation({ initialStatus }: { initialStatus?: St
       setTicket(value.ticket);
       if (value.missingPermissions.length)
         setError("缺少管理员权限：" + value.missingPermissions.join("、"));
+      else if(cfToken.trim()&&!value.cloudflareAccounts.length)
+        setError("Cloudflare Token 无法列出账号。请在下方填写 Account ID 后继续，Turnstile 尚未配置。");
       setDomains(value.domains);
       setAccounts(value.cloudflareAccounts);
       if (value.cloudflareAccounts.length === 1)

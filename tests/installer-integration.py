@@ -1,7 +1,7 @@
 """Actual release-archive install/restore/network regression. Dedicated directories only.
 Run as root with Docker access, never changes application database contents directly.
 """
-import argparse,datetime,hashlib,json,os,pathlib,secrets,shutil,socket,sqlite3,subprocess,time,urllib.request
+import argparse,datetime,hashlib,json,os,pathlib,secrets,shutil,socket,sqlite3,subprocess,tarfile,time,urllib.request
 p=argparse.ArgumentParser();p.add_argument('bundle',type=pathlib.Path);p.add_argument('--state-fixture',type=pathlib.Path);p.add_argument('--legacy',action='store_true');args=p.parse_args()
 repo=pathlib.Path(__file__).resolve().parents[1];bundle=args.bundle.resolve();stamp=str(int(time.time()));root=repo/'tests/runtime'/('installer-'+stamp);root.mkdir(parents=True);evidence=[];bootstrap=bundle.parent/'install.sh';assert bootstrap.is_file();PUBLIC=urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
@@ -120,6 +120,32 @@ try:
  recovery=list(set((a/'backups').iterdir())-existing_snapshots);recovery=[x for x in recovery if x.is_dir() and (x/'SHA256SUMS').exists()];assert len(recovery)==1
  run([a/'mailweb','restore',recovery[0],'--yes']);assert status(a)['healthy'] and dbstate(a)==before and sha(a/'secrets/session.key')==key
  check('Startup failure after a verified update returns nonzero, retains a matching snapshot and restores with its reported command without database downgrade')
+ if args.legacy:
+  # Exercise the user's actual previous Rust installer, not just a candidate
+  # reinstall. Historical releases only provide this AMD64 application bundle.
+  previous=root/'previous-rust-release';previous.mkdir();oldtag='v0.4.0-alpha.2';oldname='mail-web-linux-amd64.tar.gz'
+  for asset in ['SHA256SUMS',oldname]:
+   run(['curl','-fL','--proto','=https','--proto-redir','=https','--retry','2','--connect-timeout','15','--max-time','600','-o',previous/asset,'https://github.com/reina0721/webmail/releases/download/'+oldtag+'/'+asset],timeout=650)
+  sums=[line.split() for line in (previous/'SHA256SUMS').read_text().splitlines()];matches=[row[0] for row in sums if len(row)==2 and row[1]==oldname]
+  assert len(matches)==1 and sha(previous/oldname)==matches[0], 'Previous published bundle checksum mismatch'
+  with tarfile.open(previous/oldname,'r:gz') as archive:
+   member=next(member for member in archive if member.name.removeprefix('./')=='bin/mailwebctl');assert member.isfile()
+   oldcli=previous/'mailwebctl';oldcli.write_bytes(archive.extractfile(member).read());oldcli.chmod(0o700)
+  assert run([oldcli,'--version']).strip()=='mailwebctl 0.4.0-alpha.2'
+  upgraded=root/'previous Rust installation';oldport=port();oldcontainer='mailweb-cli-'+stamp+'-previous-rust'
+  run([oldcli,'install','--dir',upgraded,'--container-name',oldcontainer,'--bind','127.0.0.1','--port',oldport,'--allow-http','--yes','--bundle',previous/oldname],timeout=600);created.append(upgraded)
+  assert status(upgraded)['version']==oldtag
+  oldkey=sha(upgraded/'secrets/session.key');oldstate=dbstate(upgraded)
+  run([upgraded/'mailweb','update','--yes','--bundle',bundle],timeout=600)
+  current=status(upgraded);assert current['healthy'] and current['version']==candidate_version and current['container']==oldcontainer and current['port']==oldport
+  assert sha(upgraded/'secrets/session.key')==oldkey and dbstate(upgraded)==oldstate
+  assert run([upgraded/'bin/mailwebctl','--version']).strip()=='mailwebctl '+candidate_version.removeprefix('v')
+  check('Actual published v0.4.0-alpha.2 Rust CLI upgrades the candidate application and itself in place, preserving data, keys, listener and container ownership')
+  oldsnapshot=next(path for path in (upgraded/'backups').iterdir() if path.is_dir() and (path/'.env').exists() and 'MAIL_WEB_VERSION=0.4.0-alpha.2' in (path/'.env').read_text())
+  run([upgraded/'mailweb','restore',oldsnapshot,'--yes']);assert status(upgraded)['healthy'] and status(upgraded)['version']==oldtag and dbstate(upgraded)==oldstate and sha(upgraded/'secrets/session.key')==oldkey
+  run([upgraded/'mailweb','update','--yes','--bundle',bundle],timeout=600);assert status(upgraded)['healthy'] and status(upgraded)['version']==candidate_version
+  check('Previous Rust release snapshot restores its matching old image and database, then upgrades again with the retained CLI')
+  cleanup(upgraded);created.remove(upgraded)
  if args.legacy:
   legacy=root/'legacy-shell';(legacy/'deploy').mkdir(parents=True);shutil.copy(repo/'tests/fixtures/legacy-mail-web.sh',legacy/'deploy/mail-web.sh');lp=port();ln='mailweb-cli-'+stamp+'-legacy'
   bounded=legacy/'bounded-download';bounded.mkdir();realcurl=shutil.which('curl');(bounded/'curl').write_text('#!/bin/sh\nexec '+realcurl+' --ipv4 --connect-timeout 10 --max-time 60 --retry 2 "$@"\n');(bounded/'curl').chmod(0o700)

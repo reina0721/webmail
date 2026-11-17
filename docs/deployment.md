@@ -46,7 +46,7 @@ curl -fsSL https://raw.githubusercontent.com/reina0721/webmail/main/install.sh |
 
 IPv6 使用 `--bind ::1 --port 18090`；旧写法 `--bind '[::1]:18090'` 和 `--name` 仍兼容。同机多实例选择不同目录、名称及端口。通配监听输出可用的本地诊断地址，远程使用服务器实际 IP；不会把 `0.0.0.0` 或 `::` 当作访问地址。
 
-默认选择最高 SemVer 已发布版本，包含预发布并排除草稿；仅稳定版使用 `--channel stable`，精确版本使用 `--version v0.4.0-alpha.2`。选定版本缺少产物或校验失败会停止，不回退。引导 CLI 固定到已验收版本，应用版本由 Rust 解析 Release 列表。Fork 使用 `--repository OWNER/REPO`；下载代理使用 `--download-mirror HTTPS_URL`，始终校验同一 SHA-256。
+默认选择最高 SemVer 已发布版本，包含预发布并排除草稿；仅稳定版使用 `--channel stable`，精确版本使用 `--version v0.4.0-alpha.3`。选定版本缺少产物或校验失败会停止，不回退。引导 CLI 固定到已验收版本，应用版本由 Rust 解析 Release 列表。Fork 使用 `--repository OWNER/REPO`；下载代理使用 `--download-mirror HTTPS_URL`，始终校验同一 SHA-256。
 
 安装完成后运行：
 
@@ -179,6 +179,7 @@ INSTALL_DIR="$HOME/apps/mail-web"
 |---|---|
 | `.env` | 镜像版本、容器名、监听和其他基础设施选项 |
 | `config/runtime.enc` | 加密的站点与默认 Stalwart 连接配置 |
+| `config/turnstile-setup.enc` | 单独配置 Turnstile 的加密归属及恢复记录，不包含 Cloudflare API Token |
 | `config/initialization*.enc` | 按连接分开的加密初始化进度与生成凭据；不包含临时管理员授权 |
 | `config/installed-release.json` | 已安装产物的版本、架构和镜像标识 |
 | `data/db` | SQLite、WAL 与 SHM；包括额外连接的加密运行配置、域名策略与就绪记录 |

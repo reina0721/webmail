@@ -4,7 +4,13 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+## [0.4.0-alpha.3] - 2026-11-17
+
 ### Added
+
+- Token-based Turnstile repair for an installed site, with Account ID fallback and no repeat Stalwart administrative authorization.
+- Visible readiness-check results and direct links to verification setup and the real human/mail verification page.
+- Upgrade guidance in the deployment console and release acceptance using the published v0.4.0-alpha.2 Rust CLI, including restore and repeat upgrade.
 
 - English and Simplified Chinese project entry points, contributor guidance, security reporting guidance, GitHub issue/PR templates and agent discovery instructions.
 - Unattended installation and infrastructure examples, with dedicated deployment and release guides.
@@ -13,6 +19,10 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 - Version consistency and immutable-release guards, plus release packaging regression tests.
 
 ### Changed
+
+- Supplying a Cloudflare token without an account now blocks initialization instead of silently skipping Turnstile. Skipped creation is no longer reported as completed.
+- Missing Turnstile configuration no longer reports otherwise valid mail-service credentials as missing.
+- URLs are rejected as Turnstile keys. Invalid saved values remain repairable; widget initialization and script failures show an actionable message without crashing the verification page.
 
 - Both architectures must pass real draft-asset installation and restore checks before a release becomes public.
 - Release bundles include corresponding source from the recorded Git commit; existing AMD64 artifact names and manifest fields remain compatible.

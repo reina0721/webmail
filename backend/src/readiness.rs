@@ -225,7 +225,7 @@ pub async fn check(app: &App) -> Result<()> {
     item!(
         "configuration",
         "运行凭据和网站来源",
-        if s.ready() && current(app).await && !installation::initialize::active(app).await? {
+        if s.mail_ready() && current(app).await && !installation::initialize::active(app).await? {
             Ok(())
         } else {
             Err(Error(
@@ -356,7 +356,7 @@ pub async fn check(app: &App) -> Result<()> {
     item!(
         "turnstile",
         "Turnstile 配置（真实验证在下一步）",
-        if !s.turnstile_site_key.is_empty() && !s.turnstile_secret.is_empty() {
+        if s.turnstile_ready() {
             Ok(())
         } else {
             Err(Error(StatusCode::BAD_REQUEST, "turnstile_missing"))

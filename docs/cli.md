@@ -32,7 +32,7 @@ curl -fsSL https://raw.githubusercontent.com/reina0721/webmail/main/install.sh |
 
 HTTP 直连额外传 `--allow-http`，公开来源填实际服务器 IP；IPv6 URL 使用方括号。安装器不会创建反代、DNS、证书或防火墙规则。端口冲突时交互重选，无人值守直接失败；不接管其他安装的同名容器，也不覆盖未登记的非空目录或其他项目配置。
 
-默认选择整个 Release 列表中 SemVer 最高的非草稿版本，不按发布时间或 GitHub stable/latest API 排序。最高版本缺少必要资产或校验失败直接停止。引导 CLI 固定 `v0.4.0-alpha.2`，应用版本由 CLI 独立选择。没有稳定版时 stable 渠道明确失败。
+默认选择整个 Release 列表中 SemVer 最高的非草稿版本，不按发布时间或 GitHub stable/latest API 排序。最高版本缺少必要资产或校验失败直接停止。引导 CLI 固定 `v0.4.0-alpha.3`，应用版本由 CLI 独立选择。没有稳定版时 stable 渠道明确失败。
 
 应用安装后 `/console/setup/` 显示“应用已安装，邮件服务待配置”。所有 Stalwart 授权、域名、账号、Hook 和 Turnstile 操作继续在网页完成，安装器没有相关凭据参数。
 
@@ -87,8 +87,26 @@ HTTP 直连改端口时，需同步设置新 Origin：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/reina0721/webmail/main/install.sh | bash -s -- \
-  --dir /srv/mail-web --yes --version v0.4.0-alpha.2
+  --dir /srv/mail-web --yes --version v0.4.0-alpha.3
 ```
+
+## 从 v0.4.0-alpha.2 升级
+
+在旧安装目录运行（默认 `~/apps/mail-web`；自定义安装目录须使用原路径）：
+
+```bash
+cd ~/apps/mail-web
+./mailweb status --json
+./mailweb backup
+./mailweb update --version v0.4.0-alpha.3 --yes
+./mailweb status --json
+```
+
+旧版 Rust CLI 已支持原地升级，本版继续提供该能力；应用包内的管理 CLI 随应用一并更新。无需先执行 `self-update`，也无需重新初始化 Stalwart。下载和校验完成前不会停止现有服务，升级前自动保存一致性快照；更新过程会短暂重启服务。账号、邮件数据、加密配置、安装密钥和原监听参数会保留。若使用 `sudo` 安装，请继续使用同一维护用户和原目录。
+
+成功后浏览器刷新并检查页面底部版本。进入 **站点与默认设置 → 自动配置 Turnstile 人机验证**，补齐此前缺失或误填的验证配置，再进行真人与验证码收信验证。CLI 升级不会自行创建 Cloudflare 资源或修改注册开放策略。
+
+仅升级管理工具可用 `./mailweb self-update --version v0.4.0-alpha.3`；它不会升级正在运行的应用。完全离线时下载本机架构的应用包与同版 `SHA256SUMS` 放在一起，运行 `./mailweb update --bundle /absolute/path/mail-web-linux-amd64.tar.gz --yes`（ARM64 对应 `arm64` 文件）。
 
 ## 更新与恢复
 
@@ -96,7 +114,7 @@ curl -fsSL https://raw.githubusercontent.com/reina0721/webmail/main/install.sh |
 
 ```bash
 ./mailweb backup
-./mailweb update --version v0.4.0-alpha.2 --yes
+./mailweb update --version v0.4.0-alpha.3 --yes
 ./mailweb restore /absolute/install/backups/SNAPSHOT --yes
 ```
 

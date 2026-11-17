@@ -6,7 +6,7 @@
     "license": {
       "name": ""
     },
-    "version": "0.4.0-alpha.2"
+    "version": "0.4.0-alpha.3"
   },
   "paths": {
     "/api/push/action": {
@@ -1884,6 +1884,58 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/installation/turnstile": {
+      "post": {
+        "tags": [
+          "installation"
+        ],
+        "operationId": "configure",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/installation/turnstile/accounts": {
+      "post": {
+        "tags": [
+          "installation"
+        ],
+        "operationId": "accounts",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "",

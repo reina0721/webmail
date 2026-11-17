@@ -50,7 +50,14 @@ impl Job {
         }
     }
     pub fn public(&self) -> Value {
-        json!({"base":self.base,"id":self.id,"status":self.status,"step":self.step,"error":self.error,"resources":self.resources,"completed":self.completed,"spec":self.spec,"requiresAuthorization":matches!(self.status.as_str(),"failed"|"interrupted"|"cancelled"),"protocolVerified":false})
+        let skipped_turnstile =
+            self.spec.cloudflare_account.is_empty() && self.resource("turnstile").is_empty();
+        let completed: Vec<_> = self
+            .completed
+            .iter()
+            .filter(|step| !(skipped_turnstile && step.as_str() == "turnstile"))
+            .collect();
+        json!({"base":self.base,"id":self.id,"status":self.status,"step":self.step,"error":self.error,"resources":self.resources,"completed":completed,"skipped":if skipped_turnstile{vec!["turnstile"]}else{vec![]},"spec":self.spec,"requiresAuthorization":matches!(self.status.as_str(),"failed"|"interrupted"|"cancelled"),"protocolVerified":false})
     }
     pub fn name(&self, kind: &str) -> String {
         format!("mw-{}-{kind}", self.id.replace('-', ""))
@@ -70,12 +77,15 @@ fn path(app: &App) -> PathBuf {
     })
 }
 pub(super) fn read(app: &App) -> Result<Option<Job>> {
-    if !path(app).exists() {
+    read_at(app, &path(app))
+}
+pub(super) fn read_at(app: &App, path: &std::path::Path) -> Result<Option<Job>> {
+    if !path.exists() {
         return Ok(None);
     }
     let bytes = zeroize::Zeroizing::new(
         app.vault
-            .open(&std::fs::read(path(app)).map_err(|_| internal("initialization_read"))?)
+            .open(&std::fs::read(path).map_err(|_| internal("initialization_read"))?)
             .map_err(|_| internal("initialization_decrypt"))?,
     );
     Ok(Some(
@@ -83,6 +93,9 @@ pub(super) fn read(app: &App) -> Result<Option<Job>> {
     ))
 }
 pub(super) fn write(app: &App, job: &Job) -> Result<()> {
+    write_at(app, job, &path(app))
+}
+pub(super) fn write_at(app: &App, job: &Job, path: &std::path::Path) -> Result<()> {
     let data = zeroize::Zeroizing::new(
         serde_json::to_vec(job).map_err(|_| internal("initialization_encode"))?,
     );
@@ -90,7 +103,6 @@ pub(super) fn write(app: &App, job: &Job) -> Result<()> {
         .vault
         .seal(&data)
         .map_err(|_| internal("initialization_encrypt"))?;
-    let path = path(app);
     let parent = path
         .parent()
         .ok_or_else(|| internal("initialization_path"))?;
@@ -107,7 +119,7 @@ pub(super) fn write(app: &App, job: &Job) -> Result<()> {
         let mut file = options.open(&temporary)?;
         file.write_all(&encrypted)?;
         file.sync_all()?;
-        std::fs::rename(&temporary, &path)?;
+        std::fs::rename(&temporary, path)?;
         #[cfg(unix)]
         std::fs::File::open(parent)?.sync_all()?;
         Ok(())
@@ -122,6 +134,20 @@ pub(super) fn write(app: &App, job: &Job) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn skipped_turnstile_is_not_reported_as_completed() {
+        let spec:Spec=serde_json::from_value(json!({"brand":"Mail","domain":"example.com","publicOrigin":"https://webmail.example.com"})).unwrap();
+        let mut job = Job::new("owner".into(), "https://mail.example.com".into(), spec);
+        job.completed = vec!["domain".into(), "turnstile".into(), "apply".into()];
+        assert_eq!(job.public()["skipped"], json!(["turnstile"]));
+        assert_eq!(job.public()["completed"], json!(["domain", "apply"]));
+        job.resources.insert("turnstile".into(), "real-site".into());
+        assert_eq!(job.public()["skipped"], json!([]));
+        assert_eq!(
+            job.public()["completed"],
+            json!(["domain", "turnstile", "apply"])
+        );
+    }
     #[test]
     fn public_progress_never_serializes_runtime_secrets_or_pending_snapshots() {
         let spec:Spec=serde_json::from_value(json!({"brand":"Mail","domain":"example.com","publicOrigin":"https://webmail.example.com"})).unwrap();

@@ -4,7 +4,7 @@
 
 ## 版本与权限准备
 
-保留现有候选版本 `v0.4.0-alpha.2`；本文不表示该版本的新双架构产物已经发布。先检查 [Releases](https://github.com/reina0721/webmail/releases) 和远端标签，使用尚未绑定其他提交的新版本。
+本次候选版本为 `v0.4.0-alpha.3`，现有 `v0.4.0-alpha.2` 保持不变。每次发布前先检查 [Releases](https://github.com/reina0721/webmail/releases) 和远端标签，使用尚未绑定其他提交的新版本。
 
 每次准备版本时，同步以下值并提交：
 

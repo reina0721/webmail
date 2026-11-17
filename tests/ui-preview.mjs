@@ -55,7 +55,14 @@ http.createServer(async(req,res)=>{try{
    const ready=!mode.readinessFailure&&!!mode.readinessHuman;
    return json(res,{ready,items,serviceId:bindings.find(d=>d.id===domainId)?.serviceId??'default',domainId,requestedEnabled:domainPolicy.enabled,effectiveEnabled:domainPolicy.enabled&&ready,checkedAt:Date.now(),humanVerifiedAt:mode.readinessHuman?Date.now():0,releaseVersion:'0.3.0-alpha.2',protocolScope:'示例预览：未执行真实服务验收'});
   }
-  if(key==='/installation/readiness/link')return json(res,{url:setup.publicOrigin+'/setup/check/#check=isolated-preview-only',expiresInSeconds:600});
+  if(key==='/installation/readiness/link')return json(res,{url:`http://localhost:${port}/console/verification/#check=isolated-preview-only`,expiresInSeconds:600});
+  if(key==='/readiness/session')return json(res,{siteKey:mode.turnstileSiteKey??setup.turnstileSiteKey,mailSent:false});
+  if(key==='/installation/turnstile/accounts')return json(res,{accounts:[],accountIdRequired:true});
+  if(key==='/installation/turnstile'){
+   if(!input.cloudflareToken||!/^[a-f0-9]{32}$/i.test(input.cloudflareAccount??''))return json(res,{code:'cloudflare_account_required'},400);
+   mode.turnstileSiteKey='isolated-widget-key';mode.turnstileSecretSet=true;mode.readinessFailure='';
+   return json(res,{configured:true,restartRequired:true});
+  }
   if(key==='/installation/initialize/authorize'){
    if(input.username==='denied')return json(res,{code:'initialization_permissions_missing'},403);
    if(mode.slow)await new Promise(resolve=>setTimeout(resolve,1200));
@@ -77,7 +84,7 @@ http.createServer(async(req,res)=>{try{
    return json(res,{job:initializationJob});
   }
   if(key==='/installation/initialize/cancel'){initializationGrant='';if(initializationJob?.status==='running')initializationJob.status='cancelled';return json(res,{cancelRequested:true,resourcesDeleted:false});}
-  if(key==='/installation/config'&&req.method==='GET')return json(res,{settings:mode.setupConfigured?setup:{brand:'Mail Web',domain:'',publicOrigin:'',stalwartUrl:'',domainId:'',notificationAccount:'',notificationEmail:'',hookId:'',turnstileSiteKey:''},provisioningKeySet:mode.setupConfigured,notificationKeySet:false,hookSecretSet:false,turnstileSecretSet:false,policyVerified:false,missingRequirements:['验证邮件账号','验证邮件密钥','Turnstile Site Key','Turnstile Secret','本部署专用 MTA Hook','Hook 共享密钥','SMTP／JMAP 提交协议验收声明'],documentationUrl:setupDocs});
+  if(key==='/installation/config'&&req.method==='GET')return json(res,{settings:mode.setupConfigured?{...setup,turnstileSiteKey:mode.turnstileSiteKey??setup.turnstileSiteKey}:{brand:'Mail Web',domain:'',publicOrigin:'',stalwartUrl:'',domainId:'',notificationAccount:'',notificationEmail:'',hookId:'',turnstileSiteKey:''},provisioningKeySet:mode.setupConfigured,notificationKeySet:false,hookSecretSet:false,turnstileSecretSet:!!mode.turnstileSecretSet,policyVerified:false,missingRequirements:['验证邮件账号','验证邮件密钥','Turnstile Site Key','Turnstile Secret','本部署专用 MTA Hook','Hook 共享密钥','SMTP／JMAP 提交协议验收声明'],documentationUrl:setupDocs});
   if(key==='/installation/config'){setup=Object.fromEntries(Object.entries(input).filter(([k])=>!['provisioningKey','notificationKey','hookSecret','turnstileSecret'].includes(k)));mode.setupConfigured=true;mode.setupEpoch++;return json(res,{saved:true,restartRequired:true});}
   if(key==='/installation/operator'){mode.setupNeedsOperator=false;return json(res,{});}
   if(key==='/installation/discover'){
@@ -85,6 +92,7 @@ http.createServer(async(req,res)=>{try{
    const base=input.stalwartUrl,domain=input.domain,callback=input.publicOrigin?.replace(/\/$/,'')+'/internal/mta-hook';
    return json(res,{stalwartUrl:base,documentationUrl:setupDocs,persisted:false,domains:[{id:'preview-domain',name:'example.com'},{id:'preview-other',name:'other.example.com'}],accounts:domain?[{id:'preview-sender-'+domain,name:'verification',email:'verification@'+domain}]:[],hooks:[{id:'preview-hook',url:callback,matchesDeployment:true},{id:'other-app-hook',url:'https://unrelated.example.com/internal/mta-hook',matchesDeployment:false}],links:{admin:base+'/admin/',account:base+'/account/',domains:base+'/admin/Management/x:Domain',accounts:base+'/admin/Management/x:Account/User',hooks:base+'/admin/Settings/x:MtaHook',keys:base+'/account/Account/x:ApiKey'},sections:{domains:'ready',accounts:domain?'ready':'select_domain',hooks:mode.setupHookDenied?'permission_denied':'ready'},callbackUrl:callback});
   }
+  if(key==='/health/ready')return json(res,{version:'isolated-preview',revision:'local-only'});
   if(key==='/auth/session')return json(res,{id:'operator',email:'operator@example.com',operator:mode.operator});
   if(key==='/auth/logout'){mode.expired=true;return json(res,{});}
   if(key==='/account'){if(req.method==='PATCH'){if(input.display_name!==undefined)mode.profileName=input.display_name;if(input.theme!==undefined)mode.theme=input.theme;}return json(res,{email:'operator@example.com',displayName:mode.profileName??'运营团队',quotaBytes:1073741824,usedBytes:104857600,preferences:{theme:mode.theme}});}

@@ -317,6 +317,17 @@ pub(super) async fn save_config(
             "verification_test_keys_forbidden",
         ));
     }
+    if (!input.turnstile_site_key.is_empty()
+        && !config::turnstile_key_valid(&input.turnstile_site_key))
+        || input.turnstile_secret.as_ref().is_some_and(|value| {
+            !value.trim().is_empty() && !config::turnstile_key_valid(value.trim())
+        })
+    {
+        return Err(Error(
+            StatusCode::BAD_REQUEST,
+            "turnstile_configuration_invalid",
+        ));
+    }
     let _lock = CONFIG_LOCK.lock().await;
     if initialize::active(&app).await? {
         return Err(Error(StatusCode::CONFLICT, "initialization_running"));

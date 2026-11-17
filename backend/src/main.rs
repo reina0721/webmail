@@ -720,6 +720,8 @@ async fn health(State(app): State<Arc<App>>) -> Result<Json<Value>> {
         installation::initialize::start,
         installation::initialize::progress,
         installation::initialize::cancel,
+        installation::initialize::turnstile::accounts,
+        installation::initialize::turnstile::configure,
         registration::public_policy,
         registration::public_domains,
         registration::challenge,

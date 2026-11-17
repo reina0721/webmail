@@ -43,7 +43,7 @@ curl -fsSL https://raw.githubusercontent.com/reina0721/webmail/main/install.sh |
   --bind 127.0.0.1 --port 18090 --public-origin https://mail.example.org
 ```
 
-将示例来源替换为自己的网址。默认渠道包含预发布；仅稳定版使用 `--channel stable`，精确版本可使用 `--version v0.4.0-alpha.2`，但该版本必须提供本机架构的附件。详见[部署指南](docs/deployment.md)、[Stalwart 配置教程](docs/stalwart-setup.md)及[可运行示例](examples/install-unattended.sh)。
+将示例来源替换为自己的网址。默认渠道包含预发布；仅稳定版使用 `--channel stable`，精确版本可使用 `--version v0.4.0-alpha.3`，但该版本必须提供本机架构的附件。详见[部署指南](docs/deployment.md)、[Stalwart 配置教程](docs/stalwart-setup.md)及[可运行示例](examples/install-unattended.sh)。
 
 | 方式 | 用途 | 服务器行为 |
 | --- | --- | --- |
@@ -57,7 +57,7 @@ CLI 配置安装目录、容器名称和监听地址。站点品牌、Stalwart �
 基础设施参数沿用 [.env.example](.env.example)：
 
 ```dotenv
-MAIL_WEB_VERSION=0.4.0-alpha.2
+MAIL_WEB_VERSION=0.4.0-alpha.3
 CONTAINER_NAME=mail-web
 LISTEN_ADDRESS=127.0.0.1
 PORT=18090

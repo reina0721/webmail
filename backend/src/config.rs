@@ -43,6 +43,12 @@ impl Services {
         }
     }
     pub fn ready(&self) -> bool {
+        self.mail_ready() && self.turnstile_ready()
+    }
+    pub fn turnstile_ready(&self) -> bool {
+        turnstile_key_valid(&self.turnstile_site_key) && turnstile_key_valid(&self.turnstile_secret)
+    }
+    pub fn mail_ready(&self) -> bool {
         !self.domain.is_empty()
             && !self.provisioning_key.is_empty()
             && !self.notification_key.is_empty()
@@ -53,8 +59,6 @@ impl Services {
                 .is_some_and(|(local, domain)| !local.is_empty() && !domain.is_empty())
             && !self.notification_email.chars().any(char::is_whitespace)
             && !self.domain_id.is_empty()
-            && !self.turnstile_secret.is_empty()
-            && !self.turnstile_site_key.is_empty()
             && !self.hook_secret.is_empty()
             && !self.hook_id.is_empty()
     }
@@ -130,5 +134,37 @@ mod tests {
         assert!(!first.is_local_address("user@beta.example"));
         assert!(!first.is_local_address("user@not-alpha.example"));
         assert!(!Services::default().is_local_address("user@"));
+    }
+}
+
+// Basic syntax only; successful Siteverify and mail delivery remain mandatory.
+pub fn turnstile_key_valid(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 256
+        && value
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_')
+}
+#[cfg(test)]
+mod turnstile_tests {
+    use super::*;
+    #[test]
+    fn rejects_urls_and_whitespace_as_widget_keys() {
+        for invalid in [
+            "",
+            "http://85.155.115.98:8088",
+            "https://example.com",
+            "key with spaces",
+            "key\n",
+        ] {
+            assert!(!turnstile_key_valid(invalid));
+            let services = Services {
+                turnstile_site_key: invalid.into(),
+                turnstile_secret: "secret".into(),
+                ..Default::default()
+            };
+            assert!(!services.turnstile_ready());
+        }
+        assert!(turnstile_key_valid("0x4AAAAAA_example-key"));
     }
 }

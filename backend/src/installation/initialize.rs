@@ -6,6 +6,7 @@ use zeroize::Zeroize;
 mod cloudflare;
 mod journal;
 mod provision;
+pub(crate) mod turnstile;
 use journal::{Job, Spec};
 
 static GRANTS: LazyLock<Mutex<HashMap<String, Grant>>> = LazyLock::new(Default::default);
@@ -186,6 +187,11 @@ pub(super) fn routes() -> Router<Arc<App>> {
         .route("/installation/initialize/preflight", post(preflight))
         .route("/installation/initialize/job", get(progress).post(start))
         .route("/installation/initialize/cancel", post(cancel))
+        .route(
+            "/installation/turnstile/accounts",
+            post(turnstile::accounts),
+        )
+        .route("/installation/turnstile", post(turnstile::configure))
 }
 async fn owner(app: &App, headers: &HeaderMap, write: bool) -> Result<String> {
     authorize(app, headers, write).await?;
@@ -346,6 +352,12 @@ pub(crate) async fn preflight(
     normalize_spec(&mut input.spec)?;
     let who = owner(&app, &headers, true).await?;
     let mut access = grant(&input.ticket, &who).await?;
+    if !access.cloudflare_token.is_empty() && input.spec.cloudflare_account.is_empty() {
+        return Err(Error(
+            StatusCode::BAD_REQUEST,
+            "cloudflare_account_required",
+        ));
+    }
     if let Some(password) = input.operator_password.take() {
         access.operator_password = password;
         if let Some(stored) = GRANTS.lock().await.get_mut(&input.ticket) {
@@ -393,6 +405,12 @@ pub(crate) async fn start(
     normalize_spec(&mut input.spec)?;
     let who = owner(&app, &headers, true).await?;
     let mut access = grant(&input.ticket, &who).await?;
+    if !access.cloudflare_token.is_empty() && input.spec.cloudflare_account.is_empty() {
+        return Err(Error(
+            StatusCode::BAD_REQUEST,
+            "cloudflare_account_required",
+        ));
+    }
     if let Some(password) = input.operator_password.take() {
         access.operator_password = password;
         if let Some(stored) = GRANTS.lock().await.get_mut(&input.ticket) {

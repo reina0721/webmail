@@ -1,6 +1,6 @@
 # 发布维护指南
 
-本仓库使用现有 GitHub Actions 工作流，构建 Linux AMD64 与 ARM64 的离线应用包和 Rust CLI。目标服务器从 Release 下载、校验并 `docker load`，不拉取应用镜像仓库。历史版本可能只有 AMD64 附件。
+本仓库使用两阶段 GitHub Actions：先快速检查并发布，再对同一版本执行完整验证。两阶段均覆盖 Linux AMD64 与 ARM64；分发离线应用包和 Rust CLI。目标服务器从 Release 下载、校验并 `docker load`，不拉取应用镜像仓库。历史版本可能只有 AMD64 附件。
 
 ## 版本与权限准备
 
@@ -51,9 +51,11 @@ git push origin main
 
 上述命令会启动外部发布；应由维护者在检查完成后主动执行。稳定版继续要求 `docs/acceptance.json` 中 `readyForPublicRegistration` 为 true；该字段不是运行时域名注册开关。
 
-## 构建、草稿和验收
+## 第一阶段：快速检查、草稿验收与发布
 
-工作流先检查版本一致性、版本唯一性及提交归属，再在两种原生 runner 上执行 Rust／前端质量、契约、上游来源、真实 Stalwart 和完整隔离业务验证，包括至少 30 分钟注册检查。不要把构建成功写成公网投递或生产 Turnstile 已验收。
+`ci.yml`（Quick release and checks）先检查版本一致性、版本唯一性及提交归属。两种原生 runner 均执行 Rust 格式／全部 Rust 测试／Clippy、前端类型与生产构建、原生界面专项测试、API 契约、上游来源和真实 Stalwart 快速集成。通过后汇总草稿，两种架构重新下载真实附件，完成干净／重复安装、更新、备份恢复、故障恢复；AMD64 同时验证已公开 v0.4.0-alpha.2 Rust CLI 和旧 shell 版本升级。两侧成功后公开。
+
+全量客户端回归及至少 30 分钟持续注册检查移到发布后；快速检查通过不表示完整验证已通过，也不表示公网邮件投递或生产 Turnstile 已验收。Release 说明明确区分 Fast checks 与 Full validation。
 
 构建使用同一提交和版本，镜像的运行时版本与 revision 必须匹配；CLI 的 ELF 架构和版本必须匹配。打包命令在本机对应架构执行：
 
@@ -87,10 +89,27 @@ python3 tooling/release_metadata.py assemble "$(cat release-version.txt)" \
 
 两个 runner 分别重新下载草稿的全部真实附件，再校验和安装对应架构。测试覆盖干净／重复安装、更新、网络配置、备份恢复及失败恢复；AMD64 额外验证历史 shell 发布包升级，ARM64 没有历史 AMD64 包迁移步骤。只有两侧成功后才公开。CLI 选择最高 SemVer 的已发布版本，缺少本机架构产物时直接失败，不自动回退旧版或其他架构。
 
+## 第二阶段：发布后完整验证
+
+`full-validation.yml`（Full validation）在快速流程完成后通过 `workflow_run` 读取其发布记录，校验仓库、版本、源码提交、公开状态及标签归属。它检出记录中的确切提交，下载并校验实际公开附件，在两种原生 runner 上使用发布镜像运行原有的全部客户端测试、全部真实 Stalwart 业务测试、旧数据及独立备份恢复，以及至少 30 分钟持续注册检查。普通提交和 PR 仍执行完整检查，保持只读权限。
+
+完整验证开始和结束时，仅有结果汇报任务获得 `contents: write`，只更新 Release 说明中的自动验证区块，不上传或替换附件。状态为 pending、running、passed、failed 或 cancelled，并附 Actions 链接。完整检查失败会将该版标为 failed；维护者修复后必须同步新版本号并再次发布。不会自动改写源码、移动旧标签或回滚任何生产实例。
+
+发布使用 `GITHUB_TOKEN` 时，`release: published` 事件不会可靠地启动另一个工作流，因此这里使用独立的 `workflow_run` 和已发布记录，而非要求额外 PAT。机制和信任边界见 [GitHub workflow_run 文档](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run)。来自外部 PR 的运行不能进入有写权限的发布结果汇报路径。
+
 ## 失败与重试
 
-测试失败保留草稿。相同提交可在 Actions 中重跑任务；若需要修改源码，应使用新版本并同步版本字段。已有标签不可强推，已公开版本不可覆盖，同一版本也不能改绑到其他源码提交。过时的 main 构建在草稿上传前和公开前都会被拒绝。
+第一阶段失败保持未发布或草稿状态。第二阶段失败保留已公开产物并在 Release 说明标明失败。相同提交可在 Actions 中重跑任务；若需要修改源码，应使用新版本并同步版本字段。已有标签不可强推，已公开版本不可覆盖，同一版本也不能改绑到其他源码提交。过时的 main 构建在草稿上传前和公开前都会被拒绝。
 
-查看 Actions 中 `metadata`、`preflight`、两侧 `checks`、`draft`、两侧 `release-install` 和 `publish` 的状态。检查失败阶段的日志，并在修复后重新完成所需阶段。若更新启动失败，使用 CLI 给出的匹配快照恢复；不要直接对迁移后的数据库运行旧程序。
+查看快速流程中 `metadata`、`preflight`、两侧 `checks`、`draft`、两侧 `release-install` 和 `publish`；完整流程查看两侧 `checks` 和 `report`。检查失败阶段的日志，并在修复后重新完成所需阶段。若更新启动失败，使用 CLI 给出的匹配快照恢复；不要直接对迁移后的数据库运行旧程序。
 
 GitHub 设置还应由维护者确认：Issues 可用；需要时启用私密漏洞报告；为 main 与版本标签设置适当保护。文件生成不代表这些远端设置已经变更。
+
+重试原提交的快速失败任务或完整验证：
+
+```sh
+gh run rerun FAST_RUN_ID --failed --repo reina0721/webmail
+gh run rerun FULL_RUN_ID --repo reina0721/webmail
+```
+
+重跑完整验证会继续使用该次快速发布记录绑定的源码提交。Release 的 Full validation 为 pending 或 running 时，尚没有该版本的完整通过结论；使用者可据此决定是否立即升级。

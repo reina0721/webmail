@@ -12,11 +12,15 @@ if os.environ.get('MAIL_WEB_TEST_DEPLOY_LOCK')!='1':
         print('Waiting for the isolated test environment lock...',flush=True)
         fcntl.flock(stack_lock,fcntl.LOCK_EX)
 network=json.loads(subprocess.check_output(['docker','network','inspect','mailweb-rebuild_default'],text=True))[0]
-subnet=ipaddress.ip_network(network['IPAM']['Config'][0]['Subnet']);used={v['IPv4Address'].split('/')[0] for v in network['Containers'].values()}
-for _ in range(100):
-    ip=str(subnet.network_address+secrets.randbelow(subnet.num_addresses-4)+2)
-    if ip not in used:break
-else:raise RuntimeError('No free test client IP')
+from test_network import select_actor_ip
+used={value['IPv4Address'].split('/')[0] for value in network['Containers'].values() if value.get('IPv4Address')}
+# Stopped containers release their IPs, but persisted production rate buckets
+# remain. Never reuse an actor address during this test network's lifetime.
+registry=root/'tests/runtime/rebuild/actor-addresses.json'
+previous=json.loads(registry.read_text()) if registry.exists() else {}
+reserved=previous.get('addresses',[]) if previous.get('networkId')==network['Id'] else []
+ip=select_actor_ip(network['IPAM']['Config'][0]['Subnet'],used|set(reserved))
+registry.write_text(json.dumps({'networkId':network['Id'],'addresses':[*reserved,ip]})+'\n');registry.chmod(0o600)
 args=sys.argv[1:];suite='tests/rebuild-integration.py'
 if '--native' in args:suite='tests/native-client-integration.py';args.remove('--native')
 if '--push' in args:suite='tests/push-integration.py';args.remove('--push')

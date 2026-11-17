@@ -1,0 +1,50 @@
+import assert from 'node:assert/strict';
+import {test} from 'node:test';
+import fs from 'node:fs';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url);
+const YAML=require('../frontend/node_modules/.pnpm/node_modules/yaml');
+const quick=YAML.parse(fs.readFileSync(new URL('../.github/workflows/ci.yml',import.meta.url),'utf8'));
+const full=YAML.parse(fs.readFileSync(new URL('../.github/workflows/full-validation.yml',import.meta.url),'utf8'));
+const runs=job=>job.steps.map(step=>step.run??'').join('\n');
+test('quick publication waits for both native draft installation matrices',()=>{
+ assert.deepEqual(quick.jobs.publish.needs,['metadata','release-install']);
+ for(const name of ['checks','release-install'])assert.deepEqual(quick.jobs[name].strategy.matrix.include.map(item=>item.architecture),['amd64','arm64']);
+ assert.match(runs(quick.jobs.checks),/vitest run src\/native/);
+ assert.match(runs(quick.jobs.checks),/tests\/run-integration.sh/);
+ assert.doesNotMatch(runs(quick.jobs.checks),/test-env.sh up --verify/);
+ assert.match(runs(quick.jobs['release-install']),/tests\/release-install.sh/);
+});
+test('published record exists before public release and triggers pinned full validation',()=>{
+ const steps=quick.jobs.publish.steps;
+ const record=steps.findIndex(step=>step.with?.name==='published-release');
+ const publish=steps.findIndex(step=>step.run?.includes('--draft=false'));
+ assert.ok(record>=0&&record<publish);
+ assert.deepEqual(full.on.workflow_run.workflows,[quick.name]);
+ assert.match(full.jobs.metadata.if,/head_repository.full_name == github.repository/);
+ assert.match(runs(full.jobs.metadata),/sourceCommit == \$commit/);
+ assert.match(runs(full.jobs.metadata),/\.draft == false/);
+ assert.match(runs(full.jobs.metadata),/verify_owner/);
+ assert.equal(full.jobs.checks.steps[0].with.ref,'${{ needs.metadata.outputs.commit }}');
+});
+test('full validation retains quality, actual Stalwart, all business suites and public assets',()=>{
+ const commands=runs(full.jobs.checks);
+ for(const value of ['cargo test --locked --workspace','pnpm --dir frontend typecheck','tests/run-integration.sh','deploy/test-env.sh up --verify','verify-assets','tar -xOf'])assert.ok(commands.includes(value),value);
+ assert.match(commands,/MAIL_WEB_REVISION="\$SOURCE_COMMIT"/);
+ assert.equal(full.jobs.checks.env.SOURCE_COMMIT,'${{ needs.metadata.outputs.commit }}');
+ assert.ok(!('publish' in full.jobs));
+ assert.ok(!('draft' in full.jobs));
+ assert.equal(full.permissions.contents,'read');
+});
+test('ordinary checks stay read-only and full results update notes only after both architectures',()=>{
+ assert.equal(quick.permissions.contents,'read');
+ assert.equal(quick.jobs.checks.permissions,undefined);
+ assert.equal(full.jobs.checks.permissions,undefined);
+ assert.deepEqual(full.jobs.report.needs,['metadata','validation-start','checks']);
+ assert.match(full.jobs.report.if,/always\(\)/);
+ assert.match(full.jobs.report.if,/github.event_name == 'workflow_run'/);
+ assert.match(full.jobs['validation-start'].if,/github.event_name == 'workflow_run'/);
+ assert.match(full.jobs.report.if,/outputs.release == 'true'/);
+ assert.match(runs(full.jobs.report),/--phase full --status/);
+ assert.doesNotMatch(runs(full.jobs.report),/release upload|--draft=false/);
+});

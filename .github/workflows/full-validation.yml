@@ -1,0 +1,164 @@
+name: Full validation
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  workflow_run:
+    workflows: [Quick release and checks]
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: full-validation-${{ github.event.workflow_run.head_sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_run' }}
+jobs:
+  metadata:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    outputs:
+      perform: ${{ steps.context.outputs.perform }}
+      commit: ${{ steps.context.outputs.commit }}
+      version: ${{ steps.context.outputs.version }}
+      release: ${{ steps.context.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+      - id: context
+        name: Bind full validation to the published source commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          UPSTREAM_RUN: ${{ github.event.workflow_run.id }}
+          SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+          RELEASE_PUSH: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release-preview]')) }}
+        run: |
+          set -eu
+          version="$(cat release-version.txt)"
+          python3 tooling/release_metadata.py check-version "$version"
+          echo "commit=$SOURCE_COMMIT" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo 'release=false' >> "$GITHUB_OUTPUT"
+          if [ "$EVENT_NAME" = push ] && [ "$RELEASE_PUSH" = true ]; then
+            echo 'perform=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$EVENT_NAME" = workflow_run ]; then
+            count=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$UPSTREAM_RUN/artifacts" --jq '[.artifacts[] | select(.name == "published-release" and .expired == false)] | length')
+            if [ "$count" != 1 ]; then echo 'perform=false' >> "$GITHUB_OUTPUT"; exit 0; fi
+            gh run download "$UPSTREAM_RUN" --repo "$GITHUB_REPOSITORY" --name published-release --dir "$RUNNER_TEMP/release-record"
+            jq -e --arg commit "$SOURCE_COMMIT" --arg version "$version" --arg repository "$GITHUB_REPOSITORY" '.sourceCommit == $commit and .version == $version and .repository == $repository' "$RUNNER_TEMP/release-record/release-record.json"
+            if ! gh api "repos/$GITHUB_REPOSITORY/releases/tags/$version" > "$RUNNER_TEMP/published-release.json" || ! jq -e '.draft == false' "$RUNNER_TEMP/published-release.json" >/dev/null; then
+              echo 'perform=false' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            python3 -c 'import sys,json;sys.path.insert(0,"tooling");from release_status import verify_owner;verify_owner(*sys.argv[1:4],json.load(open(sys.argv[4])))' "$GITHUB_REPOSITORY" "$version" "$SOURCE_COMMIT" "$RUNNER_TEMP/published-release.json"
+            echo 'release=true' >> "$GITHUB_OUTPUT"
+          fi
+          echo 'perform=true' >> "$GITHUB_OUTPUT"
+  validation-start:
+    needs: metadata
+    if: github.event_name == 'workflow_run' && needs.metadata.outputs.release == 'true' && needs.metadata.outputs.perform == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.metadata.outputs.commit }}
+          persist-credentials: false
+      - name: Mark published release full validation as running
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.metadata.outputs.version }}
+          SOURCE_COMMIT: ${{ needs.metadata.outputs.commit }}
+        run: python3 tooling/release_status.py --repository "$GITHUB_REPOSITORY" --version "$VERSION" --commit "$SOURCE_COMMIT" --phase full --status in_progress --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+  checks:
+    name: Full validation (${{ matrix.architecture }})
+    needs: metadata
+    if: needs.metadata.outputs.perform == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    env:
+      SOURCE_COMMIT: ${{ needs.metadata.outputs.commit }}
+      VERSION: ${{ needs.metadata.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.metadata.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: corepack enable && corepack prepare pnpm@10.22.0 --activate
+      - run: pnpm install --frozen-lockfile
+        working-directory: frontend
+      - run: node frontend/tooling/check-boundaries.mjs && node frontend/tooling/check-boundaries-fixtures.mjs
+      - run: node tooling/check-persistence.mjs && node tooling/check-upstream.mjs
+      - run: pnpm --dir frontend typecheck && pnpm --dir frontend build
+      # The Docker quality target below runs the full client suite once.
+      - run: node --test tests/motion-styles.test.mjs tests/operation-id.test.mjs tests/admin-access.test.mjs tests/setup-guidance.test.mjs tests/platform-account-context.test.mjs
+      - run: rustup update stable && rustup default stable && rustup component add rustfmt clippy
+      - run: cargo fmt --all -- --check && cargo test --locked --workspace && cargo clippy --locked --workspace --all-targets -- -D warnings
+      - run: mkdir -p build && cargo run --locked -p mail-web -- --openapi > build/openapi.json && diff -u backend/contract/openapi.json build/openapi.json
+      - run: pnpm --dir frontend exec openapi-typescript ../backend/contract/openapi.json -o apps/web/src/platform/lib/generated-api.ts && git diff --exit-code frontend/apps/web/src/platform/lib/generated-api.ts
+      - run: bash -n install.sh && bash -n examples/install-unattended.sh; for script in deploy/*.sh tooling/*.sh tests/*.sh; do sh -n "$script"; done
+      - run: python3 tests/test-network.py && python3 tests/release-acceptance.py && python3 tests/release-packaging.py && python3 tooling/check-repository.py
+      - name: Download the actual published release
+        if: needs.metadata.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          set -eu
+          assets="$RUNNER_TEMP/published-assets"
+          mkdir -p "$assets"
+          gh release download "$VERSION" --repo "$GITHUB_REPOSITORY" --dir "$assets"
+          python3 tooling/release_metadata.py verify-assets "$VERSION" --inputs "$assets"
+          tar -xOf "$assets/mail-web-linux-$ARCHITECTURE.tar.gz" ./image.tar | docker load
+          docker tag "mail-web:${VERSION#v}" mail-web:ci
+      - name: Build native application
+        if: needs.metadata.outputs.release != 'true'
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: docker build --platform "linux/$ARCHITECTURE" --build-arg MAIL_WEB_REVISION="$SOURCE_COMMIT" -t mail-web:ci .
+      - run: docker run --rm --pull never mail-web:ci --runtime-info
+      - name: Real Stalwart and application integration
+        run: |
+          docker pull stalwartlabs/stalwart:v1.0.1-alpine
+          docker pull rust:1
+          sudo MAIL_WEB_TEST_IMAGE=mail-web:ci sh tests/run-integration.sh
+      - name: Complete automatic Docker deployment and core product integration
+        run: |
+          docker tag mail-web:ci mail-web:rebuild
+          sudo MAIL_WEB_REVISION="$SOURCE_COMMIT" sh deploy/test-env.sh up --verify
+  report:
+    needs: [metadata, validation-start, checks]
+    if: always() && github.event_name == 'workflow_run' && needs.metadata.outputs.release == 'true' && needs.metadata.outputs.perform == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.metadata.outputs.commit }}
+          persist-credentials: false
+      - name: Record full validation result without replacing assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.metadata.outputs.version }}
+          SOURCE_COMMIT: ${{ needs.metadata.outputs.commit }}
+          VALIDATION_RESULT: ${{ needs.checks.result }}
+        run: |
+          set -eu
+          case "$VALIDATION_RESULT" in success|failure|cancelled) ;; *) VALIDATION_RESULT=failure;; esac
+          python3 tooling/release_status.py --repository "$GITHUB_REPOSITORY" --version "$VERSION" --commit "$SOURCE_COMMIT" --phase full --status "$VALIDATION_RESULT" --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

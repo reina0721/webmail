@@ -22,3 +22,13 @@ def available_subnet():
     except FileNotFoundError:
         pass  # Some minimal development hosts have no iproute2; Docker conflicts remain checked.
     return select_subnet(occupied)
+
+
+def select_actor_ip(subnet, occupied):
+    network = ipaddress.ip_network(subnet)
+    used = set(occupied)
+    for address in network.hosts():
+        # Docker reserves the first host as its bridge gateway.
+        if address != network.network_address + 1 and str(address) not in used:
+            return str(address)
+    raise RuntimeError('No unused test client IP; recreate the disposable test network')

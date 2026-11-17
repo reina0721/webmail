@@ -25,6 +25,8 @@ Mail Web 连接已有 Stalwart，不负责安装邮件服务器，也不代替�
 
 ![Mail Web 客户端](docs/screenshots/mail-native-1440.jpg)
 
+Release 先通过原生构建、实际安装、升级和恢复等快速门禁，再对同一发布提交运行全量客户端与持续业务验证；状态与日志链接显示在 Release 说明中。
+
 ## 快速开始
 
 前提：Linux AMD64／ARM64、Docker Engine、Compose v2、Bash、curl、tar 和 SHA-256 工具。使用 root 或已有 Docker 权限的用户。正常部署还需要已有的 Stalwart 服务和 HTTPS 反代。

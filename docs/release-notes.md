@@ -4,7 +4,7 @@ Mail Web v0.4.0-alpha.3
 
 真实 Turnstile 需要 Webmail 使用域名访问；通过 IP 安装和使用邮箱后，可稍后自行配置域名并更新公开访问来源。Site Key 不能填网站地址，Secret 不能填 API Token。保存时拒绝明显错误；历史误填值可通过自动配置修复。验证组件或脚本加载失败时在原页显示原因与修复入口，避免整页崩溃。自动检查显示处理结果和明确的收信验证入口；保存配置、自动检查通过、真人收信验证和公开注册策略分别记录。
 
-首次提供 Linux AMD64 / ARM64 原生构建的离线应用包及 Rust CLI；每个架构均通过草稿附件的安装、更新、备份与故障恢复门禁后公开。保留 AGPL、上游来源记录、对应源码、SHA256SUMS，并补齐双语开源文档。
+首次提供 Linux AMD64 / ARM64 原生构建的离线应用包及 Rust CLI；每个架构均通过草稿附件的安装、更新、备份与故障恢复快速门禁后公开；完整客户端与持续业务验证随后对同一版本运行，状态与日志链接显示在本 Release 的验证区块。保留 AGPL、上游来源记录、对应源码、SHA256SUMS，并补齐双语开源文档。
 
 从 v0.4.0-alpha.2 升级：进入原安装目录执行 `./mailweb backup`，然后 `./mailweb update --version v0.4.0-alpha.3 --yes`。升级自动校验发布包、保存一致性快照并更新应用与管理 CLI；保留账号、邮件数据、安装密钥、Stalwart 配置及监听端口。故障时使用命令给出的准确快照路径执行 `./mailweb restore /absolute/path/to/backups/SNAPSHOT --yes`，不要手动把旧镜像连接到已升级的数据库。详见 [升级说明](https://github.com/reina0721/webmail/blob/main/docs/cli.md#从-v040-alpha2-升级)。
 

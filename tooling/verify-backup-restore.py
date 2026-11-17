@@ -1,7 +1,8 @@
 """Restore an isolated copy of this test stack and operate its real mailboxes.
 Only the two named test projects are managed. No runtime configuration is edited.
 """
-import contextlib,json,os,pathlib,shutil,socket,subprocess,sys,time
+import contextlib,json,os,pathlib,re,shutil,socket,subprocess,sys,time
+from test_network import available_subnet
 ROOT=pathlib.Path(__file__).resolve().parents[1];runtime=ROOT/'tests/runtime/rebuild'
 sys.argv=[sys.argv[0],str(runtime)];sys.path.insert(0,str(ROOT/'tests'));import environment_client as env
 base_file=ROOT/'deploy/compose.test.yaml';project='mailweb-rebuild';stamp=str(int(time.time()));restored=runtime/'restore-checks'/stamp;restore_project='mailweb-restore-'+stamp
@@ -47,6 +48,7 @@ finally:compose(project,original_env,'up','-d','--wait','--wait-timeout','180')
 original=original_env.read_text();old='MAIL_WEB_TEST_ROOT='+str(runtime)
 assert original.splitlines().count(old)==1,'Unexpected test volume path; refusing to restore'
 text=original.replace(old,'MAIL_WEB_TEST_ROOT='+str(restored),1)
+text=re.sub(r'^MAIL_WEB_TEST_SUBNET=.*$', 'MAIL_WEB_TEST_SUBNET='+available_subnet(),text,flags=re.M)
 (restored/'compose.env').write_text(text);(restored/'compose.env').chmod(0o600)
 with free_ports(4) as ports:
  port,a,b,mail=ports

@@ -25,6 +25,8 @@ Mail Web connects to an existing Stalwart server; it does not install a mail ser
 
 ![Mail Web client](docs/screenshots/mail-native-1440.jpg)
 
+Releases pass a fast gate with native builds and actual install, upgrade and restore checks. Full client and sustained business validation then runs against the same published commit; its status and logs appear in the Release notes.
+
 ## Quick start
 
 Prerequisites: Linux AMD64/ARM64, Docker Engine, Compose v2, Bash, curl, tar and a SHA-256 tool. Use root or a user already authorized to access Docker. An existing Stalwart service and an HTTPS reverse proxy are needed for normal deployment.

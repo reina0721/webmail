@@ -24,7 +24,7 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 - Missing Turnstile configuration no longer reports otherwise valid mail-service credentials as missing.
 - URLs are rejected as Turnstile keys. Invalid saved values remain repairable; widget initialization and script failures show an actionable message without crashing the verification page.
 
-- Both architectures must pass real draft-asset installation and restore checks before a release becomes public.
+- Both architectures must pass real draft-asset installation and restore checks before a release becomes public. Full client and sustained business validation runs after publication against the same source commit, with its result recorded in release notes.
 - Release bundles include corresponding source from the recorded Git commit; existing AMD64 artifact names and manifest fields remain compatible.
 - Installed documentation includes bilingual entry points and examples, with installer fixtures cleaned up after their coexistence checks.
 

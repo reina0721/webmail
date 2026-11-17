@@ -1,4 +1,4 @@
-name: Validate and package
+name: Quick release and checks
 on:
   push:
   pull_request:
@@ -7,7 +7,7 @@ permissions:
   contents: read
 concurrency:
   # Serialize complete release runs across both main previews and version tags.
-  group: ${{ (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release-preview]'))) && 'mail-web-release' || format('validate-{0}', github.ref) }}
+  group: ${{ (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release-preview]'))) && 'mail-web-quick-release' || format('validate-{0}', github.ref) }}
   cancel-in-progress: ${{ !(startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release-preview]'))) }}
 jobs:
   cancel-superseded:
@@ -68,6 +68,7 @@ jobs:
             *) jq -e '.readyForPublicRegistration == true' docs/acceptance.json;;
           esac
   checks:
+    name: Quick checks (${{ matrix.architecture }})
     needs: [metadata, preflight]
     if: ${{ !cancelled() && needs.metadata.result == 'success' && (needs.preflight.result == 'success' || needs.preflight.result == 'skipped') }}
     strategy:
@@ -90,14 +91,19 @@ jobs:
       - run: node frontend/tooling/check-boundaries.mjs && node frontend/tooling/check-boundaries-fixtures.mjs
       - run: node tooling/check-persistence.mjs && node tooling/check-upstream.mjs
       - run: pnpm --dir frontend typecheck && pnpm --dir frontend build
-      # The Docker quality target below runs the full client suite once.
+      # Full client and 30-minute business validation runs after publication.
+      - run: pnpm --dir frontend/apps/web exec vitest run src/native
+      - name: Restore the generated pinned worker before exporting committed source
+        run: |
+          git restore --source=HEAD -- frontend/apps/web/public/store-worker.js
+          node tooling/check-upstream.mjs
       - run: node --test tests/motion-styles.test.mjs tests/operation-id.test.mjs tests/admin-access.test.mjs tests/setup-guidance.test.mjs tests/platform-account-context.test.mjs
       - run: rustup update stable && rustup default stable && rustup component add rustfmt clippy
       - run: cargo fmt --all -- --check && cargo test --locked --workspace && cargo clippy --locked --workspace --all-targets -- -D warnings
       - run: mkdir -p build && cargo run --locked -p mail-web -- --openapi > build/openapi.json && diff -u backend/contract/openapi.json build/openapi.json
       - run: pnpm --dir frontend exec openapi-typescript ../backend/contract/openapi.json -o apps/web/src/platform/lib/generated-api.ts && git diff --exit-code frontend/apps/web/src/platform/lib/generated-api.ts
       - run: bash -n install.sh && bash -n examples/install-unattended.sh; for script in deploy/*.sh tooling/*.sh tests/*.sh; do sh -n "$script"; done
-      - run: python3 tests/test-network.py && python3 tests/release-acceptance.py && python3 tests/release-packaging.py && python3 tooling/check-repository.py
+      - run: python3 tests/release-status.py && node --test tests/release-workflows.test.mjs && python3 tests/test-network.py && python3 tests/release-acceptance.py && python3 tests/release-packaging.py && python3 tooling/check-repository.py
       - name: Build native application
         env:
           ARCHITECTURE: ${{ matrix.architecture }}
@@ -108,10 +114,6 @@ jobs:
           docker pull stalwartlabs/stalwart:v1.0.1-alpine
           docker pull rust:1
           sudo MAIL_WEB_TEST_IMAGE=mail-web:ci sh tests/run-integration.sh
-      - name: Complete automatic Docker deployment and core product integration
-        run: |
-          docker tag mail-web:ci mail-web:rebuild
-          sudo MAIL_WEB_REVISION="$GITHUB_SHA" sh deploy/test-env.sh up --verify
       - name: Package verified native release
         if: needs.metadata.outputs.release == 'true'
         env:
@@ -193,6 +195,19 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare immutable publication record
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          mkdir -p build/published
+          jq -n --arg version "$VERSION" --arg commit "$GITHUB_SHA" --arg repository "$GITHUB_REPOSITORY" '{version:$version,sourceCommit:$commit,repository:$repository}' > build/published/release-record.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: published-release
+          path: build/published/release-record.json
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 90
       - name: Publish after both native install and restore suites pass
         env:
           GH_TOKEN: ${{ github.token }}
@@ -200,4 +215,5 @@ jobs:
         run: |
           set -eu
           sh tooling/release-guard.sh "$VERSION"
+          python3 tooling/release_status.py --repository "$GITHUB_REPOSITORY" --version "$VERSION" --commit "$GITHUB_SHA" --phase fast --status success --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false

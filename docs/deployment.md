@@ -2,7 +2,7 @@
 
 通用、可自行部署的 Webmail 与管理控制台。Next.js 静态界面由 Rust/Axum 提供，SQLite 保存平台数据，现有 Stalwart 保存邮件。**项目不预设邮件域名或运营品牌**：部署后在安装面板填写自己的站点名称、域名和 Stalwart 连接信息。公开注册默认关闭。
 
-当前发布通道为开发预览。最新重构的逐项状态见 [功能对照表](feature-parity.md)，上游复用与许可证见 [来源清单](upstream/README.md)。未通过全部门禁前不把工作树构建标为完成交付。构建、隔离集成测试和真实部署验收分别记录，不将构建成功当作邮件投递或注册服务验收。
+当前发布通道为开发预览。最新重构的逐项状态见 [功能对照表](feature-parity.md)，上游复用与许可证见 [来源清单](upstream/README.md)。快速发布与完整验证分别记录，尚未完成完整验证的版本会在 Release 说明中标为 pending 或 running。构建、隔离集成测试和真实部署验收分别记录，不将构建成功当作邮件投递或注册服务验收。
 
 ## 本机隔离环境
 
@@ -12,7 +12,7 @@ sh deploy/test-env.sh up --build --verify
 
 脚本创建独立的 Compose 项目、两台真实 Stalwart 和 Mailpit，通过应用初始化 API 配置域名、身份、Hook、运营邮箱和 Cloudflare 官方测试密钥；不会修改其他业务容器。`status`、`logs`、`verify`、`down` 使用同一个脚本。热更新入口为 `sh deploy/dev.sh up`，返回生产构建使用 `sh deploy/dev.sh down`。
 
-完整验收包含 Docker 内类型/构建/测试、真实业务、旧版故障回归、独立备份恢复和至少 30 分钟持续注册。未完成的产品功能会令最终发布矩阵门禁失败；当前重构状态和阻塞见 [重构报告](rebuild-test-report.md) 与 [未完成项](rebuild-blockers.md)。本机结果不代表公网域名、反垃圾信誉或生产 Turnstile 已验收。
+完整验收包含 Docker 内类型/构建/测试、真实业务、旧版故障回归、独立备份恢复和至少 30 分钟持续注册。未完成的产品功能会令发布后完整验证失败并在 Release 说明中标明；当前重构状态和阻塞见 [重构报告](rebuild-test-report.md) 与 [未完成项](rebuild-blockers.md)。本机结果不代表公网域名、反垃圾信誉或生产 Turnstile 已验收。
 
 ## 1. 部署方式与准备
 
@@ -212,7 +212,7 @@ cargo run --locked -p mail-web -- --openapi > backend/contract/openapi.json
 pnpm --dir frontend exec openapi-typescript ../backend/contract/openapi.json -o apps/web/src/platform/lib/generated-api.ts
 ```
 
-API 契约从 Rust/Utoipa 生成，生成文件不手改。发布流程、双架构附件、版本一致性、草稿验收和失败重试见 [发布维护指南](releasing.md)。普通提交运行质量与真实服务测试；版本标签或带 `[release-preview]` 的 main 提交通过全部门禁后进入草稿发布。
+API 契约从 Rust/Utoipa 生成，生成文件不手改。发布流程、双架构附件、版本一致性、草稿验收和失败重试见 [发布维护指南](releasing.md)。普通提交运行质量与真实服务测试；版本标签或带 `[release-preview]` 的 main 提交通过快速检查、双架构草稿安装及恢复验收后公开。随后对同一发布提交运行全量客户端、全部业务及持续注册检查，结果自动写入 Release 说明。
 
 发布包包含完整镜像、CLI、Compose、教程、接口契约及对应提交源码。服务器通过 `docker load` 导入镜像；默认部署继续使用 `pull_policy: never`。SHA-256 用于验证下载完整性，发布来源依赖 GitHub 仓库和发布权限。
 

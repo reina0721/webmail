@@ -18,4 +18,15 @@ class TestSubnet(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'No unused private test subnet'):
             network.select_subnet(['172.16.0.0/12'])
 
+class ActorAddress(unittest.TestCase):
+    def test_reserves_gateway_running_and_historical_actor_addresses(self):
+        self.assertEqual(network.select_actor_ip('172.16.0.0/29', {'172.16.0.2','172.16.0.3'}), '172.16.0.4')
+    def test_actor_addresses_are_never_reused_after_the_container_exits(self):
+        reserved=[]
+        for _ in range(5):
+            address=network.select_actor_ip('172.16.0.0/29',reserved)
+            self.assertNotIn(address,reserved);reserved.append(address)
+        with self.assertRaisesRegex(RuntimeError,'No unused test client IP'):
+            network.select_actor_ip('172.16.0.0/29',reserved)
+
 if __name__=='__main__': unittest.main()

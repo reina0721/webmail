@@ -66,3 +66,6 @@ services:
 networks:
   default:
     driver: bridge
+    ipam:
+      config:
+        - subnet: ${MAIL_WEB_TEST_SUBNET:?Run deploy/test-env.sh to select a test subnet}

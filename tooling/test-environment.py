@@ -6,6 +6,7 @@ ROOT=pathlib.Path(sys.argv[2]).resolve()
 assert ROOT.parts[-3:]==('tests','runtime','rebuild'), 'Refusing a non-test runtime directory'
 SETTINGS=ROOT/'settings.json'
 MODE=sys.argv[1]
+from test_network import available_subnet
 
 def request(url,body=None,method=None,headers=None,opener=None):
     data=json.dumps(body).encode() if body is not None else None
@@ -48,7 +49,7 @@ if MODE=='prepare':
         if directory.startswith('app'):os.chown(p,10001,10001)
         elif directory.startswith('stalwart'):os.chown(p,2000,2000)
     key=ROOT/'app/secrets/session.key';key.write_text(secrets.token_hex(32));key.chmod(0o600);os.chown(key,10001,10001)
-    entries={'MAIL_WEB_TEST_ROOT':str(ROOT),'MAIL_WEB_TEST_PORT':d['port'],'MAIL_WEB_TEST_STALWART_A_PORT':d['upstreamAPort'],'MAIL_WEB_TEST_STALWART_B_PORT':d['upstreamBPort'],'MAIL_WEB_TEST_MAILPIT_PORT':d['mailpitPort'],'MAIL_WEB_TEST_ADMIN_A':d['adminA'],'MAIL_WEB_TEST_ADMIN_B':d['adminB']}
+    entries={'MAIL_WEB_TEST_SUBNET':available_subnet(),'MAIL_WEB_TEST_ROOT':str(ROOT),'MAIL_WEB_TEST_PORT':d['port'],'MAIL_WEB_TEST_STALWART_A_PORT':d['upstreamAPort'],'MAIL_WEB_TEST_STALWART_B_PORT':d['upstreamBPort'],'MAIL_WEB_TEST_MAILPIT_PORT':d['mailpitPort'],'MAIL_WEB_TEST_ADMIN_A':d['adminA'],'MAIL_WEB_TEST_ADMIN_B':d['adminB']}
     env=ROOT/'compose.env';env.write_text('\n'.join(f'{k}={v}' for k,v in entries.items())+'\n');env.chmod(0o600);save(d);sys.exit()
 d=json.loads(SETTINGS.read_text());BASE='http://127.0.0.1:'+str(d['port']);ORIGIN=d['origin']
 
@@ -108,6 +109,7 @@ if MODE=='network':
     except OSError:answers=[]
     fake=any(v in ipaddress.ip_network('198.18.0.0/15') for v in answers)
     env=ROOT/'compose.env';lines=[line for line in env.read_text().splitlines() if not line.startswith('MAIL_WEB_TEST_CALENDAR_DOH=')]
+    if not any(line.startswith('MAIL_WEB_TEST_SUBNET=') for line in lines):lines.append('MAIL_WEB_TEST_SUBNET='+available_subnet())
     lines.append('MAIL_WEB_TEST_CALENDAR_DOH='+('https://1.1.1.1/dns-query' if fake else ''))
     env.write_text('\n'.join(lines)+'\n');env.chmod(0o600)
     print('Calendar DNS: '+('trusted public DoH for detected proxy fake-IP DNS; private addresses stay blocked' if fake else 'validated system DNS'))

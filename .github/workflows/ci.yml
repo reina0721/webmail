@@ -97,7 +97,7 @@ jobs:
       - run: mkdir -p build && cargo run --locked -p mail-web -- --openapi > build/openapi.json && diff -u backend/contract/openapi.json build/openapi.json
       - run: pnpm --dir frontend exec openapi-typescript ../backend/contract/openapi.json -o apps/web/src/platform/lib/generated-api.ts && git diff --exit-code frontend/apps/web/src/platform/lib/generated-api.ts
       - run: bash -n install.sh && bash -n examples/install-unattended.sh; for script in deploy/*.sh tooling/*.sh tests/*.sh; do sh -n "$script"; done
-      - run: python3 tests/release-acceptance.py && python3 tests/release-packaging.py && python3 tooling/check-repository.py
+      - run: python3 tests/test-network.py && python3 tests/release-acceptance.py && python3 tests/release-packaging.py && python3 tooling/check-repository.py
       - name: Build native application
         env:
           ARCHITECTURE: ${{ matrix.architecture }}

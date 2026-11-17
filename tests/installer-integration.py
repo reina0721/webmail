@@ -68,6 +68,9 @@ try:
  snapshot=pathlib.Path(run([a/'mailweb','backup']).strip().splitlines()[-1]);assert snapshot.is_dir();run([a/'mailweb','restore',snapshot,'--yes']);assert dbstate(a)==before and sha(a/'secrets/session.key')==key
  if enc:assert sha(a/'config/runtime.enc')==enc
  check('Consistent application snapshot restores real SQLite data, encrypted configuration and installation keys; sessions are explicitly revoked')
+ if args.state_fixture:
+  output=run([a/'mailweb','restore',snapshot,'--port',port(),'--yes'],False);assert 'public-origin' in output and status(a)['healthy'] and dbstate(a)==before
+  check('Restore refuses a changed listener without explicit Origin before stopping the existing configured instance')
  run([a/'deploy/mail-web.sh','status']);run([a/'deploy/mail-web.sh','version']);run([a/'mailweb','doctor','--json']);check('Legacy management wrapper, project-local CLI and JSON diagnostics work without depending on current directory')
  # A Docker-authorized non-root process, without changing any host group membership.
  if os.getuid()==0 and pathlib.Path('/home/zero').is_dir():

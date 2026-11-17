@@ -739,6 +739,29 @@ fn restore(s: &Settings, snapshot: &Path, cli: &Cli) -> Result<()> {
     let stage = tempfile::tempdir_in(&s.root)?;
     release::unpack(&path.join("config-secrets.tar.gz"), stage.path())?;
     let env = config::env_read(&path.join(".env"))?;
+    if stage.path().join("config/runtime.enc").exists() && cli.public_origin.is_none() {
+        let original_bind = env
+            .get("LISTEN_ADDRESS")
+            .map(String::as_str)
+            .unwrap_or("127.0.0.1")
+            .trim_matches(['[', ']'])
+            .parse()?;
+        let original_port = env
+            .get("PORT")
+            .map(String::as_str)
+            .unwrap_or("18090")
+            .parse()?;
+        let (target_bind, target_port) = if let Some(bind) = &cli.bind {
+            let (ip, port) = config::endpoint(bind, cli.port)?;
+            (ip, port.unwrap_or(original_port))
+        } else {
+            (original_bind, cli.port.unwrap_or(original_port))
+        };
+        ensure!(
+            original_bind == target_bind && original_port == target_port,
+            "恢复时更改已有站点监听，必须使用 --public-origin 明确保留的反代来源或新的直连来源"
+        );
+    }
     let version = env.get("MAIL_WEB_VERSION").context("快照缺少版本")?;
     let image = format!("mail-web:{version}");
     let image_id = docker::capture(&["image", "inspect", "--format", "{{.Id}}", &image])?;

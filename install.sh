@@ -10,6 +10,8 @@ repo_explicit=0
 args=("$@")
 for ((i=0;i<${#args[@]};i++)); do
  case "${args[i]}" in
+  --repository=*) repository=${args[i]#*=}; repo_explicit=1;;
+  --download-mirror=*) mirror=${args[i]#*=};;
   --repository) ((i+1<${#args[@]})) || { echo '缺少仓库参数' >&2; exit 1; }; repository=${args[i+1]}; repo_explicit=1;;
   --download-mirror) ((i+1<${#args[@]})) || { echo '缺少下载代理参数' >&2; exit 1; }; mirror=${args[i+1]};;
   --help|-h) echo 'Mail Web 一键安装：--dir PATH --container-name NAME --bind IP --port PORT --public-origin URL --allow-http --version latest|vVERSION --channel latest|stable --repository OWNER/REPO --download-mirror HTTPS_URL --yes';exit 0;;

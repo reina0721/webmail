@@ -2,7 +2,7 @@
 
 Bulwark 固定基线：`7cdedb60cc157cfeaf19623732b1135da6d3dc28`。范围：local Docker and isolated Stalwart only；通知系统弹窗、系统打印窗口在内嵌浏览器不可观察，报告明确区分组件/协议回归与系统界面验收；不要求用户安装额外浏览器。
 
-`browser-verified` 有真实浏览器操作及服务结果；`verified` 使用浏览器、真实服务与边界回归证据组合。系统界面限制不计为已观察通过。核心门禁已通过；提交后的发布核对单独记录。
+`browser-verified` 有真实浏览器操作及服务结果；`verified` 使用浏览器、真实服务与边界回归证据组合。系统界面限制不计为已观察通过。核心和发布门禁分别记录。
 
 | 模块 | 功能 | 状态 | 上游 / 本站入口 | 适配及证据 |
 | --- | --- | --- | --- | --- |
@@ -34,4 +34,4 @@ Bulwark 固定基线：`7cdedb60cc157cfeaf19623732b1135da6d3dc28`。范围：loc
 | 控制台 | 统一概览、账号配额、服务域名、注册验证、任务审计、部署信息 | browser-verified | 本站统一控制台 · [frontend/apps/web/src/native/console.tsx](../frontend/apps/web/src/native/console.tsx) | 原平台 API 兼容及安装控制面；统一概览、用户、服务、注册、站点、任务和安装七页明暗主题五宽度无整页溢出。实际配额保存、注册名额 100→99→100、目录策略关闭/恢复、默认撤销延时 5→10→5、品牌修改/恢复均刷新回显。双向服务/域名选择、目录作用域、深链接和未保存保护通过。任务、健康、审计及完整运行版本可读。配额浮层五宽度无溢出，Tab/Escape 后焦点返回管理按钮。[console-service-context-fixed-dark-390.jpg](screenshots/console-service-context-fixed-dark-390.jpg)、console-*-{light,dark}-final-*.jpg。 |
 | 安装 | 自动首次初始化、读取、增量、失败续跑 | verified | 本站自动配置适配（非 Bulwark 复制模块） · [frontend/apps/web/src/native/setup.tsx](../frontend/apps/web/src/native/setup.tsx) | Rust 安装 journal/自动服务资源创建；两台服务首次 API 初始化、授权增量目录升级、幂等重复 bootstrap、迁移前一致性快照、中断/创建未知恢复和独立备份恢复通过；浏览器 /console/setup/ 读取已完成 directory/hook/gateway-v2/apply journal，旧 /admin/ 和 /setup/ 实际跳转统一控制台。最终候选部署回归结果见 rebuild-test-report.md。 |
 | 持续注册 | 健康过期、故障恢复及 30 分钟生产构建注册 | verified | 本站注册稳定性修复（非 Bulwark 复制模块） · [frontend/apps/web/src/native/auth.tsx](../frontend/apps/web/src/native/auth.tsx) | 持久开放策略与实时健康分离；最终生产 Docker 构建 working-tree-5602285-native-v44 连续 1802.6 秒，四次真实 SMTP 验证码收信、注册与登录通过；前后 build.json 完全一致。健康过期及依赖故障恢复通过 Rust 和真实服务回归。证据 docs/acceptance/[soak-build-report.json](acceptance/soak-build-report.json) 与 [soak-report.json](acceptance/soak-report.json)；仅本机隔离环境。 |
-| 发布 | 全部门禁、提交、推送、运行提交标识 | pending | 本站构建与发布脚本 · [frontend/apps/web/native-build.mjs](../frontend/apps/web/native-build.mjs) | Docker/备份/契约/自动验证；工作树构建已运行，未提交或推送；不得把旧 UI 报告算作新交付 |
+| 发布 | 全部门禁、提交、推送、运行提交标识 | verified | 本站构建与发布脚本 · [frontend/apps/web/native-build.mjs](../frontend/apps/web/native-build.mjs) | Docker/备份/契约/自动验证；核心质量、真实双服务、恢复及 1802.6 秒四轮持续注册门禁通过后，实现提交 9959363da42e14f870c9a6bd0c7045677105acbd 已推送 origin/main 并部署。前端 build.json、后端 revision 和远端提交一致，双服务真实登录及邮件/PIM 读取通过；[publication-report.json](acceptance/publication-report.json)。最终文档收尾提交保持相同应用源码指纹，并同步运行提交标识。 |

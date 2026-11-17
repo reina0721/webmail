@@ -290,8 +290,8 @@
       "upstreamUrl": null,
       "local": "frontend/apps/web/native-build.mjs",
       "adapter": "Docker/备份/契约/自动验证",
-      "status": "pending",
-      "evidence": "工作树构建已运行，未提交或推送；不得把旧 UI 报告算作新交付"
+      "status": "verified",
+      "evidence": "核心质量、真实双服务、恢复及 1802.6 秒四轮持续注册门禁通过后，实现提交 9959363da42e14f870c9a6bd0c7045677105acbd 已推送 origin/main 并部署。前端 build.json、后端 revision 和远端提交一致，双服务真实登录及邮件/PIM 读取通过；publication-report.json。最终文档收尾提交保持相同应用源码指纹，并同步运行提交标识。"
     }
   ],
   "remainingTransportAdapters": [],

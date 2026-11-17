@@ -78,11 +78,12 @@
   "currentRebuild": {
     "baseline": "7cdedb60cc157cfeaf19623732b1135da6d3dc28",
     "releaseReady": true,
-    "status": "Local core gates passed for the Bulwark-native rebuild; publication and exact deployed commit are recorded separately.",
+    "status": "Local core gates and implementation publication passed; current deployed commit is exposed by build.json and the backend revision. Historical public-production evidence does not certify this rebuild.",
     "featureMatrix": "docs/feature-parity.json",
     "scope": "Local Docker, two isolated Stalwart services and Mailpit only; not public production",
     "report": "docs/rebuild-test-report.md",
-    "evidence": "docs/acceptance/workflow-report.json"
+    "evidence": "docs/acceptance/workflow-report.json",
+    "publication": "docs/acceptance/publication-report.json"
   },
   "historicalEvidenceOnly": "The older production/release lists below predate the Bulwark-native rebuild. Only currentRebuild and its linked reports describe this candidate."
 }

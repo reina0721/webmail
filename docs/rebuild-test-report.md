@@ -73,6 +73,6 @@ EML、ZIP、mbox、PST 实际导入并阅读。42 MB/80 封 mbox 在第 37 封�
 
 ## 最终交付记录
 
-本机核心门禁已完成，见 [命令结果](acceptance/workflow-report.json) 和 [脱敏摘要](acceptance/workflow-summary.log)。提交、推送及对应版本部署在通过门禁后执行，并单独保存 publication-report.json。`docs/acceptance.json` 中旧生产记录属于历史版本，不能替代本文的本机重构验收。
+本机核心门禁完成后，实现提交 [`9959363da42e14f870c9a6bd0c7045677105acbd`](https://github.com/reina0721/webmail/commit/9959363da42e14f870c9a6bd0c7045677105acbd) 已推送 `origin/main` 并部署；前后端与远端 SHA 一致，双服务真实登录、邮件/PIM 读取及注册策略通过。见 [发布核对](acceptance/publication-report.json)、[命令结果](acceptance/workflow-report.json) 和 [脱敏摘要](acceptance/workflow-summary.log)。证据收尾提交仅修改文档，最终运行标识再次与当前 `HEAD` 和 `origin/main` 同步；运行时 `/build.json`、控制台概览和后端健康接口可查看实际版本。`docs/acceptance.json` 中旧生产记录属于历史版本，不能替代本文的本机重构验收。
 
 日历修复跨手机/桌面缩放时 resize 与 scroll 事件交错覆盖周锚点，以及 Today 导航未同步父标题，三项针对性回归均通过。实机：五宽度连续缩放保持 2026-10-26 首周与 11 月标题，页面宽度等于视口；固定月份模式六周布局五宽度检查通过，恢复自由滚动并刷新保留。确认长页截图会触发虚拟网格重排，故自由滚动以 DOM 几何和真实视口截图交叉验收，固定月份用完整截图；不将截图副作用单独当作产品失败。

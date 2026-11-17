@@ -1,0 +1,19 @@
+{
+  "commit": "9959363da42e14f870c9a6bd0c7045677105acbd",
+  "remoteMain": "9959363da42e14f870c9a6bd0c7045677105acbd",
+  "frontendBuild": {
+    "buildId": "9959363da42e14f870c9a6bd0c7045677105acbd",
+    "revision": "9959363da42e14f870c9a6bd0c7045677105acbd",
+    "version": "v0.4.0-alpha.1"
+  },
+  "backendRevision": "9959363da42e14f870c9a6bd0c7045677105acbd",
+  "applicationInputFingerprint": "bbaec466d907158b261cd685fcf6de84a4ffecdaf979f347e495d8912ee8c235",
+  "publicRegistrationPolicyEnabled": true,
+  "realPrimaryAndSecondServerLogins": true,
+  "mailAndPimReads": true,
+  "scope": "local isolated Docker only",
+  "attestation": "Implementation commit publication; evidence-only finishing commits retain identical production inputs and receive a final runtime SHA check.",
+  "at": "2026-11-17T12:04:55.733103+00:00",
+  "passed": true,
+  "phase": "published"
+}

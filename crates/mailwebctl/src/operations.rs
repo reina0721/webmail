@@ -228,6 +228,25 @@ fn read_origin(s: &Settings) -> Result<String> {
         .unwrap_or_default()
         .into())
 }
+fn ensure_not_downgrade(s: &Settings, version: &str) -> Result<()> {
+    let target = semver::Version::parse(version.trim_start_matches('v'))?;
+    let manifest = installed(s)?;
+    // .env is committed before the new program may migrate the database. The
+    // success manifest can still be old if startup or the host was interrupted.
+    for record in [
+        s.values.get("MAIL_WEB_VERSION").map(String::as_str),
+        manifest.as_ref().map(|m| m.version.as_str()),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        ensure!(
+            semver::Version::parse(record.trim_start_matches('v'))? <= target,
+            "禁止直接降级数据库；请使用匹配快照恢复"
+        );
+    }
+    Ok(())
+}
 fn install(
     s: &mut Settings,
     old: &Settings,
@@ -247,13 +266,7 @@ fn install(
         cli.download_mirror.as_deref(),
         bundle,
     )?;
-    if let Some(old) = installed(s)? {
-        ensure!(
-            semver::Version::parse(old.version.trim_start_matches('v'))?
-                <= semver::Version::parse(manifest.version.trim_start_matches('v'))?,
-            "禁止直接降级数据库；请使用匹配快照恢复"
-        )
-    }
+    ensure_not_downgrade(s, &manifest.version)?;
     eprintln!(
         "校验完成：{} · {}",
         manifest.version, manifest.source_commit
@@ -860,5 +873,33 @@ mod root_tests {
         let d = tempfile::tempdir().unwrap();
         fs::create_dir(d.path().join("bin")).unwrap();
         assert!(installed_root(&d.path().join("bin/mailwebctl")).is_none());
+    }
+}
+
+#[cfg(test)]
+mod downgrade_tests {
+    use super::*;
+    #[test]
+    fn interrupted_upgrade_keeps_the_runtime_version_floor_even_with_an_old_manifest() {
+        let d = tempfile::tempdir().unwrap();
+        fs::write(d.path().join(".env"), "MAIL_WEB_VERSION=0.4.0-alpha.2").unwrap();
+        let s = Settings::load(d.path()).unwrap();
+        assert!(ensure_not_downgrade(&s, "v0.3.0-alpha.2").is_err());
+        s.init().unwrap();
+        let old = Manifest {
+            version: "v0.3.0-alpha.2".into(),
+            source_commit: "a".repeat(40),
+            architecture: "linux/amd64".into(),
+            image: "mail-web:0.3.0-alpha.2".into(),
+            image_id: format!("sha256:{}", "a".repeat(64)),
+            cli_version: None,
+        };
+        fs::write(
+            s.root.join("config/installed-release.json"),
+            serde_json::to_vec(&old).unwrap(),
+        )
+        .unwrap();
+        assert!(ensure_not_downgrade(&s, "v0.3.0-alpha.2").is_err());
+        assert!(ensure_not_downgrade(&s, "v0.4.0-alpha.2").is_ok());
     }
 }

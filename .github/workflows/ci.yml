@@ -39,7 +39,7 @@ jobs:
       - run: node frontend/tooling/check-boundaries.mjs && node frontend/tooling/check-boundaries-fixtures.mjs
       - run: node tooling/check-persistence.mjs && node tooling/check-upstream.mjs
       - run: pnpm --dir frontend typecheck && pnpm --dir frontend build
-      - run: pnpm --dir frontend/apps/web test:client
+      # The Docker quality target below runs the full client suite once.
       - run: node --test tests/motion-styles.test.mjs tests/operation-id.test.mjs tests/admin-access.test.mjs tests/setup-guidance.test.mjs tests/platform-account-context.test.mjs
       - run: rustup update stable && rustup default stable && rustup component add rustfmt clippy
       - run: cargo fmt --all -- --check && cargo test --locked --workspace && cargo clippy --locked --workspace --all-targets -- -D warnings
@@ -57,7 +57,7 @@ jobs:
       - name: Complete automatic Docker deployment and core product integration
         run: |
           docker tag mail-web:ci mail-web:rebuild
-          sudo sh deploy/test-env.sh up --verify
+          sudo MAIL_WEB_REVISION="$GITHUB_SHA" sh deploy/test-env.sh up --verify
       - if: startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release-preview]'))
         run: docker save mail-web:ci -o /tmp/mail-web-image.tar
       - uses: actions/upload-artifact@v4

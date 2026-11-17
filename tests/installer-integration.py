@@ -122,6 +122,10 @@ try:
    run(['bash',bootstrap,'--dir',legacy,'--yes','--bundle',bundle],env=env);created.append(legacy)
    ls=status(legacy);assert ls['healthy'] and ls['container']==ln and ls['port']==lp and ls['version']=='v0.4.0-alpha.2';assert sha(legacy/'secrets/session.key')==oldkey
    run([legacy/'deploy/mail-web.sh','status']);check('Actual v0.3.0-alpha.2 Release and legacy shell installation upgrade to Rust management and new schema without resetting custom infrastructure or session key')
+   oldsnapshot=next(x for x in (legacy/'backups').iterdir() if x.is_dir() and (x/'.env').exists() and 'MAIL_WEB_VERSION=0.3.0-alpha.2' in (x/'.env').read_text())
+   run([legacy/'mailweb','restore',oldsnapshot,'--yes']);ls=status(legacy);assert ls['healthy'] and ls['version']=='v0.3.0-alpha.2' and sha(legacy/'secrets/session.key')==oldkey
+   run([legacy/'mailweb','install','--yes','--bundle',bundle]);assert status(legacy)['healthy'] and status(legacy)['version']=='v0.4.0-alpha.2'
+   check('Matching old-version snapshot restores the old database and retained image safely, then upgrades again with the same installation key')
   finally:
    if (legacy/'mailweb').exists():run([legacy/'mailweb','stop'])
    else:run(['sh',legacy/'deploy/mail-web.sh','stop'])

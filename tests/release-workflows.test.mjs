@@ -22,6 +22,7 @@ test('published record exists before public release and triggers pinned full val
  assert.ok(record>=0&&record<publish);
  assert.deepEqual(full.on.workflow_run.workflows,[quick.name]);
  assert.match(full.jobs.metadata.if,/head_repository.full_name == github.repository/);
+ assert.match(full.jobs.metadata.if,/workflow_dispatch/);
  assert.match(runs(full.jobs.metadata),/sourceCommit == \$commit/);
  assert.match(runs(full.jobs.metadata),/\.draft == false/);
  assert.match(runs(full.jobs.metadata),/verify_owner/);

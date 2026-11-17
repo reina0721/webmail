@@ -1,7 +1,7 @@
 """Actual release-archive install/restore/network regression. Dedicated directories only.
 Run as root with Docker access, never changes application database contents directly.
 """
-import argparse,datetime,hashlib,json,os,pathlib,secrets,shutil,socket,sqlite3,subprocess,tarfile,time,urllib.request
+import argparse,datetime,hashlib,json,os,pathlib,secrets,shutil,socket,sqlite3,subprocess,tarfile,tempfile,time,urllib.request
 p=argparse.ArgumentParser();p.add_argument('bundle',type=pathlib.Path);p.add_argument('--state-fixture',type=pathlib.Path);p.add_argument('--legacy',action='store_true');args=p.parse_args()
 repo=pathlib.Path(__file__).resolve().parents[1];bundle=args.bundle.resolve();stamp=str(int(time.time()));root=repo/'tests/runtime'/('installer-'+stamp);root.mkdir(parents=True);evidence=[];bootstrap=bundle.parent/'install.sh';assert bootstrap.is_file();PUBLIC=urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
@@ -90,11 +90,15 @@ try:
  # Explicit failure paths must leave infrastructure and unrelated services untouched.
  foreigndir=root/'unrelated-directory';foreigndir.mkdir();foreigncompose=foreigndir/'compose.yaml';foreigncompose.write_text('unrelated service');output=run([a/'mailweb','install','--dir',foreigndir,'--yes','--bundle',bundle],False);assert '拒绝覆盖' in output and foreigncompose.read_text()=='unrelated service' and not (foreigndir/'.env').exists()
  check('Unrecognized nonempty directory is refused without overwriting another project configuration')
- denied=root/'no-docker';denied.mkdir();os.chown(denied,1000,1000)
- def no_docker():os.setgroups([]);os.setgid(1000);os.setuid(1000)
- denied_cli=root/'no-docker-cli';shutil.copy(a/'bin/mailwebctl',denied_cli);denied_cli.chmod(0o755)
- output=run([denied_cli,'install','--dir',denied,'--yes','--bundle',bundle],False,preexec=no_docker)
- assert 'Docker' in output and not (denied/'.env').exists()
+ # Runner workspaces may live under a private /home/runner. A dropped
+ # process must be able to execute the CLI before testing Docker denial.
+ with tempfile.TemporaryDirectory(prefix='mailweb-no-docker-') as temporary:
+  public=pathlib.Path(temporary);public.chmod(0o755)
+  denied=public/'installation';denied.mkdir();os.chown(denied,65534,65534)
+  def no_docker():os.setgroups([]);os.setgid(65534);os.setuid(65534)
+  denied_cli=public/'mailwebctl';shutil.copy(a/'bin/mailwebctl',denied_cli);denied_cli.chmod(0o755)
+  output=run([denied_cli,'install','--dir',denied,'--yes','--bundle',bundle],False,preexec=no_docker)
+  assert 'Docker' in output and not (denied/'.env').exists()
  check('Missing Docker socket permission fails clearly before writing installation configuration')
  downloads=root/'interrupted-download';downloads.mkdir();curl=downloads/'curl'
  curl.write_text('#!/usr/bin/env python3\nimport pathlib,sys,shutil\na=sys.argv[1:];out=pathlib.Path(a[a.index("-o")+1]);url=next(x for x in a if x.startswith("https://"))\nif url.endswith("SHA256SUMS"):shutil.copy('+repr(str(bundle.parent/'SHA256SUMS'))+',out)\nelse:out.write_bytes(b"partial");sys.exit(18)\n')

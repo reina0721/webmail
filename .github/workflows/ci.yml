@@ -25,9 +25,9 @@ jobs:
       - run: cargo fmt --all -- --check && cargo test --locked --workspace && cargo clippy --locked --workspace --all-targets -- -D warnings
       - run: cargo run --locked -p mail-web -- --openapi > build-openapi.json && diff -u backend/contract/openapi.json build-openapi.json
       - run: pnpm --dir frontend exec openapi-typescript ../backend/contract/openapi.json -o apps/web/src/platform/lib/generated-api.ts && git diff --exit-code frontend/apps/web/src/platform/lib/generated-api.ts
-      - run: for script in deploy/*.sh tooling/*.sh tests/*.sh; do sh -n "$script"; done
+      - run: bash -n install.sh; for script in deploy/*.sh tooling/*.sh tests/*.sh; do sh -n "$script"; done
       - run: python3 tests/release-acceptance.py
-      - run: docker build --platform linux/amd64 -t mail-web:ci .
+      - run: docker build --platform linux/amd64 --build-arg MAIL_WEB_REVISION="$GITHUB_SHA" -t mail-web:ci .
       - run: docker run --rm --pull never mail-web:ci --runtime-info
       - name: Real Stalwart and application integration
         run: |
@@ -83,21 +83,43 @@ jobs:
       - env:
           VERSION: ${{ steps.version.outputs.version }}
         run: sh tooling/package-release.sh "$VERSION"
-      - name: Publish direct-download assets
+      - name: Create or update draft release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          directory="build/release/$VERSION"
-          case "$VERSION" in *-*) prerelease=--prerelease;; *) prerelease=;; esac
-          gh release create "$VERSION" "$directory/mail-web-linux-amd64.tar.gz" "$directory/SHA256SUMS" "$directory/release-manifest.json" --target "$GITHUB_SHA" --title "Mail Web $VERSION" --notes-file docs/release-notes.md $prerelease
-      - name: Verify published direct-download installation and restore
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          docker pull python:3.13-slim-bookworm
-          if ! sudo MAIL_WEB_TEST_PYTHON_IMAGE=python:3.13-slim-bookworm sh tests/release-install.sh "$VERSION"; then
-            gh release edit "$VERSION" --draft
-            exit 1
+          set -eu
+          if gh release view "$VERSION" --json isDraft --jq .isDraft > /tmp/release-draft 2>/dev/null; then
+            test "$(cat /tmp/release-draft)" = true || { echo 'Published releases are immutable'; exit 1; }
+          else
+            case "$VERSION" in *-*) preview=--prerelease;; *) preview=;; esac
+            gh release create "$VERSION" --draft $preview --target "$GITHUB_SHA" --title "Mail Web $VERSION" --notes-file docs/release-notes.md
           fi
+          # Only an unpublished draft may retarget its tag after a failed build.
+          # Never alter a tag associated with an already published release.
+          if tag_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$VERSION" --jq .object.sha 2>/tmp/release-tag-error); then
+            if [ "$tag_sha" != "$GITHUB_SHA" ]; then
+              gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$VERSION" -f sha="$GITHUB_SHA" -F force=true
+            fi
+          else
+            grep -q 'HTTP 404' /tmp/release-tag-error || { cat /tmp/release-tag-error; exit 1; }
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$VERSION" -f sha="$GITHUB_SHA"
+          fi
+          gh release edit "$VERSION" --target "$GITHUB_SHA" --notes-file docs/release-notes.md
+          directory="build/release/$VERSION"
+          gh release upload "$VERSION" "$directory/mail-web-linux-amd64.tar.gz" "$directory/mailwebctl-linux-amd64.tar.gz" "$directory/SHA256SUMS" "$directory/release-manifest.json" "$directory/install.sh" --clobber
+      - name: Download and verify the actual draft assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -eu
+          assets="$RUNNER_TEMP/draft-assets"
+          mkdir -p "$assets"
+          gh release download "$VERSION" --repo "$GITHUB_REPOSITORY" --dir "$assets"
+          sudo MAIL_WEB_RELEASE_ASSET_DIR="$assets" sh tests/release-install.sh "$VERSION"
+      - name: Publish only after installation and restore passed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: gh release edit "$VERSION" --draft=false

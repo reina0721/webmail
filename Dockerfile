@@ -13,6 +13,9 @@ ENV MAIL_WEB_REVISION=$MAIL_WEB_REVISION
 WORKDIR /source
 COPY Cargo.toml Cargo.lock ./
 COPY backend/ ./backend/
+COPY crates/ ./crates/
+COPY compose.yaml install.sh ./
+COPY deploy/ ./deploy/
 RUN --mount=type=cache,target=/usr/local/cargo/registry --mount=type=cache,target=/source/target cargo build --locked --release -p mail-web && cp /source/target/release/mail-web /source/mail-web
 
 # Opt-in quality target used by the one-command verification workflow.
@@ -34,7 +37,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry --mount=type=cache,targe
 FROM client-quality AS quality
 COPY --from=backend-quality /source/backend-quality.done /source/backend-quality.done
 
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim AS application
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/* \
     && groupadd -g 10001 mail-web && useradd -u 10001 -g 10001 -M mail-web
 WORKDIR /app
@@ -43,3 +46,19 @@ COPY --from=frontend /source/frontend/apps/web/out /app/static
 USER 10001:10001
 EXPOSE 8080
 ENTRYPOINT ["/app/mail-web"]
+
+# Static host CLI release asset; never included as an application runtime service.
+FROM rust:1-alpine AS cli-release
+WORKDIR /source
+RUN apk add --no-cache musl-dev
+COPY Cargo.toml Cargo.lock ./
+COPY backend/ ./backend/
+COPY crates/ ./crates/
+COPY compose.yaml install.sh ./
+COPY deploy/ ./deploy/
+RUN --mount=type=cache,target=/usr/local/cargo/registry --mount=type=cache,target=/source/target cargo build --locked --release -p mailwebctl && mkdir /output && cp target/release/mailwebctl /output/mailwebctl
+
+FROM scratch AS cli-artifact
+COPY --from=cli-release /output/mailwebctl /mailwebctl
+
+FROM application AS final

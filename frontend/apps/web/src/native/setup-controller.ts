@@ -132,6 +132,8 @@ export function useAutomaticInstallation({ initialStatus }: { initialStatus?: St
     try {
       const current = initialStatus ?? (await api<Status>("/installation"));
       if (!active()) return;
+      setStatus(current);
+      if (!current.configured) setSpec((s) => ({ ...s, publicOrigin: s.publicOrigin || origin }));
       const prior = await api<{ job: Job | null }>(
         "/installation/initialize/job",
         { headers: auth() },
@@ -172,7 +174,9 @@ export function useAutomaticInstallation({ initialStatus }: { initialStatus?: St
       setLoaded(true);
     } catch (e) {
       if (active()) {
-        setError(errorMessage(e));
+        setError(e instanceof ApiError && e.status === 401
+          ? token ? "安装令牌无效或已轮换，请重新获取本安装的管理链接" : "请填写安装令牌，或使用安装工具提供的管理链接继续"
+          : errorMessage(e));
         setLoaded(false);
       }
     } finally {

@@ -5,12 +5,15 @@ services:
     pull_policy: never
     restart: unless-stopped
     init: true
-    user: "10001:10001"
+    user: "${APP_UID:-10001}:${APP_GID:-10001}"
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     ports:
-      - "${LISTEN_ADDRESS:-127.0.0.1}:${PORT:-18090}:8080"
+      - target: 8080
+        published: "${PORT:-18090}"
+        host_ip: "${LISTEN_ADDRESS:-127.0.0.1}"
+        protocol: tcp
     env_file: .env
     environment:
       BIND_ADDR: 0.0.0.0:8080

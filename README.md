@@ -16,42 +16,46 @@ sh deploy/test-env.sh up --build --verify
 
 ## 1. 部署方式与准备
 
-- 发布平台：Linux AMD64；单实例 SQLite。
-- 服务器已有 Docker Engine、Compose v2，以及 `curl jq openssl tar sha256sum flock realpath`。安装器只检查这些工具，**不安装系统软件**。
-- 安装时不需要填写 Stalwart、邮箱域名或管理员密码；无邮件连接时仍能启动并通过健康检查。
-- 安装完成后在面板授权已有 Stalwart 的 HTTPS JMAP 服务；需要自动创建 Turnstile 时再提供目标 Cloudflare 账号的 Turnstile 写入 Token。
-- 先选择专用安装目录、容器名称和监听地址。目录通过 `--dir` 传入，项目没有固定安装路径。
+支持 Linux AMD64，宿主机需已有 Docker Engine、Compose v2，以及 Bash、curl、tar 和 SHA-256 工具。支持 root 或已有 Docker 权限的普通用户；安装器不安装系统软件。
 
-服务器下载 GitHub Release 的项目产物，校验 SHA-256，使用 `docker load` 导入镜像，再以 `--pull never --no-build` 启动。**目标服务器不从镜像仓库拉取镜像，也不编译源码。** CI 构建环境可使用官方构建和隔离测试镜像。
+服务器下载并校验 GitHub Release 包，通过 `docker load` 导入镜像。目标服务器不编译源码、不从镜像仓库拉取镜像。安装器只管理应用目录、容器、监听和访问方式；Stalwart 授权、域名、账号、Hook 与 Turnstile 均由网页控制台配置。
 
-## 2. 下载与安装
+## 2. 一键安装
 
-以下目录只是示例，请自行指定：
-
-```sh
-INSTALL_DIR="$HOME/apps/mail-web"
-VERSION=v0.3.0-alpha.2
-mkdir -p "$INSTALL_DIR"
-curl -fSL "https://raw.githubusercontent.com/reina0721/webmail/$VERSION/deploy/install.sh" -o "$INSTALL_DIR/install.sh"
-sh "$INSTALL_DIR/install.sh" \
-  --dir "$INSTALL_DIR" \
-  --version "$VERSION" \
-  --name mail-web \
-  --bind 127.0.0.1:18090
+```bash
+curl -fsSL https://raw.githubusercontent.com/reina0721/webmail/main/install.sh | bash
 ```
 
-默认只绑定回环地址。若已准备 HTTPS 反代，将它指向所选监听端口。代理需保留正确 Host/Origin，允许 SSE 长连接并关闭缓冲。本项目不自动修改 DNS、反向代理或其他项目。
+中文向导通过 `/dev/tty` 读取输入，支持管道运行。首次默认目录为 `~/apps/mail-web`，监听 `127.0.0.1:18090`，默认采用已有 HTTPS 反代；容器名和 Compose 项目名按规范化目录生成稳定标识。向导可修改目录、名称、IP、端口和访问方式。安装器不修改宿主机反代、DNS、证书或防火墙。
 
-要直接通过指定 IP 和端口使用 HTTP，需要自行选择监听 IP，并显式传入 `--allow-http`。HTTP 不加密登录信息、邮件或 Cookie；管理配置应使用后文的 SSH 通道，正式用户入口建议配置 HTTPS。不能把 HTTP 登录描述为加密访问。
+已有 HTTPS 反代的无人值守示例：
 
-安装结束会显示当前安装的 `/console/setup/` 链接及管理令牌。该链接属于管理能力，请保密。令牌保存在本安装的 `secrets/setup.key`，不会进入镜像或 Git。再次获取或轮换：
-
-```sh
-sh "$INSTALL_DIR/deploy/mail-web.sh" setup
-sh "$INSTALL_DIR/deploy/mail-web.sh" rotate-setup-token
+```bash
+curl -fsSL https://raw.githubusercontent.com/reina0721/webmail/main/install.sh | bash -s -- \
+  --yes --dir "$HOME/apps/mail-web" --container-name my-webmail \
+  --bind 127.0.0.1 --port 18090 --public-origin https://mail.example.org
 ```
 
-无稳定版时，`latest` 会明确失败；开发预览请像示例一样指定准确版本。稳定版发布后可使用 `--version latest`。可用 `--repository OWNER/REPO` 或 `MAIL_WEB_REPOSITORY` 为自己的 fork 指定产物来源。
+HTTP 直连需明确选择或传入 `--allow-http`：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/reina0721/webmail/main/install.sh | bash -s -- \
+  --yes --dir "$HOME/apps/mail-web" --bind 0.0.0.0 --port 18090 \
+  --allow-http --public-origin http://YOUR_SERVER_IP:18090
+```
+
+IPv6 使用 `--bind ::1 --port 18090`；旧写法 `--bind '[::1]:18090'` 和 `--name` 仍兼容。同机多实例选择不同目录、名称及端口。通配监听输出可用的本地诊断地址，远程使用服务器实际 IP；不会把 `0.0.0.0` 或 `::` 当作访问地址。
+
+默认选择最高 SemVer 已发布版本，包含预发布并排除草稿；仅稳定版使用 `--channel stable`，精确版本使用 `--version v0.4.0-alpha.2`。选定版本缺少产物或校验失败会停止，不回退。引导 CLI 固定到已验收版本，应用版本由 Rust 解析 Release 列表。Fork 使用 `--repository OWNER/REPO`；下载代理使用 `--download-mirror HTTPS_URL`，始终校验同一 SHA-256。
+
+安装完成后运行：
+
+```bash
+"$HOME/apps/mail-web/mailweb" status
+"$HOME/apps/mail-web/mailweb" setup --show-token
+```
+
+管理链接包含敏感令牌，请保密。非终端输出默认隐藏令牌；显式 `setup --show-token` 可显示。无需手工编辑 `.env`。完整参数、维护命令及旧版迁移见 [Rust CLI 文档](docs/cli.md)。
 
 ## 3. 进入面板配置 Stalwart
 
@@ -146,28 +150,28 @@ docker compose --project-directory "$INSTALL_DIR" -f "$INSTALL_DIR/compose.yaml"
 
 ## 6. CLI 更新、备份和恢复
 
-以下命令可从任意工作目录调用；数据位置始终按已安装脚本的父目录解析。
+以下入口可从任意工作目录调用，始终识别自身安装目录：
 
-```sh
-sh "$INSTALL_DIR/deploy/mail-web.sh" version
-sh "$INSTALL_DIR/deploy/mail-web.sh" status
-sh "$INSTALL_DIR/deploy/mail-web.sh" check-update vNEXT_VERSION
-sh "$INSTALL_DIR/deploy/mail-web.sh" backup
-sh "$INSTALL_DIR/deploy/mail-web.sh" update vNEXT_VERSION
-sh "$INSTALL_DIR/deploy/mail-web.sh" restart
+```bash
+INSTALL_DIR="$HOME/apps/mail-web"
+"$INSTALL_DIR/mailweb" status --json
+"$INSTALL_DIR/mailweb" doctor --json
+"$INSTALL_DIR/mailweb" logs --tail 100
+"$INSTALL_DIR/mailweb" backup
+"$INSTALL_DIR/mailweb" update --version vNEXT_VERSION --yes
+"$INSTALL_DIR/mailweb" restore "$INSTALL_DIR/backups/SNAPSHOT" --yes
 ```
 
-更新先下载、验证和导入新镜像，再停止本安装、保存一致性快照、替换发布配置并启动。域名、站点名称、密钥、数据库和监听设置不会被发布包中的示例值覆盖。管理脚本也随已校验的发布包更新。不执行 `docker pull`、镜像清理或业务数据清理。
+更新先下载、校验并导入镜像，然后停止本实例并保存一致性快照，再启动新版本。保留旧镜像和快照；启动失败返回非零并显示匹配快照的恢复命令。数据库迁移后禁止直接以旧程序打开新数据库。恢复先验证完整性，失败恢复原文件；成功后撤销旧会话。
 
-更新失败时保留文件和快照，并停止失败服务；按输出检查 `logs/`。数据库迁移不保证向后兼容，回滚须恢复匹配的更新前备份和旧镜像：
+变更监听使用 `configure`。已配置站点以非交互方式更改 IP 或端口时，必须用 `--public-origin` 明确保留的 HTTPS 反代地址或新的 HTTP 直连地址。维护命令仅修改加密配置中的网站来源，不重新配置 Stalwart；来源变更后的验证要求会在控制台说明，注册开放策略保持独立。
 
-```sh
-sh "$INSTALL_DIR/deploy/mail-web.sh" restore "$INSTALL_DIR/backups/SNAPSHOT"
+```bash
+"$INSTALL_DIR/mailweb" configure --bind 127.0.0.1 --port 18091 \
+  --public-origin https://mail.example.org --yes
 ```
 
-备份使用 SQLite `VACUUM INTO` 一致性快照，包含已提交 WAL 数据；同时保存加密配置、安装密钥和 Compose 文件。恢复前校验文件，并把原数据库移到本安装的 `backups/pre-restore-*`，恢复后撤销旧会话。恢复到新的安装目录时，将快照复制到新目录的 `backups/` 中，可通过 `MAIL_WEB_CONTAINER_NAME=NEW_NAME` 选择一个未占用的容器名。不要直接恢复到正在运行的另一个项目目录。
-
-备份包含敏感密钥，应保存独立的离线副本。丢失 `secrets/session.key` 将无法解密运行配置或会话。CLI 不自动删除历史快照、发布包和本地镜像。
+旧 `deploy/mail-web.sh` 统一转交 Rust CLI，旧命令及参数继续兼容。重复运行根安装器并指定原 `--dir` 即可升级旧安装，不重建数据。备份包含加密配置和密钥，请保存独立离线副本。详见 [CLI 与迁移说明](docs/cli.md)。
 
 ## 7. 数据与边界
 
@@ -207,8 +211,8 @@ cargo run --locked -p mail-web -- --openapi > backend/contract/openapi.json
 pnpm --dir frontend exec openapi-typescript ../backend/contract/openapi.json -o apps/web/src/platform/lib/generated-api.ts
 ```
 
-API 契约从 Rust/Utoipa 生成，生成文件不手改。GitHub Actions 完成检查与隔离 Stalwart 测试后，版本标签或带 `[release-preview]` 的 main 提交会发布：`mail-web-linux-amd64.tar.gz`、`SHA256SUMS` 和 `release-manifest.json`。维护者应更新 `release-version.txt` 为新的唯一版本，不覆盖已发布版本。稳定版仍受 `docs/acceptance.json` 门禁约束。
+API 契约从 Rust/Utoipa 生成，生成文件不手改。GitHub Actions 完成检查与隔离 Stalwart 测试后，版本标签或带 `[release-preview]` 的 main 提交会先创建草稿，提供 `mail-web-linux-amd64.tar.gz`、`mailwebctl-linux-amd64.tar.gz`、`install.sh`、`SHA256SUMS` 和 `release-manifest.json`。维护者应更新 `release-version.txt` 为新的唯一版本，不覆盖已发布版本。稳定版仍受 `docs/acceptance.json` 门禁约束。
 
-发布包含完整镜像、CLI、Compose、教程和接口契约。SHA-256 用于验证下载完整性，发布来源仍依赖 GitHub 仓库和发布权限。发布后 CI 再从公开直链执行干净安装、重复安装、备份和恢复；失败的发布会被转为草稿。
+发布包含完整镜像、CLI、Compose、教程和接口契约。SHA-256 用于验证下载完整性，发布来源仍依赖 GitHub 仓库和发布权限。CI 下载真实草稿产物执行干净安装、重复安装、旧版升级、备份和恢复；全部通过后公开，失败保持草稿。
 
-前端基础包来自 `reina0721/console-web` 提交 `7a159d8908120f34e6444df932496cf1dc273349`。HeroUI／React Aria 是 UI adapter 的底层实现。组件规范与动效检查页位于 `/ui-elements/`，详见 [组件检查记录](docs/ui-component-review.md)。
+前端业务与布局基于 Bulwark，MUI 提供基础控件；来源、许可证和差异记录见 [上游复用清单](docs/upstream/README.md)。安装和宿主机 CLI 参考固定 DSH 基线，见 [DSH 来源说明](docs/upstream/dsh/README.md)。

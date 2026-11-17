@@ -1,0 +1,21 @@
+[package]
+name = "mailwebctl"
+version = "0.4.0-alpha.2"
+edition = "2024"
+license = "AGPL-3.0-only"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+semver = "1"
+sha2 = "0.10"
+hex = "0.4"
+flate2 = "1"
+tar = "0.4"
+tempfile = "3"
+fs2 = "0.4"
+libc = "0.2"
+rand = "0.8"

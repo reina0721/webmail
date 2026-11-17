@@ -4,6 +4,7 @@ import {Action,TextField,PasswordField,SelectField,CheckboxField,ConfirmDialog} 
 export function ConsoleSetup(){
  const c=useAutomaticInstallation({});const busy=c.pending||c.job?.status==='running'||c.job?.status==='applying';
  return <div className="console-setup"><header><p className="console-eyebrow">AUTOMATIC SETUP</p><h1>连接你的邮件服务</h1><p>授权后自动创建专用身份、提交策略与验证服务。已有资源会被识别，任务中断后可继续。</p></header>
+ {c.status&&!c.status.configured&&<section className="console-panel" role="status"><h2>应用已安装，邮件服务待配置</h2><p>目录、容器和端口已由安装工具准备完成。请在下方授权 Stalwart，继续配置邮件服务。</p></section>}
  <section className="console-panel"><h2>1 · 安装访问</h2><PasswordField label="安装令牌（已登录管理员可留空）" purpose="current" value={c.token} onChange={e=>c.setToken(e.target.value)}/><p className="console-hint">令牌由部署脚本生成，也可通过安装链接自动读取。</p></section>
  {c.error&&<div className="console-alert" role="alert">{c.error}<Action variant="quiet" onPress={()=>void c.load()}>重新读取配置</Action></div>}
  {c.job&&<section className="console-panel"><h2>初始化任务 · {c.job.status}</h2><p role="status">当前步骤：{c.job.step}</p>{c.job.error&&<p role="alert">{c.job.error}</p>}<ol>{c.job.completed.map(step=><li key={step}>✓ {step}</li>)}</ol>{c.applied?<><a className="console-link" href="/console/">配置已应用，进入控制台 →</a><Action variant="secondary" onPress={()=>void c.cancel()}>重新授权 / 升级配置权限</Action></>:<Action variant="secondary" disabled={c.pending} onPress={()=>void c.cancel()}>停止后续步骤 / 重新授权继续</Action>}</section>}

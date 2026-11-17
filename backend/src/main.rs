@@ -930,7 +930,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let sqlite = db::version().await?;
         println!(
             "{}",
-            json!({"version":env!("CARGO_PKG_VERSION"),"sqlite":sqlite})
+            json!({"version":env!("CARGO_PKG_VERSION"),"sqlite":sqlite,"revision":option_env!("MAIL_WEB_REVISION").unwrap_or("development")})
         );
         return Ok(());
     }
@@ -967,6 +967,14 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     }
     let key = std::fs::read_to_string(std::env::var("SESSION_KEY_FILE")?)?;
     let vault = Vault::new(&hex::decode(key.trim())?)?;
+    if let Some(index) = args.iter().position(|arg| arg == "--set-public-origin") {
+        let origin = args.get(index + 1).ok_or("public origin required")?;
+        installation::set_public_origin(&vault, origin)?;
+        println!(
+            "Website origin updated; Stalwart configuration and registration policy preserved."
+        );
+        return Ok(());
+    }
     let db = db::connect(std::path::Path::new(
         &std::env::var("DATABASE_PATH").unwrap_or_else(|_| "data/db/mail-web.sqlite".into()),
     ))

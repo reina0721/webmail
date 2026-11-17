@@ -64,6 +64,26 @@ pub fn ensure_token() -> std::result::Result<(), Box<dyn std::error::Error>> {
     file.sync_all()?;
     Ok(())
 }
+/// Offline host maintenance: only the website origin changes. No upstream call.
+pub(crate) fn set_public_origin(
+    vault: &Vault,
+    origin: &str,
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    set_public_origin_at(vault, origin, &config_path())
+}
+fn set_public_origin_at(
+    vault: &Vault,
+    origin: &str,
+    path: &std::path::Path,
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let origin = crate::config::validate_origin(origin)?;
+    if let Some(mut saved) = load_at(vault, path)? {
+        saved.origin = origin;
+        persist_at(vault, &saved, path).map_err(|_| "configuration could not be saved")?;
+    }
+    Ok(())
+}
+
 fn persist(vault: &Vault, value: &RuntimeConfig) -> Result<()> {
     persist_at(vault, value, &config_path())
 }
@@ -535,6 +555,39 @@ mod tests {
     use super::*;
     use axum::{body::Body, http::Request};
     use tower::ServiceExt;
+
+    #[test]
+    fn origin_maintenance_preserves_all_upstream_fields_and_rejects_invalid_input() {
+        let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../tests/runtime")
+            .join(format!("origin-{}", Uuid::new_v4()));
+        let path = directory.join("runtime.enc");
+        let vault = Vault::new(&[9; 32]).unwrap();
+        let value = RuntimeConfig {
+            version: 1,
+            origin: "https://old.example".into(),
+            stalwart_url: "https://stalwart.example".into(),
+            services: config::Services {
+                domain: "mail.example".into(),
+                provisioning_key: "keep-private".into(),
+                policy_verified: true,
+                ..Default::default()
+            },
+        };
+        persist_at(&vault, &value, &path).unwrap();
+        set_public_origin_at(&vault, "https://new.example:8443", &path).unwrap();
+        let saved = load_at(&vault, &path).unwrap().unwrap();
+        assert_eq!(saved.origin, "https://new.example:8443");
+        assert_eq!(saved.stalwart_url, value.stalwart_url);
+        assert_eq!(
+            serde_json::to_value(saved.services).unwrap(),
+            serde_json::to_value(value.services).unwrap()
+        );
+        let before = std::fs::read(&path).unwrap();
+        assert!(set_public_origin_at(&vault, "https://bad.example/path", &path).is_err());
+        assert_eq!(before, std::fs::read(&path).unwrap());
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 
     #[test]
     fn persisted_configuration_is_authenticated_and_replaceable() {

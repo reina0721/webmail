@@ -11,7 +11,7 @@ pub(crate) struct DiscoveryInput {
 
 pub(super) fn documentation_url() -> String {
     let repository =
-        std::env::var("RELEASE_REPOSITORY").unwrap_or_else(|_| "reina0721/mail-web".into());
+        std::env::var("RELEASE_REPOSITORY").unwrap_or_else(|_| "reina0721/webmail".into());
     let parts: Vec<_> = repository.split('/').collect();
     let valid = parts.len() == 2
         && parts.iter().all(|p| {
@@ -24,7 +24,7 @@ pub(super) fn documentation_url() -> String {
         if valid {
             &repository
         } else {
-            "reina0721/mail-web"
+            "reina0721/webmail"
         }
     )
 }

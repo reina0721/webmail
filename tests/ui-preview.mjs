@@ -15,7 +15,7 @@ const boxes=['inbox','sent','drafts','archive','junk','trash'].map(role=>({id:ro
 boxes.push({id:'projects',name:'项目协作',role:null,unreadEmails:0});
 const audit=[{id:'a1',actorId:'operator',subjectId:'lin',action:'account.update',outcome:'success',createdAt:1793797200000},{id:'a2',actorId:'operator',subjectId:null,action:'registration.update',outcome:'success',createdAt:1793793600000},{id:'a3',actorId:'operator',subjectId:null,action:'task.retry',outcome:'queued',createdAt:1793790000000}];
 const mode={expired:false,operator:true,fail:'',slow:false,theme:'light',ready:false,setupConfigured:true,setupNeedsOperator:false,setupEpoch:0};
-const setupDocs='https://github.com/reina0721/mail-web/blob/main/docs/stalwart-setup.md';
+const setupDocs='https://github.com/reina0721/webmail/blob/main/docs/stalwart-setup.md';
 let setup={brand:'Mail Web',domain:'example.com',publicOrigin:'https://webmail.example.com',stalwartUrl:'https://mail.example.com',domainId:'preview-domain',notificationAccount:'',notificationEmail:'',hookId:'',turnstileSiteKey:''};
 const log=[];
 let initializationJob=null,initializationGrant='',initializationPolls=0,initializationBase='';

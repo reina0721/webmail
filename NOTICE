@@ -66,3 +66,9 @@ Third-party data:
 
 Mail Web modifications: React/MUI surfaces and Rust session transport, 2026-11-16.
 Bulwark source baseline: 7cdedb60cc157cfeaf19623732b1135da6d3dc28
+
+Host installer/CLI portions are adapted from reina0721/dsh-docker,
+commit 86a6e10f3a616e7b2eba983744f9e8c65bb7860a, MIT OR Apache-2.0.
+Original license texts and adaptation records: docs/upstream/dsh/.
+Mail Web adaptations: release-import delivery, host networking, snapshots and
+website-origin maintenance, 2026-11-17.

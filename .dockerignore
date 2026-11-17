@@ -19,3 +19,5 @@ frontend/packages/config
 .cache
 
 .pnpm-store
+
+/build

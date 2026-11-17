@@ -126,7 +126,9 @@ try:
  check('Startup failure after a verified update returns nonzero, retains a matching snapshot and restores with its reported command without database downgrade')
  if args.legacy:
   # Exercise the user's actual previous Rust installer, not just a candidate
-  # reinstall. Historical releases only provide this AMD64 application bundle.
+  # reinstall. The current bootstrap prepares the old image's portable identity;
+  # its unmodified embedded v0.4.0-alpha.2 CLI performs the actual update.
+  # Historical releases only provide this AMD64 application bundle.
   previous=root/'previous-rust-release';previous.mkdir();oldtag='v0.4.0-alpha.2';oldname='mail-web-linux-amd64.tar.gz'
   for asset in ['SHA256SUMS',oldname]:
    run(['curl','-fL','--proto','=https','--proto-redir','=https','--retry','2','--connect-timeout','15','--max-time','600','-o',previous/asset,'https://github.com/reina0721/webmail/releases/download/'+oldtag+'/'+asset],timeout=650)
@@ -137,7 +139,8 @@ try:
    oldcli=previous/'mailwebctl';oldcli.write_bytes(archive.extractfile(member).read());oldcli.chmod(0o700)
   assert run([oldcli,'--version']).strip()=='mailwebctl 0.4.0-alpha.2'
   upgraded=root/'previous Rust installation';oldport=port();oldcontainer='mailweb-cli-'+stamp+'-previous-rust'
-  run([oldcli,'install','--dir',upgraded,'--container-name',oldcontainer,'--bind','127.0.0.1','--port',oldport,'--allow-http','--yes','--bundle',previous/oldname],timeout=600);created.append(upgraded)
+  run([a/'bin/mailwebctl','install','--dir',upgraded,'--container-name',oldcontainer,'--bind','127.0.0.1','--port',oldport,'--allow-http','--yes','--bundle',previous/oldname],timeout=600);created.append(upgraded)
+  assert run([upgraded/'bin/mailwebctl','--version']).strip()=='mailwebctl 0.4.0-alpha.2'
   assert status(upgraded)['version']==oldtag
   oldkey=sha(upgraded/'secrets/session.key');oldstate=dbstate(upgraded)
   run([upgraded/'mailweb','update','--yes','--bundle',bundle],timeout=600)

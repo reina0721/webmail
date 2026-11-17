@@ -52,6 +52,61 @@ pub fn config_id(path: &Path, image: &str) -> Result<String> {
     }
     digest.context("镜像包缺少配置")
 }
+/// Legacy publishers sometimes recorded an OCI descriptor instead of config Id.
+/// Accept that spelling only when its hashed source manifest binds this config.
+pub fn declared_config_id(path: &Path, image: &str, declared: &str) -> Result<String> {
+    let canonical = config_id(path, image)?;
+    if canonical == declared {
+        return Ok(canonical);
+    }
+    let mut nodes = std::collections::HashMap::new();
+    for entry in tar::Archive::new(File::open(path)?).entries()? {
+        let mut entry = entry?;
+        if entry.header().entry_type().is_file()
+            && entry.size() <= 1_048_576
+            && entry.path()?.to_string_lossy().starts_with("blobs/sha256/")
+        {
+            let mut bytes = Vec::new();
+            entry.read_to_end(&mut bytes)?;
+            if let Ok(node) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+                nodes.insert(
+                    format!("sha256:{}", hex::encode(Sha256::digest(&bytes))),
+                    node,
+                );
+            }
+        }
+    }
+    let mut pending = vec![declared.to_owned()];
+    let mut visited = std::collections::HashSet::new();
+    while let Some(id) = pending.pop() {
+        if !visited.insert(id.clone()) {
+            continue;
+        }
+        ensure!(visited.len() <= 1024, "镜像描述符过多");
+        if let Some(node) = nodes.get(&id) {
+            match node["mediaType"].as_str().unwrap_or_default() {
+                "application/vnd.oci.image.manifest.v1+json"
+                | "application/vnd.docker.distribution.manifest.v2+json" => {
+                    if node["config"]["digest"] == canonical {
+                        return Ok(canonical);
+                    }
+                }
+                "application/vnd.oci.image.index.v1+json"
+                | "application/vnd.docker.distribution.manifest.list.v2+json" => {
+                    if let Some(items) = node["manifests"].as_array() {
+                        pending.extend(
+                            items
+                                .iter()
+                                .filter_map(|item| item["digest"].as_str().map(str::to_owned)),
+                        );
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    anyhow::bail!("镜像配置与发布声明不匹配")
+}
 pub fn matches(image: &str, expected: &str) -> Result<bool> {
     let reported = crate::docker::capture(&["image", "inspect", "--format", "{{.Id}}", image])?;
     if reported.trim() == expected {
@@ -95,6 +150,46 @@ mod tests {
         }
         archive.finish().unwrap();
         file
+    }
+    #[test]
+    fn legacy_descriptor_must_cryptographically_bind_the_same_config() {
+        let source = fixture("mail-web:1", b"{}", false);
+        let canonical = config_id(source.path(), "mail-web:1").unwrap();
+        let node=serde_json::to_vec(&serde_json::json!({"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","config":{"digest":canonical}})).unwrap();
+        let digest = format!("sha256:{}", hex::encode(Sha256::digest(&node)));
+        let target = tempfile::NamedTempFile::new().unwrap();
+        let mut builder = tar::Builder::new(target.reopen().unwrap());
+        for entry in tar::Archive::new(source.reopen().unwrap())
+            .entries()
+            .unwrap()
+        {
+            let mut entry = entry.unwrap();
+            builder.append(&entry.header().clone(), &mut entry).unwrap();
+        }
+        let mut header = tar::Header::new_gnu();
+        header.set_size(node.len() as u64);
+        header.set_mode(0o644);
+        header.set_cksum();
+        builder
+            .append_data(
+                &mut header,
+                format!("blobs/sha256/{}", &digest[7..]),
+                node.as_slice(),
+            )
+            .unwrap();
+        builder.finish().unwrap();
+        assert_eq!(
+            declared_config_id(target.path(), "mail-web:1", &digest).unwrap(),
+            canonical
+        );
+        assert!(
+            declared_config_id(
+                target.path(),
+                "mail-web:1",
+                &format!("sha256:{}", "0".repeat(64))
+            )
+            .is_err()
+        );
     }
     #[test]
     fn config_digest_is_portable_and_binds_the_rootfs() {

@@ -259,12 +259,17 @@ fn install(
     }
     let origin = desired_origin(s, old, cli)?;
     preflight(old, s, cli)?;
-    let (package, manifest) = release::prepare(
+    let (package, mut manifest) = release::prepare(
         s,
         version,
         &cli.channel,
         cli.download_mirror.as_deref(),
         bundle,
+    )?;
+    manifest.image_id = crate::image::declared_config_id(
+        &package.join("image.tar"),
+        &manifest.image,
+        &manifest.image_id,
     )?;
     ensure_not_downgrade(s, &manifest.version)?;
     eprintln!(

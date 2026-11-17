@@ -201,6 +201,38 @@ impl Settings {
         );
         validate_repo(&self.repository)
     }
+    pub fn guard_directory(&self, restoring: bool) -> Result<()> {
+        if !self.root.exists() {
+            return Ok(());
+        }
+        if self.values.contains_key("MAIL_WEB_VERSION")
+            || self.root.join("config/installed-release.json").is_file()
+        {
+            return Ok(());
+        }
+        ensure!(
+            !self.root.join(".env").exists(),
+            "目录包含非 Mail Web 配置，拒绝接管；请选择独立安装目录"
+        );
+        let partial = self.root.join("config/deployment.lock").is_file();
+        for entry in fs::read_dir(&self.root)? {
+            let name = entry?.file_name();
+            let name = name.to_string_lossy();
+            let allowed = name == "install.sh"
+                || restoring && name == "backups"
+                || partial
+                    && [
+                        "bin", "deploy", "data", "config", "secrets", "logs", "backups",
+                        "releases", "docs", "mailweb",
+                    ]
+                    .contains(&name.as_ref());
+            ensure!(
+                allowed,
+                "目录包含未登记文件，拒绝覆盖其他项目；请选择独立安装目录"
+            );
+        }
+        Ok(())
+    }
     pub fn init(&self) -> Result<()> {
         fs::create_dir_all(&self.root)?;
         for n in [
@@ -450,5 +482,50 @@ mod tests {
         let mut s = Settings::load(d.path()).unwrap();
         s.save().unwrap();
         assert_eq!(env_read(&d.path().join(".env")).unwrap()["CUSTOM"], "keep");
+    }
+}
+
+#[cfg(test)]
+mod ownership_tests {
+    use super::*;
+    #[test]
+    fn unrelated_directory_and_environment_are_never_adopted() {
+        let d = tempfile::tempdir().unwrap();
+        let settings = Settings::load(d.path()).unwrap();
+        assert!(settings.guard_directory(false).is_ok());
+        fs::write(d.path().join("compose.yaml"), "unrelated service").unwrap();
+        assert!(settings.guard_directory(false).is_err());
+        assert_eq!(
+            fs::read_to_string(d.path().join("compose.yaml")).unwrap(),
+            "unrelated service"
+        );
+        fs::remove_file(d.path().join("compose.yaml")).unwrap();
+        fs::write(d.path().join(".env"), "OTHER_APPLICATION=1").unwrap();
+        assert!(
+            Settings::load(d.path())
+                .unwrap()
+                .guard_directory(false)
+                .is_err()
+        );
+        fs::write(d.path().join(".env"), "MAIL_WEB_VERSION=0.3.0-alpha.2").unwrap();
+        assert!(
+            Settings::load(d.path())
+                .unwrap()
+                .guard_directory(false)
+                .is_ok()
+        );
+    }
+    #[test]
+    fn interrupted_install_and_explicit_backup_destination_can_resume() {
+        let d = tempfile::tempdir().unwrap();
+        let settings = Settings::load(d.path()).unwrap();
+        settings.init().unwrap();
+        let _lock = settings.lock().unwrap();
+        assert!(settings.guard_directory(false).is_ok());
+        let fresh = tempfile::tempdir().unwrap();
+        fs::create_dir(fresh.path().join("backups")).unwrap();
+        let settings = Settings::load(fresh.path()).unwrap();
+        assert!(settings.guard_directory(false).is_err());
+        assert!(settings.guard_directory(true).is_ok());
     }
 }

@@ -66,6 +66,7 @@ pub fn run(cli: Cli) -> Result<()> {
             | Command::Doctor { fix: false, .. }
     );
     if writing {
+        s.guard_directory(matches!(cli.command, Command::Restore { .. }))?;
         if !matches!(
             cli.command,
             Command::SelfUpdate { .. } | Command::RotateSetupToken

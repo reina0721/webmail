@@ -30,7 +30,7 @@ curl -fsSL https://raw.githubusercontent.com/reina0721/webmail/main/install.sh |
   --bind 127.0.0.1 --port 18090 --public-origin https://mail.example.org
 ```
 
-HTTP 直连额外传 `--allow-http`，公开来源填实际服务器 IP；IPv6 URL 使用方括号。安装器不会创建反代、DNS、证书或防火墙规则。端口冲突时交互重选，无人值守直接失败；不接管其他安装的同名容器。
+HTTP 直连额外传 `--allow-http`，公开来源填实际服务器 IP；IPv6 URL 使用方括号。安装器不会创建反代、DNS、证书或防火墙规则。端口冲突时交互重选，无人值守直接失败；不接管其他安装的同名容器，也不覆盖未登记的非空目录或其他项目配置。
 
 默认选择整个 Release 列表中 SemVer 最高的非草稿版本，不按发布时间或 GitHub stable/latest API 排序。最高版本缺少必要资产或校验失败直接停止。引导 CLI 固定 `v0.4.0-alpha.2`，应用版本由 CLI 独立选择。没有稳定版时 stable 渠道明确失败。
 

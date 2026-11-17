@@ -80,6 +80,8 @@ try:
   report=json.loads(run([normal/'mailweb','status','--json'],env={**env,'HOME':'/home/zero','DOCKER_CONFIG':str(normal/'.docker')},preexec=drop));assert report['healthy'];uid=run(['docker','inspect','--format','{{.Config.User}}',normalname]).strip();assert uid.startswith('1000:')
   check('Docker-authorized non-root installation runs the application as its non-root owner and can maintain its files')
  # Explicit failure paths must leave infrastructure and unrelated services untouched.
+ foreigndir=root/'unrelated-directory';foreigndir.mkdir();foreigncompose=foreigndir/'compose.yaml';foreigncompose.write_text('unrelated service');output=run([a/'mailweb','install','--dir',foreigndir,'--yes','--bundle',bundle],False);assert '拒绝覆盖' in output and foreigncompose.read_text()=='unrelated service' and not (foreigndir/'.env').exists()
+ check('Unrecognized nonempty directory is refused without overwriting another project configuration')
  denied=root/'no-docker';denied.mkdir();os.chown(denied,1000,1000)
  def no_docker():os.setgroups([]);os.setgid(1000);os.setuid(1000)
  denied_cli=root/'no-docker-cli';shutil.copy(a/'bin/mailwebctl',denied_cli);denied_cli.chmod(0o755)

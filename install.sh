@@ -19,13 +19,17 @@ for ((i=0;i<${#args[@]};i++)); do
 done
 if [[ $repo_explicit == 0 ]]; then args+=(--repository "$repository"); fi
 case "$repository" in *[!a-zA-Z0-9_./-]*|/*|*..*|*/*/*) echo '仓库必须是 OWNER/REPO' >&2;exit 1;; */*) ;; *) exit 1;; esac
-[[ $(uname -s)/$(uname -m) == Linux/x86_64 ]] || { echo '当前发布仅支持 Linux AMD64' >&2; exit 1; }
+case "$(uname -s)/$(uname -m)" in
+ Linux/x86_64|Linux/amd64) architecture=amd64;;
+ Linux/aarch64|Linux/arm64) architecture=arm64;;
+ *) echo '当前发布仅支持 Linux AMD64 / ARM64' >&2; exit 1;;
+esac
 for tool in curl tar; do command -v "$tool" >/dev/null || { echo "缺少 $tool" >&2; exit 1; }; done
 if command -v sha256sum >/dev/null; then sha=(sha256sum); elif command -v shasum >/dev/null; then sha=(shasum -a 256); else echo '缺少 SHA-256 工具' >&2;exit 1;fi
 if [[ -n $mirror ]]; then [[ $mirror == https://* && $mirror != *'@'* && $mirror != *'?'* && $mirror != *'#'* ]] || { echo '下载代理必须是无凭据 HTTPS 地址' >&2;exit 1; };fi
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
-asset=mailwebctl-linux-amd64.tar.gz
+asset="mailwebctl-linux-$architecture.tar.gz"
 base="https://github.com/$repository/releases/download/$bootstrap_version"
 fetch() {
  local url=$1 destination=$2

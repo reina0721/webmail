@@ -1,6 +1,7 @@
 //! Release download/checksum and archive staging adapted from DSH commands.rs
 //! (self-update) and backup.rs, commit 86a6e10, MIT OR Apache-2.0.
 use crate::config::{self, Settings};
+use crate::platform::Architecture;
 use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -98,7 +99,7 @@ impl Client {
                 ensure!(page < 100, "Release 列表超过查询上限，需指定版本");
             }
         }
-        select(all, channel)
+        select(all, channel, Architecture::current()?)
     }
     pub fn download(&self, url: &str, to: &Path) -> Result<()> {
         ensure!(url.starts_with("https://"), "下载必须使用 HTTPS");
@@ -157,7 +158,7 @@ impl Client {
         Err(last.context("下载失败")?)
     }
 }
-fn select(all: Vec<Release>, channel: &str) -> Result<(String, String)> {
+fn select(all: Vec<Release>, channel: &str, arch: Architecture) -> Result<(String, String)> {
     let selected = all
         .into_iter()
         .filter(|r| !r.draft && (channel != "stable" || !r.prerelease))
@@ -173,7 +174,7 @@ fn select(all: Vec<Release>, channel: &str) -> Result<(String, String)> {
     let asset = selected
         .assets
         .iter()
-        .find(|a| a.name == "mail-web-linux-amd64.tar.gz")
+        .find(|a| a.name == arch.app_asset())
         .context("最新所选版本缺少应用包，不自动回退旧版本")?;
     ensure!(
         selected.assets.iter().any(|a| a.name == "SHA256SUMS"),
@@ -247,6 +248,7 @@ pub fn prepare(
     mirror: Option<&str>,
     local: Option<&Path>,
 ) -> Result<(PathBuf, Manifest)> {
+    let arch = Architecture::current()?;
     let cache = s.root.join("releases");
     fs::create_dir_all(&cache)?;
     let (dir, tag) = if let Some(local) = local {
@@ -254,7 +256,7 @@ pub fn prepare(
         // outer tar too when --bundle names an archive. Used for draft release QA.
         if local.is_file() {
             let sums = local.parent().unwrap().join("SHA256SUMS");
-            verify(local, &sums, "mail-web-linux-amd64.tar.gz")?;
+            verify(local, &sums, arch.app_asset())?;
             let stage = cache.join(format!("package-{}", rand::random::<u64>()));
             unpack(local, &stage)?;
             (stage, None)
@@ -273,19 +275,15 @@ pub fn prepare(
             ),
             &dir.join("SHA256SUMS"),
         )?;
-        let archive = dir.join("mail-web-linux-amd64.tar.gz");
+        let archive = dir.join(arch.app_asset());
         client.download(&url, &archive)?;
-        verify(
-            &archive,
-            &dir.join("SHA256SUMS"),
-            "mail-web-linux-amd64.tar.gz",
-        )?;
+        verify(&archive, &dir.join("SHA256SUMS"), arch.app_asset())?;
         let stage = dir.join(format!("package-{}", rand::random::<u64>()));
         unpack(&archive, &stage)?;
         (stage, Some(tag))
     };
     let manifest: Manifest = serde_json::from_slice(&fs::read(dir.join("release-manifest.json"))?)?;
-    ensure!(manifest.architecture == "linux/amd64", "发布包架构不匹配");
+    arch.validate(&manifest.architecture)?;
     let parsed = semver::Version::parse(
         manifest
             .version
@@ -391,7 +389,10 @@ mod selection_tests {
             release("v1.1.0-alpha.2", false, true, true),
             release("v2.0.0", true, false, true),
         ];
-        assert_eq!(select(r, "latest").unwrap().0, "v1.1.0-alpha.2");
+        assert_eq!(
+            select(r, "latest", Architecture::Amd64).unwrap().0,
+            "v1.1.0-alpha.2"
+        );
     }
     #[test]
     fn stable_excludes_preview() {
@@ -401,7 +402,8 @@ mod selection_tests {
                     release("v1.0.0", false, false, true),
                     release("v1.1.0-alpha.1", false, true, true)
                 ],
-                "stable"
+                "stable",
+                Architecture::Amd64
             )
             .unwrap()
             .0,
@@ -416,10 +418,87 @@ mod selection_tests {
                     release("v1.0.0", false, false, true),
                     release("v1.1.0", false, false, false)
                 ],
-                "latest"
+                "latest",
+                Architecture::Amd64
             )
             .is_err()
         );
+    }
+    #[test]
+    fn arm64_selects_its_asset_and_never_falls_back_to_amd64() {
+        let amd = release("v1.0.0", false, false, true);
+        assert!(select(vec![amd], "latest", Architecture::Arm64).is_err());
+        let mut arm = release("v1.0.0", false, false, true);
+        arm.assets[0].name = Architecture::Arm64.app_asset().into();
+        assert!(select(vec![arm], "latest", Architecture::Arm64).is_ok());
+        let mut missing_sums = release("v1.0.0", false, false, true);
+        missing_sums.assets.retain(|a| a.name != "SHA256SUMS");
+        assert!(select(vec![missing_sums], "latest", Architecture::Amd64).is_err());
+    }
+    #[test]
+    fn corrupt_checksum_rejected() {
+        let d = tempfile::tempdir().unwrap();
+        let file = d.path().join("bundle");
+        fs::write(&file, b"original").unwrap();
+        let sums = d.path().join("SHA256SUMS");
+        fs::write(&sums, format!("{}  bundle\n", checksum(&file).unwrap())).unwrap();
+        fs::write(&file, b"corrupt").unwrap();
+        assert!(verify(&file, &sums, "bundle").is_err());
+    }
+    #[test]
+    fn offline_bundle_checks_platform_and_requested_version() {
+        let root = tempfile::tempdir().unwrap();
+        let settings = Settings::load(root.path()).unwrap();
+        let arch = Architecture::current().unwrap();
+        let other = match arch {
+            Architecture::Amd64 => Architecture::Arm64,
+            Architecture::Arm64 => Architecture::Amd64,
+        };
+        let bundle = root.path().join(arch.app_asset());
+        for (platform, request, valid) in [
+            (arch.platform(), "v1.0.0", true),
+            (other.platform(), "v1.0.0", false),
+            (arch.platform(), "v2.0.0", false),
+        ] {
+            let manifest = serde_json::json!({
+                "version": "v1.0.0", "sourceCommit": "1".repeat(40),
+                "architecture": platform, "image": "mail-web:1.0.0",
+                "imageId": format!("sha256:{}", "a".repeat(64)), "cliVersion": "1.0.0"
+            });
+            let image = b"synthetic image";
+            let encoder = flate2::write::GzEncoder::new(
+                File::create(&bundle).unwrap(),
+                flate2::Compression::default(),
+            );
+            let mut archive = tar::Builder::new(encoder);
+            for (name, bytes) in [
+                (
+                    "release-manifest.json",
+                    serde_json::to_vec(&manifest).unwrap(),
+                ),
+                ("image.tar", image.to_vec()),
+                (
+                    "image.sha256",
+                    format!("{:x}  image.tar\n", Sha256::digest(image)).into_bytes(),
+                ),
+            ] {
+                let mut header = tar::Header::new_gnu();
+                header.set_size(bytes.len() as u64);
+                header.set_mode(0o644);
+                header.set_cksum();
+                archive
+                    .append_data(&mut header, name, bytes.as_slice())
+                    .unwrap();
+            }
+            archive.into_inner().unwrap().finish().unwrap();
+            fs::write(
+                root.path().join("SHA256SUMS"),
+                format!("{}  {}\n", checksum(&bundle).unwrap(), arch.app_asset()),
+            )
+            .unwrap();
+            let result = prepare(&settings, request, "latest", None, Some(&bundle));
+            assert_eq!(result.is_ok(), valid, "{platform} / {request}: {result:?}");
+        }
     }
     #[test]
     fn archive_symlink_refused() {

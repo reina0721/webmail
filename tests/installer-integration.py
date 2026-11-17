@@ -16,6 +16,9 @@ def port(ip='127.0.0.1'):
 def origin(ip,port):return 'http://'+('['+ip+']' if ':' in ip else ip)+':'+str(port)
 def status(directory):return json.loads(run([directory/'mailweb','status','--json']))
 def request(base,path):return json.load(PUBLIC.open(base+'/api/v1'+path,timeout=15))
+def cleanup(directory):
+ run([directory/'mailweb','stop'])
+ run(['docker','compose','--project-directory',directory,'--env-file',directory/'.env','-f',directory/'compose.yaml','down'])
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 def dbstate(directory):
  db=sqlite3.connect('file:'+str(directory/'data/db/mail-web.sqlite')+'?mode=ro',uri=True)
@@ -31,7 +34,9 @@ a=root/'installation with spaces';b=root/'ipv6-instance';pa=port();pb=port('::1'
 env={**os.environ,'MAIL_WEB_BOOTSTRAP_DIR':str(bundle.parent)}
 try:
  run(['bash',bootstrap,'--dir',a,'--container-name',namea,'--bind','127.0.0.1','--port',pa,'--allow-http','--yes','--bundle',bundle],env=env);created.append(a)
- s=status(a);assert s['healthy'] and not s['configured'] and s['port']==pa;assert request(s['accessUrl'],'/installation')['configured'] is False
+ s=status(a);candidate_version=s['version'];assert s['healthy'] and not s['configured'] and s['port']==pa;assert request(s['accessUrl'],'/installation')['configured'] is False
+ for document in ['README.md','README_ZH.md','CONTRIBUTING.md','CHANGELOG.md','SECURITY.md','llms.txt','.env.example','docs/deployment.md','docs/releasing.md','examples/install-unattended.sh']:
+  assert (a/document).is_file(), 'Missing installed documentation: '+document
  check('Actual bootstrap CLI and release image install in a spaced directory; host HTTP, container health and pending web setup are valid')
  key=sha(a/'secrets/session.key');reinstalled=run([a/'mailweb','install','--yes','--bundle',bundle]);assert str(a) in reinstalled;assert sha(a/'secrets/session.key')==key and status(a)['port']==pa
  check('Repeated install preserves generated keys and custom listener without manual configuration')
@@ -40,6 +45,8 @@ try:
  run(['bash',bootstrap,'--dir',b,'--name',nameb,'--bind','[::1]:'+str(pb),'--allow-http','--yes','--bundle',bundle],env=env);created.append(b)
  s=status(b);assert s['healthy'] and s['bind']=='::1' and s['accessUrl']==origin('::1',pb)
  check('Legacy name and bracketed IPv6 endpoint flags install a concurrent independent instance')
+ # Coexistence is proven; release this fixture before allocating more networks.
+ cleanup(b);created.remove(b)
  bad=root/'occupied-port';sock=socket.socket();sock.bind(('127.0.0.1',0));sock.listen();busy=sock.getsockname()[1]
  output=run([a/'mailweb','install','--dir',bad,'--bind','127.0.0.1','--port',busy,'--yes','--bundle',bundle],False);sock.close();assert '占用' in output and not (bad/'.env').exists()
  check('Occupied explicit port fails before installation without taking over another listener')
@@ -79,6 +86,7 @@ try:
   run(['bash',bootstrap,'--dir',normal,'--container-name',normalname,'--bind','127.0.0.1','--port',normalport,'--yes','--bundle',bundle],env={**env,'HOME':'/home/zero','DOCKER_CONFIG':str(normal/'.docker')},preexec=drop);created.append(normal)
   report=json.loads(run([normal/'mailweb','status','--json'],env={**env,'HOME':'/home/zero','DOCKER_CONFIG':str(normal/'.docker')},preexec=drop));assert report['healthy'];uid=run(['docker','inspect','--format','{{.Config.User}}',normalname]).strip();assert uid.startswith('1000:')
   check('Docker-authorized non-root installation runs the application as its non-root owner and can maintain its files')
+  cleanup(normal);created.remove(normal)
  # Explicit failure paths must leave infrastructure and unrelated services untouched.
  foreigndir=root/'unrelated-directory';foreigndir.mkdir();foreigncompose=foreigndir/'compose.yaml';foreigncompose.write_text('unrelated service');output=run([a/'mailweb','install','--dir',foreigndir,'--yes','--bundle',bundle],False);assert '拒绝覆盖' in output and foreigncompose.read_text()=='unrelated service' and not (foreigndir/'.env').exists()
  check('Unrecognized nonempty directory is refused without overwriting another project configuration')
@@ -120,11 +128,11 @@ try:
   oldkey=sha(legacy/'secrets/session.key')
   try:
    run(['bash',bootstrap,'--dir',legacy,'--yes','--bundle',bundle],env=env);created.append(legacy)
-   ls=status(legacy);assert ls['healthy'] and ls['container']==ln and ls['port']==lp and ls['version']=='v0.4.0-alpha.2';assert sha(legacy/'secrets/session.key')==oldkey
+   ls=status(legacy);assert ls['healthy'] and ls['container']==ln and ls['port']==lp and ls['version']==candidate_version;assert sha(legacy/'secrets/session.key')==oldkey
    run([legacy/'deploy/mail-web.sh','status']);check('Actual v0.3.0-alpha.2 Release and legacy shell installation upgrade to Rust management and new schema without resetting custom infrastructure or session key')
    oldsnapshot=next(x for x in (legacy/'backups').iterdir() if x.is_dir() and (x/'.env').exists() and 'MAIL_WEB_VERSION=0.3.0-alpha.2' in (x/'.env').read_text())
    run([legacy/'mailweb','restore',oldsnapshot,'--yes']);ls=status(legacy);assert ls['healthy'] and ls['version']=='v0.3.0-alpha.2' and sha(legacy/'secrets/session.key')==oldkey
-   run([legacy/'mailweb','install','--yes','--bundle',bundle]);assert status(legacy)['healthy'] and status(legacy)['version']=='v0.4.0-alpha.2'
+   run([legacy/'mailweb','install','--yes','--bundle',bundle]);assert status(legacy)['healthy'] and status(legacy)['version']==candidate_version
    check('Matching old-version snapshot restores the old database and retained image safely, then upgrades again with the same installation key')
   finally:
    if (legacy/'mailweb').exists():run([legacy/'mailweb','stop'])
@@ -133,6 +141,5 @@ try:
 finally:
  for directory in created:
   try:
-   run([directory/'mailweb','stop'])
-   run(['docker','compose','--project-directory',directory,'--env-file',directory/'.env','-f',directory/'compose.yaml','down'])
+   cleanup(directory)
   except Exception as error:print('Cleanup stop:',str(error)[:300],flush=True)

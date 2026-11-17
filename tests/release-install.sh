@@ -10,5 +10,11 @@ if [ -z "${MAIL_WEB_RELEASE_ASSET_DIR:-}" ]; then
  command -v gh >/dev/null || { echo 'gh is required only for authenticated draft asset acceptance; set MAIL_WEB_RELEASE_ASSET_DIR for downloaded assets.' >&2;exit 1; }
  gh release download "$version" --repo "$repository" --dir "$assets" --clobber
 fi
-(cd "$assets"; sha256sum -c SHA256SUMS)
-python3 "$root/tests/installer-integration.py" "$assets/mail-web-linux-amd64.tar.gz" --legacy
+architecture=$(sh "$root/tooling/platform.sh")
+python3 "$root/tooling/release_metadata.py" verify-assets "$version" --inputs "$assets"
+# Published historical shell releases only exist for AMD64.
+if [ "$architecture" = amd64 ]; then
+ python3 "$root/tests/installer-integration.py" "$assets/mail-web-linux-$architecture.tar.gz" --legacy
+else
+ python3 "$root/tests/installer-integration.py" "$assets/mail-web-linux-$architecture.tar.gz"
+fi

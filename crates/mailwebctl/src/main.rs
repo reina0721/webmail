@@ -3,8 +3,9 @@
 mod config;
 mod docker;
 mod operations;
+mod platform;
 mod release;
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -120,9 +121,7 @@ fn run() -> Result<()> {
             .transpose()?;
     }
     cli.allow_http |= std::env::var("MAIL_WEB_ALLOW_HTTP").as_deref() == Ok("true");
-    if !cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-        bail!("此发布仅支持 Linux AMD64")
-    }
+    platform::Architecture::current()?;
     operations::run(cli)
 }
 fn main() {

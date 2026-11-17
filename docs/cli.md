@@ -1,6 +1,6 @@
 # 安装与 Rust CLI
 
-支持 Linux AMD64。安装器下载 Release、校验 SHA-256、导入完整镜像；服务器无需 Rust、Node 或源码构建工具。Docker Engine 与 Compose v2 必须已安装，普通用户须已有 Docker 权限。
+支持 Linux AMD64 / ARM64（以所选 Release 的实际附件为准；历史版本可能只有 AMD64）。安装器下载 Release、校验 SHA-256、导入完整镜像；服务器无需 Rust、Node 或源码构建工具。Docker Engine 与 Compose v2 必须已安装，普通用户须已有 Docker 权限。
 
 ## 安装
 
@@ -106,6 +106,6 @@ curl -fsSL https://raw.githubusercontent.com/reina0721/webmail/main/install.sh |
 
 ## 发布与验收
 
-Release 包含独立静态 CLI、应用镜像、安装脚本、对应源码、许可证、版本清单和 SHA256SUMS。CI 先创建草稿，上传后重新下载实际产物，执行安装、旧版升级、双实例、网络、备份及恢复验证，通过后才公开。失败保留草稿；已公开版本不可覆盖。
+Release 包含独立静态 CLI、应用镜像、安装脚本、对应源码、许可证、版本清单和 SHA256SUMS。CI 汇总两种架构后创建草稿，由两个原生 runner 重新下载实际产物，分别执行安装、双实例、网络、备份及恢复验证；AMD64 额外验证历史版本升级。两侧通过后才公开。失败保留草稿；已公开版本不可覆盖。流程及附件清单见 [发布维护指南](releasing.md)。
 
 本机隔离验收报告见 [安装器报告](installer-test-report.md)。DSH 固定基线复用记录与双许可见 [来源说明](upstream/dsh/README.md)。

@@ -6,17 +6,18 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: validate-${{ github.ref }}
-  cancel-in-progress: true
+  # Serialize complete release runs across both main previews and version tags.
+  group: ${{ (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release-preview]'))) && 'mail-web-release' || format('validate-{0}', github.ref) }}
+  cancel-in-progress: ${{ !(startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release-preview]'))) }}
 jobs:
   cancel-superseded:
-    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
     permissions:
       actions: write
       contents: read
     steps:
       - name: Cancel older main runs before they can publish stale assets
-        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -25,9 +26,59 @@ jobs:
           while read -r run; do
             gh run cancel "$run" --repo "$GITHUB_REPOSITORY" || true
           done < /tmp/older-runs
+  metadata:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release: ${{ steps.version.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        name: Check coordinated versions before building
+        env:
+          IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release-preview]')) }}
+        run: |
+          set -eu
+          version="$(cat release-version.txt)"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then version="$GITHUB_REF_NAME"; fi
+          python3 tooling/release_metadata.py check-version "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release=$IS_RELEASE" >> "$GITHUB_OUTPUT"
+  preflight:
+    if: needs.metadata.outputs.release == 'true'
+    needs: metadata
+    runs-on: ubuntu-24.04
+    # Draft visibility requires push access; this job never runs for a PR.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check version ownership and stable acceptance before native builds
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          if [ "$GITHUB_REF" = refs/heads/main ]; then
+            case "$VERSION" in v*-*) ;; *) echo 'Branch releases must be prereleases'; exit 1;; esac
+          fi
+          sh tooling/release-guard.sh "$VERSION"
+          case "$VERSION" in
+            *-*) echo 'Prerelease: production evidence is not promoted';;
+            *) jq -e '.readyForPublicRegistration == true' docs/acceptance.json;;
+          esac
   checks:
-    needs: cancel-superseded
-    runs-on: ubuntu-latest
+    needs: [metadata, preflight]
+    if: ${{ !cancelled() && needs.metadata.result == 'success' && (needs.preflight.result == 'success' || needs.preflight.result == 'skipped') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,11 +94,14 @@ jobs:
       - run: node --test tests/motion-styles.test.mjs tests/operation-id.test.mjs tests/admin-access.test.mjs tests/setup-guidance.test.mjs tests/platform-account-context.test.mjs
       - run: rustup update stable && rustup default stable && rustup component add rustfmt clippy
       - run: cargo fmt --all -- --check && cargo test --locked --workspace && cargo clippy --locked --workspace --all-targets -- -D warnings
-      - run: cargo run --locked -p mail-web -- --openapi > build-openapi.json && diff -u backend/contract/openapi.json build-openapi.json
+      - run: mkdir -p build && cargo run --locked -p mail-web -- --openapi > build/openapi.json && diff -u backend/contract/openapi.json build/openapi.json
       - run: pnpm --dir frontend exec openapi-typescript ../backend/contract/openapi.json -o apps/web/src/platform/lib/generated-api.ts && git diff --exit-code frontend/apps/web/src/platform/lib/generated-api.ts
-      - run: bash -n install.sh; for script in deploy/*.sh tooling/*.sh tests/*.sh; do sh -n "$script"; done
-      - run: python3 tests/release-acceptance.py
-      - run: docker build --platform linux/amd64 --build-arg MAIL_WEB_REVISION="$GITHUB_SHA" -t mail-web:ci .
+      - run: bash -n install.sh && bash -n examples/install-unattended.sh; for script in deploy/*.sh tooling/*.sh tests/*.sh; do sh -n "$script"; done
+      - run: python3 tests/release-acceptance.py && python3 tests/release-packaging.py && python3 tooling/check-repository.py
+      - name: Build native application
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: docker build --platform "linux/$ARCHITECTURE" --build-arg MAIL_WEB_REVISION="$GITHUB_SHA" -t mail-web:ci .
       - run: docker run --rm --pull never mail-web:ci --runtime-info
       - name: Real Stalwart and application integration
         run: |
@@ -58,95 +112,92 @@ jobs:
         run: |
           docker tag mail-web:ci mail-web:rebuild
           sudo MAIL_WEB_REVISION="$GITHUB_SHA" sh deploy/test-env.sh up --verify
-      - if: startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release-preview]'))
-        run: docker save mail-web:ci -o /tmp/mail-web-image.tar
+      - name: Package verified native release
+        if: needs.metadata.outputs.release == 'true'
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          docker tag mail-web:ci "mail-web:${VERSION#v}"
+          sh tooling/package-release.sh "$VERSION" "$ARCHITECTURE"
       - uses: actions/upload-artifact@v4
-        if: startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release-preview]'))
+        if: needs.metadata.outputs.release == 'true'
         with:
-          name: application-image
-          path: /tmp/mail-web-image.tar
+          name: release-${{ matrix.architecture }}
+          path: build/release/${{ needs.metadata.outputs.version }}/${{ matrix.architecture }}/*
+          if-no-files-found: error
           compression-level: 0
-  release:
-    if: startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release-preview]'))
-    needs: checks
-    runs-on: ubuntu-latest
+  draft:
+    if: needs.metadata.outputs.release == 'true'
+    needs: [metadata, checks]
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - id: version
-        name: Resolve immutable release version
-        run: |
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            version="$GITHUB_REF_NAME"
-          else
-            version="$(cat release-version.txt)"
-            case "$version" in v*-*) ;; *) echo 'Branch releases must be prereleases'; exit 1;; esac
-          fi
-          [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-      - name: Enforce stable acceptance gate
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          case "$VERSION" in
-            *-*) echo 'Prerelease: production registration remains closed' ;;
-            *) jq -e '.readyForPublicRegistration == true' docs/acceptance.json ;;
-          esac
       - uses: actions/download-artifact@v4
         with:
-          name: application-image
-          path: /tmp/image
-      - env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: docker load -i /tmp/image/mail-web-image.tar && docker tag mail-web:ci "mail-web:${VERSION#v}"
-      - env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: sh tooling/package-release.sh "$VERSION"
-      - name: Refuse superseded main publication
-        if: github.ref == 'refs/heads/main'
-        run: test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
-      - name: Create or update draft release
+          pattern: release-*
+          merge-multiple: true
+          path: build/release-inputs
+      - name: Assemble and checksum both architectures
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          python3 tooling/release_metadata.py assemble "$VERSION" --inputs build/release-inputs --output build/release-assets
+          (cd build/release-assets && sha256sum -c SHA256SUMS)
+      - name: Create or refresh same-commit draft
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.metadata.outputs.version }}
         run: |
           set -eu
-          if gh release view "$VERSION" --json isDraft --jq .isDraft > /tmp/release-draft 2>/dev/null; then
-            test "$(cat /tmp/release-draft)" = true || { echo 'Published releases are immutable'; exit 1; }
-          else
+          state=$(sh tooling/release-guard.sh "$VERSION")
+          if [ "$state" = new ]; then
             case "$VERSION" in *-*) preview=--prerelease;; *) preview=;; esac
-            gh release create "$VERSION" --draft $preview --target "$GITHUB_SHA" --title "Mail Web $VERSION" --notes-file docs/release-notes.md
-          fi
-          # Only an unpublished draft may retarget its tag after a failed build.
-          # Never alter a tag associated with an already published release.
-          if tag_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$VERSION" --jq .object.sha 2>/tmp/release-tag-error); then
-            if [ "$tag_sha" != "$GITHUB_SHA" ]; then
-              gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$VERSION" -f sha="$GITHUB_SHA" -F force=true
-            fi
+            gh release create "$VERSION" --repo "$GITHUB_REPOSITORY" --draft $preview --target "$GITHUB_SHA" --title "Mail Web $VERSION" --notes-file docs/release-notes.md
           else
-            grep -q 'HTTP 404' /tmp/release-tag-error || { cat /tmp/release-tag-error; exit 1; }
-            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$VERSION" -f sha="$GITHUB_SHA"
+            gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --notes-file docs/release-notes.md
           fi
-          gh release edit "$VERSION" --target "$GITHUB_SHA" --notes-file docs/release-notes.md
-          directory="build/release/$VERSION"
-          gh release upload "$VERSION" "$directory/mail-web-linux-amd64.tar.gz" "$directory/mailwebctl-linux-amd64.tar.gz" "$directory/SHA256SUMS" "$directory/release-manifest.json" "$directory/install.sh" --clobber
-      - name: Download and verify the actual draft assets
+          gh release upload "$VERSION" build/release-assets/* --repo "$GITHUB_REPOSITORY" --clobber
+  release-install:
+    needs: [metadata, draft]
+    # Keep private draft downloads working; the successful draft job gates access.
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and verify actual draft assets on the native host
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.metadata.outputs.version }}
         run: |
           set -eu
           assets="$RUNNER_TEMP/draft-assets"
           mkdir -p "$assets"
           gh release download "$VERSION" --repo "$GITHUB_REPOSITORY" --dir "$assets"
           sudo MAIL_WEB_RELEASE_ASSET_DIR="$assets" sh tests/release-install.sh "$VERSION"
-      - name: Publish only after installation and restore passed
+  publish:
+    needs: [metadata, release-install]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish after both native install and restore suites pass
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.metadata.outputs.version }}
         run: |
-          if [ "$GITHUB_REF" = refs/heads/main ]; then
-            test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
-          fi
-          gh release edit "$VERSION" --draft=false
+          set -eu
+          sh tooling/release-guard.sh "$VERSION"
+          gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false

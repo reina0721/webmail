@@ -7,6 +7,7 @@ if ! docker info >/dev/null 2>&1; then
  echo 'Docker Engine access is required.' >&2; exit 1
 fi
 for command in python3 openssl flock; do command -v "$command" >/dev/null || { echo "Missing dependency: $command" >&2; exit 1; }; done
+architecture=$(sh tooling/platform.sh)
 root="$PWD/tests/runtime/rebuild"
 mkdir -p "$root"
 if [ "${MAIL_WEB_TEST_DEPLOY_LOCK:-}" != 1 ]; then
@@ -19,7 +20,7 @@ if [ ! -s "$root/compose.env" ]; then
 fi
 compose(){ docker compose --project-name mailweb-rebuild --env-file "$root/compose.env" -f deploy/compose.test.yaml "$@"; }
 verify_stack(){
- docker build --platform linux/amd64 --target quality --build-arg MAIL_WEB_REVISION="${MAIL_WEB_REVISION:-$(git describe --always --dirty)}" -t mail-web-quality:rebuild .
+ docker build --platform "linux/$architecture" --target quality --build-arg MAIL_WEB_REVISION="${MAIL_WEB_REVISION:-$(git describe --always --dirty)}" -t mail-web-quality:rebuild .
  python3 tests/release-acceptance.py
  if docker ps -q --filter label=com.docker.compose.project=mailweb-rebuild --filter label=com.docker.compose.service=web | grep -q .; then echo 'Use deploy/test-env.sh up to switch from hot development to the production test build.' >&2;return 1;fi
  python3 tooling/run-test-actor.py
@@ -38,7 +39,7 @@ case "$action" in
   python3 tooling/test-environment.py network "$root"
   build=false; verify=false
   for arg in "$@"; do case "$arg" in --build) build=true;; --verify) verify=true;; *) echo "Unknown option: $arg" >&2;exit 1;; esac;done
-  if [ "$build" = true ] || ! docker image inspect mail-web:rebuild >/dev/null 2>&1; then docker build --platform linux/amd64 --build-arg MAIL_WEB_REVISION="${MAIL_WEB_REVISION:-$(git describe --always --dirty)}" -t mail-web:rebuild .; fi
+  if [ "$build" = true ] || ! docker image inspect mail-web:rebuild >/dev/null 2>&1; then docker build --platform "linux/$architecture" --build-arg MAIL_WEB_REVISION="${MAIL_WEB_REVISION:-$(git describe --always --dirty)}" -t mail-web:rebuild .; fi
   if docker ps -aq --filter label=com.docker.compose.project=mailweb-rebuild --filter label=com.docker.compose.service=web | grep -q .; then
    docker compose --project-name mailweb-rebuild --env-file "$root/compose.env" -f deploy/compose.test.yaml -f deploy/compose.dev.yaml stop web
    docker compose --project-name mailweb-rebuild --env-file "$root/compose.env" -f deploy/compose.test.yaml -f deploy/compose.dev.yaml rm -f web

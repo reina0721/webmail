@@ -352,14 +352,7 @@ fn install(
                 .then(|| package.join("bin/mailwebctl"))
                 .as_deref(),
         )?;
-        for file in ["README.md", "LICENSE", "NOTICE"] {
-            if package.join(file).is_file() {
-                fs::copy(package.join(file), s.root.join(file))?;
-            }
-        }
-        if package.join("docs").is_dir() {
-            copy_tree(&package.join("docs"), &s.root.join("docs"))?
-        }
+        install_docs(&package, &s.root)?;
         Ok(())
     })();
     if let Err(e) = apply {
@@ -692,6 +685,31 @@ fn copy_tree(from: &Path, to: &Path) -> Result<()> {
     }
     Ok(())
 }
+fn install_docs(package: &Path, root: &Path) -> Result<()> {
+    for file in [
+        "README.md",
+        "README_ZH.md",
+        "CONTRIBUTING.md",
+        "CHANGELOG.md",
+        "SECURITY.md",
+        "llms.txt",
+        ".env.example",
+        "LICENSE",
+        "NOTICE",
+    ] {
+        if package.join(file).is_file() {
+            config::safe_tree(&root.join(file))?;
+            fs::copy(package.join(file), root.join(file))?;
+        }
+    }
+    for directory in ["docs", "examples"] {
+        if package.join(directory).is_dir() {
+            config::safe_tree(&root.join(directory))?;
+            copy_tree(&package.join(directory), &root.join(directory))?;
+        }
+    }
+    Ok(())
+}
 fn apply_snapshot(s: &Settings, path: &Path) -> Result<()> {
     let stage = tempfile::tempdir_in(&s.root)?;
     release::unpack(&path.join("config-secrets.tar.gz"), stage.path())?;
@@ -836,7 +854,7 @@ fn self_update(s: &Settings, cli: &Cli, version: &str) -> Result<()> {
         s.repository
     );
     let temp = tempfile::tempdir_in(&s.root)?;
-    let name = "mailwebctl-linux-amd64.tar.gz";
+    let name = crate::platform::Architecture::current()?.cli_asset();
     c.download(
         &format!("{base}/SHA256SUMS"),
         &temp.path().join("SHA256SUMS"),

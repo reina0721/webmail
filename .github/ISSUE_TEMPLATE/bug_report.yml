@@ -1,0 +1,43 @@
+name: Bug report / 问题反馈
+description: Report a reproducible Mail Web defect using synthetic or redacted data.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: "For sensitive reports, follow SECURITY.md. Do not include tokens, passwords, private mail or database dumps."
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Include the release version and revision from redacted status output.
+    validations:
+      required: true
+  - type: dropdown
+    id: architecture
+    attributes:
+      label: Platform
+      options:
+        - Linux AMD64
+        - Linux ARM64
+        - Other / source development
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Docker/Compose versions, Stalwart version, browser and HTTPS or explicit HTTP mode. Omit private addresses if unnecessary.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Use synthetic data and include expected and actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted logs or screenshots
+      description: Check attachments for secrets and private mail before submitting.

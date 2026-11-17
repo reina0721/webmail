@@ -1,0 +1,38 @@
+# Mail Web
+
+> Development-preview self-hosted Webmail and operations console for existing Stalwart servers. Rust/Axum, SQLite, a Next.js static client and the Rust mailwebctl host manager share one repository.
+
+## Entry points
+- English overview: README.md; 简体中文: README_ZH.md
+- Deployment and data boundaries: docs/deployment.md
+- Commands, setup and migration: docs/cli.md
+- Stalwart authorization and registration: docs/stalwart-setup.md
+- Build/test instructions: CONTRIBUTING.md
+- Release invariants and artifacts: docs/releasing.md
+- API schema: backend/contract/openapi.json; generated TypeScript must not be hand-edited.
+- Upstream source and license records: docs/upstream/README.md, LICENSE, NOTICE.
+
+## Installation
+- Supported release targets: Linux AMD64 and ARM64; inspect the selected Release's assets. Historical releases can be AMD64-only.
+- Prerequisites: Docker Engine, Compose v2, Bash, curl, tar, SHA-256 tooling and existing Docker authorization. Site usage requires an existing Stalwart service.
+- Interactive: curl -fsSL https://raw.githubusercontent.com/reina0721/webmail/main/install.sh | bash
+- Non-interactive, behind an existing HTTPS reverse proxy:
+  curl -fsSL https://raw.githubusercontent.com/reina0721/webmail/main/install.sh | bash -s -- --yes --dir "$HOME/apps/mail-web" --bind 127.0.0.1 --port 18090 --public-origin https://mail.example.org
+- Replace the example origin. --channel stable excludes previews; --version vVERSION pins a release; --repository OWNER/REPO selects a fork; --download-mirror HTTPS_URL changes the download route while retaining checksum verification.
+- --bundle PATH accepts an offline application archive with adjacent SHA256SUMS. The server loads the bundled image; installation does not compile source or pull application images from a registry.
+- Site branding, domains, Stalwart, service credentials and Turnstile are configured through /console/setup/, not a fictional YAML config.
+
+## Machine-readable diagnostics
+- "$HOME/apps/mail-web/mailweb" status --json
+- "$HOME/apps/mail-web/mailweb" doctor --json
+- status fields: directory, container, running, healthy, version, revision, bind, port, accessUrl, configured. version/revision may be null before installation or when health information is unavailable.
+- Use --yes for unattended operations. The CLI has no generic --output option. Errors return nonzero; do not treat a healthy unconfigured instance as a connected mail service.
+- setup --show-token explicitly reveals an administrative capability. Never log it or copy it into an issue.
+- backup prints the snapshot path. restore SNAPSHOT --yes restores a matching snapshot; direct database downgrade is unsupported.
+
+## Development and evidence
+- Run cargo test --locked --workspace and the frontend checks documented in CONTRIBUTING.md.
+- python3 tests/release-packaging.py checks artifact assembly and architecture selection without touching deployment state.
+- sh deploy/test-env.sh up --build --verify manages disposable Linux/Docker fixtures and includes a >=30-minute registration soak. It is not a production verification command.
+- Feature status: docs/feature-parity.json. Stable promotion: docs/acceptance.json. Historical evidence does not certify current production behavior.
+- Read applicable AGENTS.md before modifying frontend modules. Preserve pinned upstream hashes and reviewed adaptation records.

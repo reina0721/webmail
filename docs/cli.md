@@ -98,11 +98,12 @@ curl -fsSL https://raw.githubusercontent.com/reina0721/webmail/main/install.sh |
 cd ~/apps/mail-web
 ./mailweb status --json
 ./mailweb backup
+./mailweb self-update --version v0.4.0-alpha.4
 ./mailweb update --version v0.4.0-alpha.4 --yes
 ./mailweb status --json
 ```
 
-旧版 Rust CLI 已支持原地升级，本版继续提供该能力；应用包内的管理 CLI 随应用一并更新。无需先执行 `self-update`，也无需重新初始化 Stalwart。下载和校验完成前不会停止现有服务，升级前自动保存一致性快照；更新过程会短暂重启服务。账号、邮件数据、加密配置、安装密钥和原监听参数会保留。若使用 `sudo` 安装，请继续使用同一维护用户和原目录。
+旧版 Rust CLI 已支持原地升级，本版继续提供该能力；应用包内的管理 CLI 随应用一并更新。请先执行上面的 `self-update`，再更新应用，以获得 Docker classic／containerd 镜像标识兼容处理；无需重新初始化 Stalwart。下载和校验完成前不会停止现有服务，升级前自动保存一致性快照；更新过程会短暂重启服务。账号、邮件数据、加密配置、安装密钥和原监听参数会保留。若使用 `sudo` 安装，请继续使用同一维护用户和原目录。
 
 成功后浏览器刷新并检查页面底部版本。进入 **站点与默认设置 → 自动配置 Turnstile 人机验证**，补齐此前缺失或误填的验证配置，再进行真人与验证码收信验证。CLI 升级不会自行创建 Cloudflare 资源或修改注册开放策略。
 
@@ -114,6 +115,7 @@ cd ~/apps/mail-web
 
 ```bash
 ./mailweb backup
+./mailweb self-update --version v0.4.0-alpha.4
 ./mailweb update --version v0.4.0-alpha.4 --yes
 ./mailweb restore /absolute/install/backups/SNAPSHOT --yes
 ```

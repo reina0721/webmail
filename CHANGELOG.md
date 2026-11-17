@@ -22,6 +22,7 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 
 - Supplying a Cloudflare token without an account now blocks initialization instead of silently skipping Turnstile. Skipped creation is no longer reported as completed.
 - Missing Turnstile configuration no longer reports otherwise valid mail-service credentials as missing.
+- Docker classic and containerd image stores share a canonical config digest for offline installation and snapshot restore; older installations should update the CLI first.
 - URLs are rejected as Turnstile keys. Invalid saved values remain repairable; widget initialization and script failures show an actionable message without crashing the verification page.
 
 - Both architectures must pass real draft-asset installation and restore checks before a release becomes public. Full client and sustained business validation runs after publication against the same source commit, with its result recorded in release notes.

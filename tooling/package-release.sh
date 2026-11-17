@@ -40,10 +40,10 @@ tar -czf "$destination/mailwebctl-linux-$architecture.tar.gz" -C "$stage/cli" .
 cp "$stage/cli/bin/mailwebctl" "$stage/package/bin/"
 test "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$image")" = "linux/$architecture"
 runtime=$(docker run --rm --pull never "$image" --runtime-info)
-image_id=$(docker image inspect --format '{{.Id}}' "$image")
 commit=$(git rev-parse HEAD)
 printf '%s' "$runtime" | jq -e --arg version "${version#v}" --arg commit "$commit" '.version == $version and .revision == $commit' >/dev/null
 docker save "$image" -o "$stage/package/image.tar"
+image_id=$(python3 tooling/image_config_id.py "$stage/package/image.tar" "$image")
 migration_version=$(python3 -c 'from pathlib import Path; print(max(int(p.name.split("_")[0]) for p in Path("backend/migrations/sqlite").glob("*.sql")))')
 jq -n --argjson migration "$migration_version" --arg version "$version" --arg commit "$commit" --arg arch "linux/$architecture" --arg image "$image" --arg id "$image_id" --argjson runtime "$runtime" '{cliVersion:($version|ltrimstr("v")),version:$version,sourceCommit:$commit,architecture:$arch,image:$image,imageId:$id,sqliteVersion:$runtime.sqlite,database:{engine:"sqlite",migrationVersion:$migration,rollback:"restore-matching-backup"}}' > "$stage/package/release-manifest.json"
 cp compose.yaml .env.example README.md README_ZH.md CONTRIBUTING.md CHANGELOG.md SECURITY.md llms.txt LICENSE NOTICE install.sh "$stage/package/"

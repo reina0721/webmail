@@ -6,6 +6,8 @@ Mail Web v0.4.0-alpha.4
 
 首次提供 Linux AMD64 / ARM64 原生构建的离线应用包及 Rust CLI；每个架构均通过草稿附件的安装、更新、备份与故障恢复快速门禁后公开；完整客户端与持续业务验证随后对同一版本运行，状态与日志链接显示在本 Release 的验证区块。保留 AGPL、上游来源记录、对应源码、SHA256SUMS，并补齐双语开源文档。
 
-从 v0.4.0-alpha.2 升级：进入原安装目录执行 `./mailweb backup`，然后 `./mailweb update --version v0.4.0-alpha.4 --yes`。升级自动校验发布包、保存一致性快照并更新应用与管理 CLI；保留账号、邮件数据、安装密钥、Stalwart 配置及监听端口。故障时使用命令给出的准确快照路径执行 `./mailweb restore /absolute/path/to/backups/SNAPSHOT --yes`，不要手动把旧镜像连接到已升级的数据库。详见 [升级说明](https://github.com/reina0721/webmail/blob/main/docs/cli.md#从-v040-alpha2-升级)。
+从 v0.4.0-alpha.2 升级：进入原安装目录执行 `./mailweb backup`，先执行 `./mailweb self-update --version v0.4.0-alpha.4` 更新管理工具，然后 `./mailweb update --version v0.4.0-alpha.4 --yes`。升级自动校验发布包、保存一致性快照并更新应用与管理 CLI；保留账号、邮件数据、安装密钥、Stalwart 配置及监听端口。故障时使用命令给出的准确快照路径执行 `./mailweb restore /absolute/path/to/backups/SNAPSHOT --yes`，不要手动把旧镜像连接到已升级的数据库。详见 [升级说明](https://github.com/reina0721/webmail/blob/main/docs/cli.md#从-v040-alpha2-升级)。
 
 生产域名实际 Turnstile 与公网邮件投递仍需部署后由真人完成验证；此版本不把隔离测试结果提升为生产验收状态。
+
+兼容 Docker classic 与 containerd 镜像存储：镜像清单使用规范配置摘要；加载与恢复时仍核对 SHA-256 配置摘要，避免把 manifest 摘要差异误判成镜像内容变化。

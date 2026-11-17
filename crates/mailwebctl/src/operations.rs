@@ -277,8 +277,7 @@ fn install(
         package.join("image.tar").to_str().context("包路径无效")?,
     ])?;
     ensure!(
-        docker::capture(&["image", "inspect", "--format", "{{.Id}}", &manifest.image])?.trim()
-            == manifest.image_id,
+        crate::image::matches(&manifest.image, &manifest.image_id)?,
         "导入镜像 ID 与清单不符"
     );
     let runtime: Value = serde_json::from_str(&docker::capture(&[
@@ -796,11 +795,17 @@ fn restore(s: &Settings, snapshot: &Path, cli: &Cli) -> Result<()> {
     }
     let version = env.get("MAIL_WEB_VERSION").context("快照缺少版本")?;
     let image = format!("mail-web:{version}");
-    let image_id = docker::capture(&["image", "inspect", "--format", "{{.Id}}", &image])?;
     let m = stage.path().join("config/installed-release.json");
     if m.is_file() {
         let m: Manifest = serde_json::from_slice(&fs::read(m)?)?;
-        ensure!(m.image_id == image_id.trim(), "快照镜像 ID 不匹配")
+        ensure!(
+            crate::image::matches(&image, &m.image_id)?,
+            "快照镜像 ID 不匹配"
+        )
+    } else {
+        // Historical snapshots lack a manifest, but the retained image must
+        // still exist before the current installation is stopped.
+        docker::capture(&["image", "inspect", "--format", "{{.Id}}", &image])?;
     }
     let existing = s.root.join(".env").exists();
     let was_running = existing && docker::running(s);

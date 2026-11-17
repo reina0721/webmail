@@ -2,6 +2,7 @@
 //! reina0721/dsh-docker@86a6e10 (MIT OR Apache-2.0); see docs/upstream/dsh.
 mod config;
 mod docker;
+mod image;
 mod operations;
 mod platform;
 mod release;

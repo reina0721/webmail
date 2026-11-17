@@ -25,7 +25,7 @@ Mail Web 连接已有 Stalwart，不负责安装邮件服务器，也不代替�
 
 ![Mail Web 客户端](docs/screenshots/mail-native-1440.jpg)
 
-Release 先通过原生构建、实际安装、升级和恢复等快速门禁，再对同一发布提交运行全量客户端与持续业务验证；状态与日志链接显示在 Release 说明中。
+Release 完成原生构建、版本／架构及附件校验后自动公开；安装、升级、恢复、全量客户端与持续业务测试随后对同一发布提交运行，状态与日志链接显示在 Release 说明中。
 
 ## 快速开始
 
@@ -92,7 +92,7 @@ tooling/            契约检查、打包与发布门禁
 .github/            CI、双架构发布及贡献模板
 ```
 
-Rust 提供静态 UI 和平台 API。SQLite 保存平台状态，Stalwart 保存邮件。各组件在同一仓库中同步版本。[贡献指南](CONTRIBUTING.md)说明开发检查，[发布指南](docs/releasing.md)说明版本不可变规则及草稿验收。
+Rust 提供静态 UI 和平台 API。SQLite 保存平台状态，Stalwart 保存邮件。各组件在同一仓库中同步版本。[贡献指南](CONTRIBUTING.md)说明开发检查，[发布指南](docs/releasing.md)说明版本不可变规则及发布校验。
 
 ## 数据、安全与许可证
 

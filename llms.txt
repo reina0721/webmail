@@ -38,6 +38,6 @@
 - Read applicable AGENTS.md before modifying frontend modules. Preserve pinned upstream hashes and reviewed adaptation records.
 
 Release validation phases
-- ci.yml: fast checks, native builds, actual dual-architecture draft install/update/restore, then publication.
-- full-validation.yml: published-record-bound source and assets, full client and business tests, >=30-minute soak; status is written to Release notes without replacing assets.
+- ci.yml: native builds, version/architecture/source checks, attachment checksums, then publication.
+- full-validation.yml: published-record-bound source and assets, dual-architecture install/update/restore, all quality/client/business tests, >=30-minute soak; status is written to Release notes without replacing assets.
 - Fast passed plus full pending/running is not a full validation pass. A failed full run requires a new version for source fixes; published tags/assets stay immutable.

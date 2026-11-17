@@ -3,6 +3,11 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      release-version:
+        description: 'Published version to validate (blank validates selected ref)'
+        required: false
+        type: string
   workflow_run:
     workflows: [Quick release and checks]
     types: [completed]
@@ -24,7 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ inputs.release-version || github.event.workflow_run.head_sha || github.sha }}
           persist-credentials: false
       - id: context
         name: Bind full validation to the published source commit
@@ -32,10 +37,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
           UPSTREAM_RUN: ${{ github.event.workflow_run.id }}
-          SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+          DISPATCH_VERSION: ${{ inputs.release-version }}
           RELEASE_PUSH: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release-preview]')) }}
         run: |
           set -eu
+          SOURCE_COMMIT=$(git rev-parse HEAD)
           version="$(cat release-version.txt)"
           python3 tooling/release_metadata.py check-version "$version"
           echo "commit=$SOURCE_COMMIT" >> "$GITHUB_OUTPUT"
@@ -44,6 +50,13 @@ jobs:
           if [ "$EVENT_NAME" = push ] && [ "$RELEASE_PUSH" = true ]; then
             echo 'perform=false' >> "$GITHUB_OUTPUT"
             exit 0
+          fi
+          if [ "$EVENT_NAME" = workflow_dispatch ] && [ -n "$DISPATCH_VERSION" ]; then
+            test "$DISPATCH_VERSION" = "$version"
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$version" > "$RUNNER_TEMP/published-release.json"
+            jq -e '.draft == false' "$RUNNER_TEMP/published-release.json" >/dev/null
+            python3 -c 'import sys,json;sys.path.insert(0,"tooling");from release_status import verify_owner;verify_owner(*sys.argv[1:4],json.load(open(sys.argv[4])))' "$GITHUB_REPOSITORY" "$version" "$SOURCE_COMMIT" "$RUNNER_TEMP/published-release.json"
+            echo 'release=true' >> "$GITHUB_OUTPUT"
           fi
           if [ "$EVENT_NAME" = workflow_run ]; then
             count=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$UPSTREAM_RUN/artifacts" --jq '[.artifacts[] | select(.name == "published-release" and .expired == false)] | length')
@@ -60,7 +73,7 @@ jobs:
           echo 'perform=true' >> "$GITHUB_OUTPUT"
   validation-start:
     needs: metadata
-    if: github.event_name == 'workflow_run' && needs.metadata.outputs.release == 'true' && needs.metadata.outputs.perform == 'true'
+    if: needs.metadata.outputs.release == 'true' && needs.metadata.outputs.perform == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -75,6 +88,34 @@ jobs:
           VERSION: ${{ needs.metadata.outputs.version }}
           SOURCE_COMMIT: ${{ needs.metadata.outputs.commit }}
         run: python3 tooling/release_status.py --repository "$GITHUB_REPOSITORY" --version "$VERSION" --commit "$SOURCE_COMMIT" --phase full --status in_progress --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+  installation:
+    name: Published installation (${{ matrix.architecture }})
+    needs: metadata
+    if: needs.metadata.outputs.release == 'true' && needs.metadata.outputs.perform == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.metadata.outputs.commit }}
+          persist-credentials: false
+      - name: Verify public attachments, install, upgrade and restore
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          set -eu
+          assets="$RUNNER_TEMP/published-install-assets"
+          mkdir -p "$assets"
+          gh release download "$VERSION" --repo "$GITHUB_REPOSITORY" --dir "$assets"
+          sudo MAIL_WEB_RELEASE_ASSET_DIR="$assets" sh tests/release-install.sh "$VERSION"
   checks:
     name: Full validation (${{ matrix.architecture }})
     needs: metadata
@@ -112,7 +153,7 @@ jobs:
       - run: mkdir -p build && cargo run --locked -p mail-web -- --openapi > build/openapi.json && diff -u backend/contract/openapi.json build/openapi.json
       - run: pnpm --dir frontend exec openapi-typescript ../backend/contract/openapi.json -o apps/web/src/platform/lib/generated-api.ts && git diff --exit-code frontend/apps/web/src/platform/lib/generated-api.ts
       - run: bash -n install.sh && bash -n examples/install-unattended.sh; for script in deploy/*.sh tooling/*.sh tests/*.sh; do sh -n "$script"; done
-      - run: python3 tests/test-network.py && python3 tests/release-acceptance.py && python3 tests/release-packaging.py && python3 tooling/check-repository.py
+      - run: python3 tests/image-identity.py && python3 tests/release-status.py && node --test tests/release-workflows.test.mjs && python3 tests/test-network.py && python3 tests/release-acceptance.py && python3 tests/release-packaging.py && python3 tooling/check-repository.py
       - name: Download the actual published release
         if: needs.metadata.outputs.release == 'true'
         env:
@@ -142,8 +183,8 @@ jobs:
           docker tag mail-web:ci mail-web:rebuild
           sudo MAIL_WEB_REVISION="$SOURCE_COMMIT" sh deploy/test-env.sh up --verify
   report:
-    needs: [metadata, validation-start, checks]
-    if: always() && github.event_name == 'workflow_run' && needs.metadata.outputs.release == 'true' && needs.metadata.outputs.perform == 'true'
+    needs: [metadata, validation-start, checks, installation]
+    if: always() && needs.metadata.outputs.release == 'true' && needs.metadata.outputs.perform == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -158,7 +199,9 @@ jobs:
           VERSION: ${{ needs.metadata.outputs.version }}
           SOURCE_COMMIT: ${{ needs.metadata.outputs.commit }}
           VALIDATION_RESULT: ${{ needs.checks.result }}
+          INSTALLATION_RESULT: ${{ needs.installation.result }}
         run: |
           set -eu
+          if [ "$INSTALLATION_RESULT" != success ]; then VALIDATION_RESULT=failure; fi
           case "$VALIDATION_RESULT" in success|failure|cancelled) ;; *) VALIDATION_RESULT=failure;; esac
           python3 tooling/release_status.py --repository "$GITHUB_REPOSITORY" --version "$VERSION" --commit "$SOURCE_COMMIT" --phase full --status "$VALIDATION_RESULT" --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

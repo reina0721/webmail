@@ -7,13 +7,15 @@ const YAML=require('../frontend/node_modules/.pnpm/node_modules/yaml');
 const quick=YAML.parse(fs.readFileSync(new URL('../.github/workflows/ci.yml',import.meta.url),'utf8'));
 const full=YAML.parse(fs.readFileSync(new URL('../.github/workflows/full-validation.yml',import.meta.url),'utf8'));
 const runs=job=>job.steps.map(step=>step.run??'').join('\n');
-test('quick publication waits for both native draft installation matrices',()=>{
- assert.deepEqual(quick.jobs.publish.needs,['metadata','release-install']);
- for(const name of ['checks','release-install'])assert.deepEqual(quick.jobs[name].strategy.matrix.include.map(item=>item.architecture),['amd64','arm64']);
- assert.match(runs(quick.jobs.checks),/vitest run src\/native/);
- assert.match(runs(quick.jobs.checks),/tests\/run-integration.sh/);
- assert.doesNotMatch(runs(quick.jobs.checks),/test-env.sh up --verify/);
- assert.match(runs(quick.jobs['release-install']),/tests\/release-install.sh/);
+test('publication depends on native builds and checksums; installation runs after publication',()=>{
+ assert.deepEqual(quick.jobs.publish.needs,['metadata','draft']);
+ assert.equal(quick.jobs['release-install'],undefined);
+ for(const job of [quick.jobs.checks,full.jobs.installation])assert.deepEqual(job.strategy.matrix.include.map(item=>item.architecture),['amd64','arm64']);
+ assert.doesNotMatch(runs(quick.jobs.checks),/vitest|cargo test|run-integration|test-env.sh/);
+ assert.match(runs(quick.jobs.checks),/docker build/);
+ assert.match(runs(quick.jobs.draft),/sha256sum -c SHA256SUMS/);
+ assert.match(full.jobs.installation.if,/outputs.release == 'true'/);
+ assert.match(runs(full.jobs.installation),/tests\/release-install.sh/);
 });
 test('published record exists before public release and triggers pinned full validation',()=>{
  const steps=quick.jobs.publish.steps;
@@ -41,10 +43,12 @@ test('ordinary checks stay read-only and full results update notes only after bo
  assert.equal(quick.permissions.contents,'read');
  assert.equal(quick.jobs.checks.permissions,undefined);
  assert.equal(full.jobs.checks.permissions,undefined);
- assert.deepEqual(full.jobs.report.needs,['metadata','validation-start','checks']);
+ assert.deepEqual(full.jobs.report.needs,['metadata','validation-start','checks','installation']);
  assert.match(full.jobs.report.if,/always\(\)/);
- assert.match(full.jobs.report.if,/github.event_name == 'workflow_run'/);
- assert.match(full.jobs['validation-start'].if,/github.event_name == 'workflow_run'/);
+ assert.match(full.jobs['validation-start'].if,/outputs.release == 'true'/);
+ assert.ok(full.on.workflow_dispatch.inputs['release-version']);
+ assert.match(runs(full.jobs.metadata),/DISPATCH_VERSION/);
+ assert.match(runs(full.jobs.report),/INSTALLATION_RESULT/);
  assert.match(full.jobs.report.if,/outputs.release == 'true'/);
  assert.match(runs(full.jobs.report),/--phase full --status/);
  assert.doesNotMatch(runs(full.jobs.report),/release upload|--draft=false/);

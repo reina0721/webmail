@@ -25,7 +25,7 @@ Mail Web connects to an existing Stalwart server; it does not install a mail ser
 
 ![Mail Web client](docs/screenshots/mail-native-1440.jpg)
 
-Releases pass a fast gate with native builds and actual install, upgrade and restore checks. Full client and sustained business validation then runs against the same published commit; its status and logs appear in the Release notes.
+Releases publish after native builds, version/architecture checks and attachment checksums. Installation, upgrade, restore, full client and sustained business tests run afterward against the same published commit; status and logs appear in the Release notes.
 
 ## Quick start
 
@@ -92,7 +92,7 @@ tooling/            Contract checks, packaging and release guards
 .github/            CI, dual-architecture releases and contribution templates
 ```
 
-Rust serves the exported UI and platform API. SQLite stores platform state; Stalwart stores mail. All components share one versioned repository. [Contributing](CONTRIBUTING.md) covers development checks; [Releasing](docs/releasing.md) covers immutable versions and draft verification.
+Rust serves the exported UI and platform API. SQLite stores platform state; Stalwart stores mail. All components share one versioned repository. [Contributing](CONTRIBUTING.md) covers development checks; [Releasing](docs/releasing.md) covers immutable versions and publication checks.
 
 ## Data, security and license
 

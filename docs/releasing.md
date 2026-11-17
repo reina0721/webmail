@@ -1,6 +1,6 @@
 # 发布维护指南
 
-本仓库使用两阶段 GitHub Actions：先快速检查并发布，再对同一版本执行完整验证。两阶段均覆盖 Linux AMD64 与 ARM64；分发离线应用包和 Rust CLI。目标服务器从 Release 下载、校验并 `docker load`，不拉取应用镜像仓库。历史版本可能只有 AMD64 附件。
+本仓库使用两阶段 GitHub Actions：先构建、校验并自动发布，再对同一版本执行全部测试。两阶段均覆盖 Linux AMD64 与 ARM64；分发离线应用包和 Rust CLI。目标服务器从 Release 下载、校验并 `docker load`，不拉取应用镜像仓库。历史版本可能只有 AMD64 附件。
 
 ## 版本与权限准备
 
@@ -22,7 +22,7 @@ python3 tests/release-packaging.py
 python3 tooling/check-repository.py
 ```
 
-GitHub 必须允许 Actions 使用仓库的 `GITHUB_TOKEN`。仓库 **Settings → Actions → General → Workflow permissions** 可配置 Read and write permissions；若组织策略限制，需由管理员允许发布任务请求 `contents: write`。工作流默认及普通 PR 保持只读；发布预检和草稿附件验收任务也单独请求 `contents: write`，以获得草稿可见性；它们只在发布路径运行，普通 PR 不会启动这些任务。草稿上传与公开任务负责写 Releases，main 的旧运行取消任务单独请求 `actions: write`。草稿访问规则见 [GitHub Releases API 文档](https://docs.github.com/en/rest/releases/releases)。不需要 GHCR、Docker Hub 或包注册表密钥。
+GitHub 必须允许 Actions 使用仓库的 `GITHUB_TOKEN`。仓库 **Settings → Actions → General → Workflow permissions** 可配置 Read and write permissions；若组织策略限制，需由管理员允许发布任务请求 `contents: write`。工作流默认及普通 PR 保持只读；发布预检也单独请求 `contents: write`，以获得草稿可见性；它们只在发布路径运行，普通 PR 不会启动这些任务。草稿上传与公开任务负责写 Releases，main 的旧运行取消任务单独请求 `actions: write`。草稿访问规则见 [GitHub Releases API 文档](https://docs.github.com/en/rest/releases/releases)。不需要 GHCR、Docker Hub 或包注册表密钥。
 
 公开仓库使用 `ubuntu-24.04` 与 `ubuntu-24.04-arm` 原生 runner。迁移到其他服务或权限环境时，应先确认同等 runner 可用。Fork 需将 README 安装 URL、仓库链接、根 `install.sh` 的默认仓库、`.env.example`、示例和 CLI 默认仓库调整为实际 `OWNER/REPO`；工作流发布目标使用 `GITHUB_REPOSITORY`。
 
@@ -51,11 +51,11 @@ git push origin main
 
 上述命令会启动外部发布；应由维护者在检查完成后主动执行。稳定版继续要求 `docs/acceptance.json` 中 `readyForPublicRegistration` 为 true；该字段不是运行时域名注册开关。
 
-## 第一阶段：快速检查、草稿验收与发布
+## 第一阶段：构建、校验与自动发布
 
-`ci.yml`（Quick release and checks）先检查版本一致性、版本唯一性及提交归属。两种原生 runner 均执行 Rust 格式／全部 Rust 测试／Clippy、前端类型与生产构建、原生界面专项测试、API 契约、上游来源和真实 Stalwart 快速集成。通过后汇总草稿，两种架构重新下载真实附件，完成干净／重复安装、更新、备份恢复、故障恢复；AMD64 同时验证已公开 v0.4.0-alpha.2 Rust CLI 和旧 shell 版本升级。两侧成功后公开。
+`ci.yml`（Quick release and checks）检查版本一致性、唯一性及提交归属。两个原生 runner 构建应用镜像与静态 CLI，核对运行时版本、源码提交和平台，再汇总归档、清单及 SHA256SUMS。附件校验通过后立即自动公开；这一阶段不运行单元、集成、安装、恢复或历史迁移测试。
 
-全量客户端回归及至少 30 分钟持续注册检查移到发布后；快速检查通过不表示完整验证已通过，也不表示公网邮件投递或生产 Turnstile 已验收。Release 说明明确区分 Fast checks 与 Full validation。
+安装、升级、恢复、全部质量检查、客户端回归及至少 30 分钟持续注册检查均在发布后；构建与附件校验通过不表示测试已通过，也不表示公网邮件投递或生产 Turnstile 已验收。Release 说明明确区分 Fast checks 与 Full validation。
 
 构建使用同一提交和版本，镜像的运行时版本与 revision 必须匹配；CLI 的 ELF 架构和版本必须匹配。打包命令在本机对应架构执行：
 
@@ -68,7 +68,7 @@ sh tooling/package-release.sh "$version" "$architecture"
 
 在已提交源码上运行，输出位于 `build/release/VERSION/ARCHITECTURE/`。修改后的未提交源文件不得用已提交 revision 标记。应用包中的 `source.tar.gz` 从该 Git 提交导出，包含追踪的源码、锁文件和许可证，不收录工作区运行数据或缓存。
 
-标签与 main 预览的完整发布运行共用串行并发组，避免草稿验收期间被另一运行替换附件。双架构产物汇总后创建草稿，草稿提供：
+标签与 main 预览的完整发布运行共用串行并发组，避免打包与发布期间被另一运行替换附件。双架构产物汇总后创建草稿，草稿提供：
 
 | 附件 | 内容 |
 | --- | --- |
@@ -87,11 +87,11 @@ python3 tooling/release_metadata.py assemble "$(cat release-version.txt)" \
 (cd build/release-assets && sha256sum -c SHA256SUMS)
 ```
 
-两个 runner 分别重新下载草稿的全部真实附件，再校验和安装对应架构。测试覆盖干净／重复安装、更新、网络配置、备份恢复及失败恢复；AMD64 额外验证历史 shell 发布包升级，ARM64 没有历史 AMD64 包迁移步骤。只有两侧成功后才公开。CLI 选择最高 SemVer 的已发布版本，缺少本机架构产物时直接失败，不自动回退旧版或其他架构。
+附件汇总校验成功后由 `publish` 自动公开，不等待测试。第二阶段的两个 runner 下载已公开的全部附件再安装对应架构；测试覆盖干净／重复安装、更新、网络配置、备份及失败恢复，AMD64 额外验证历史版本升级。第二阶段失败会记录结果，保持公开附件不变。CLI 选择最高 SemVer 的已发布版本，缺少本机架构产物时直接失败，不回退到其他架构或旧版。
 
 ## 第二阶段：发布后完整验证
 
-`full-validation.yml`（Full validation）在快速流程完成后通过 `workflow_run` 读取其发布记录，校验仓库、版本、源码提交、公开状态及标签归属。它检出记录中的确切提交，下载并校验实际公开附件，在两种原生 runner 上使用发布镜像运行原有的全部客户端测试、全部真实 Stalwart 业务测试、旧数据及独立备份恢复，以及至少 30 分钟持续注册检查。普通提交和 PR 仍执行完整检查，保持只读权限。
+`full-validation.yml`（Full validation）在快速流程完成后通过 `workflow_run` 读取其发布记录，校验仓库、版本、源码提交、公开状态及标签归属。它检出记录中的确切提交，下载并校验实际公开附件，在两种原生 runner 上并行执行公开附件安装／历史升级／恢复及原有的全部质量、客户端测试、全部真实 Stalwart 业务测试、旧数据及独立备份恢复，以及至少 30 分钟持续注册检查。普通提交和 PR 仍执行完整检查，保持只读权限。
 
 完整验证开始和结束时，仅有结果汇报任务获得 `contents: write`，只更新 Release 说明中的自动验证区块，不上传或替换附件。状态为 pending、running、passed、failed 或 cancelled，并附 Actions 链接。完整检查失败会将该版标为 failed；维护者修复后必须同步新版本号并再次发布。不会自动改写源码、移动旧标签或回滚任何生产实例。
 
@@ -101,7 +101,7 @@ python3 tooling/release_metadata.py assemble "$(cat release-version.txt)" \
 
 第一阶段失败保持未发布或草稿状态。第二阶段失败保留已公开产物并在 Release 说明标明失败。相同提交可在 Actions 中重跑任务；若需要修改源码，应使用新版本并同步版本字段。已有标签不可强推，已公开版本不可覆盖，同一版本也不能改绑到其他源码提交。过时的 main 构建在草稿上传前和公开前都会被拒绝。
 
-查看快速流程中 `metadata`、`preflight`、两侧 `checks`、`draft`、两侧 `release-install` 和 `publish`；完整流程查看两侧 `checks` 和 `report`。检查失败阶段的日志，并在修复后重新完成所需阶段。若更新启动失败，使用 CLI 给出的匹配快照恢复；不要直接对迁移后的数据库运行旧程序。
+查看快速流程中 `metadata`、`preflight`、两侧 `checks`、`draft` 和 `publish`；完整流程查看两侧 `installation`、两侧 `checks` 和 `report`。检查失败阶段的日志，并在修复后重新完成所需阶段。若更新启动失败，使用 CLI 给出的匹配快照恢复；不要直接对迁移后的数据库运行旧程序。
 
 GitHub 设置还应由维护者确认：Issues 可用；需要时启用私密漏洞报告；为 main 与版本标签设置适当保护。文件生成不代表这些远端设置已经变更。
 
@@ -113,3 +113,12 @@ gh run rerun FULL_RUN_ID --repo reina0721/webmail
 ```
 
 重跑完整验证会继续使用该次快速发布记录绑定的源码提交。Release 的 Full validation 为 pending 或 running 时，尚没有该版本的完整通过结论；使用者可据此决定是否立即升级。
+
+
+手动公开现有草稿后，可针对该版本启动第二阶段，不重新执行第一阶段：
+
+```bash
+gh workflow run full-validation.yml --repo reina0721/webmail --ref main -f release-version=v0.4.0-alpha.4
+```
+
+也可在 Actions → Full validation → Run workflow 填写 `release-version`。流程按公开标签检出确切源码，验证版本与标签归属并下载实际附件；结果更新该 Release。留空时只检查所选分支／标签，不写发布状态。

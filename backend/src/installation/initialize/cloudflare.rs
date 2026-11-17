@@ -1,5 +1,17 @@
 use super::*;
 pub(super) const API: &str = "https://api.cloudflare.com/client/v4";
+pub(super) fn hostname(origin: &str) -> Result<String> {
+    let url = reqwest::Url::parse(origin)
+        .map_err(|_| Error(StatusCode::BAD_REQUEST, "public_origin_invalid"))?;
+    let host = url
+        .host_str()
+        .filter(|host| domain_valid(host))
+        .ok_or(Error(
+            StatusCode::BAD_REQUEST,
+            "turnstile_hostname_required",
+        ))?;
+    Ok(host.to_owned())
+}
 async fn request_at(
     client: &reqwest::Client,
     base: &str,
@@ -128,10 +140,7 @@ pub(super) async fn create_at(
         return Ok(());
     }
     let endpoint = format!("/accounts/{account}/challenges/widgets");
-    let host = reqwest::Url::parse(&job.spec.public_origin)
-        .ok()
-        .and_then(|u| u.host_str().map(str::to_owned))
-        .ok_or(Error(StatusCode::BAD_REQUEST, "public_origin_invalid"))?;
+    let host = hostname(&job.spec.public_origin)?;
     let name = job.name("turnstile");
     // Reconcile by a unique per-installation name, exact host and creation snapshot.
     let items = widgets(app, key, &endpoint, base).await?;
@@ -182,6 +191,24 @@ pub(super) async fn create_at(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn widget_hostname_requires_a_domain_without_origin_port_or_path() {
+        assert_eq!(
+            hostname("https://webmail.example.com:8088").unwrap(),
+            "webmail.example.com"
+        );
+        for origin in [
+            "http://85.155.115.98:8088",
+            "http://[::1]:8088",
+            "http://localhost:8088",
+        ] {
+            assert_eq!(
+                hostname(origin).unwrap_err().1,
+                "turnstile_hostname_required"
+            );
+        }
+    }
+
     #[tokio::test]
     async fn cloudflare_transport_handles_create_permission_limit_redirect_and_timeout() {
         use axum::{extract::OriginalUri, http::StatusCode, response::IntoResponse};

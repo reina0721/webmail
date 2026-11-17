@@ -18,6 +18,8 @@ Webmail 网站来源、Stalwart 来源和邮箱域名是三项独立信息。Clo
 
 ### 已安装站点单独补充 Turnstile
 
+**域名前提：** Cloudflare 的组件主机名须为域名，不能填 IP、端口或完整网址（[官方要求](https://developers.cloudflare.com/turnstile/additional-configuration/hostname-management/)）。仍通过 IP 访问时可以先安装和使用邮箱，稍后自行配置 Webmail 域名、反代与证书，再在站点设置保存新的“公开访问来源”。本程序不会自动修改 DNS。
+
 **字段含义：** Site Key 是 Cloudflare 为验证组件生成的公开标识，不能填写 Webmail 地址；Secret 是同一组件的服务端密钥，不能填写 Cloudflare API Token。通常无需手工处理这两项，使用下面的自动配置即可。格式检查只排除明显错误，组件能否使用仍需实际验证。
 
 已完成邮件服务初始化时，进入 **站点与默认设置 → 自动配置 Turnstile 人机验证**，或在原安装页的完成结果下使用同一面板。填写有 Turnstile 编辑权限的 Cloudflare API Token，点击 **读取 Cloudflare 账号**；只有一个账号时自动选中，没有列账号权限时填写目标账号的 32 位 Account ID，再点击 **自动创建并保存验证配置**。

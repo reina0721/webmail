@@ -54,6 +54,7 @@ async fn complete(
     path: &std::path::Path,
     api: &str,
 ) -> Result<()> {
+    cloudflare::hostname(&saved.origin)?;
     cloudflare::validate_at(
         app,
         input.cloudflare_token.trim(),

@@ -152,6 +152,7 @@ export function TurnstileSetup({
     <section className="console-panel" id="turnstile-setup">
       <header>
         <h2>自动配置 Turnstile 人机验证</h2>
+        <p>真实 Turnstile 需要 Webmail 使用域名访问。当前若通过 IP 访问，请先配置自己的域名，再保存上方“公开访问来源”；IP 访问仍可用于安装和邮箱操作。</p>
         <p>
           填写有 Turnstile 编辑权限的 Cloudflare API
           Token，程序自动创建组件并保存 Site Key 和 Secret。无需再次授权

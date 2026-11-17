@@ -352,6 +352,9 @@ pub(crate) async fn preflight(
     normalize_spec(&mut input.spec)?;
     let who = owner(&app, &headers, true).await?;
     let mut access = grant(&input.ticket, &who).await?;
+    if !input.spec.cloudflare_account.is_empty() {
+        cloudflare::hostname(&input.spec.public_origin)?;
+    }
     if !access.cloudflare_token.is_empty() && input.spec.cloudflare_account.is_empty() {
         return Err(Error(
             StatusCode::BAD_REQUEST,
@@ -405,6 +408,9 @@ pub(crate) async fn start(
     normalize_spec(&mut input.spec)?;
     let who = owner(&app, &headers, true).await?;
     let mut access = grant(&input.ticket, &who).await?;
+    if !input.spec.cloudflare_account.is_empty() {
+        cloudflare::hostname(&input.spec.public_origin)?;
+    }
     if !access.cloudflare_token.is_empty() && input.spec.cloudflare_account.is_empty() {
         return Err(Error(
             StatusCode::BAD_REQUEST,

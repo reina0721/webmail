@@ -1,3 +1,14 @@
+--- a/components/push-notification-prompt.tsx
++++ b/frontend/apps/web/src/components/push-notification-prompt.tsx
+@@ -69,7 +69,7 @@
+ 
+ function isExcludedPath(pathname: string): boolean {
+   return /(^|\/)settings(?:\/|$)/.test(pathname)
+-    || /(^|\/)setup(?:\/|$)/.test(pathname)
++    || /(^|\/)(?:console|setup)(?:\/|$)/.test(pathname)
+     || /(^|\/)login(?:\/|$)/.test(pathname);
+ }
+ 
 --- a/components/mail/mail-app.tsx
 +++ b/frontend/apps/web/src/components/mail/mail-app.tsx
 @@ -5840,7 +5840,10 @@

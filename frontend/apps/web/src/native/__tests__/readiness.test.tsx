@@ -57,7 +57,7 @@ it("shows pending feedback and a visible completion summary for unsuccessful che
   );
   render(<RegistrationReadiness />);
   await screen.findByText("Turnstile 配置");
-  fireEvent.click(screen.getByRole("button", { name: "立即检查" }));
+  fireEvent.click(screen.getByRole("button", { name: "检查注册条件" }));
   expect(screen.getByText(/正在检查运行配置与邮件服务/)).toBeInTheDocument();
   resolve({ ...report, checkedAt: 2 });
   expect(await screen.findByText(/检查完成：1\/2 项通过/)).toBeInTheDocument();

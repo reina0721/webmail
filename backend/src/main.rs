@@ -707,6 +707,7 @@ async fn health(State(app): State<Arc<App>>) -> Result<Json<Value>> {
         installation::status,
         installation::read_config,
         installation::save_config,
+        installation::update_site,
         installation::enroll_operator,
         installation::discovery::discover,
         readiness::report,

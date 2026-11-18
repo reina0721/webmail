@@ -1,17 +1,385 @@
-'use client';
-import {useAutomaticInstallation} from './setup-controller';
-import {TurnstileSetup} from './turnstile-setup';
-import {Action,TextField,PasswordField,SelectField,CheckboxField,ConfirmDialog} from '@mail-web/ui';
-export function ConsoleSetup(){
- const c=useAutomaticInstallation({});const busy=c.pending||c.job?.status==='running'||c.job?.status==='applying';
- return <div className="console-setup"><header><p className="console-eyebrow">AUTOMATIC SETUP</p><h1>连接你的邮件服务</h1><p>授权后自动创建专用身份、提交策略与验证服务。已有资源会被识别，任务中断后可继续。</p></header>
- {c.status&&!c.status.configured&&<section className="console-panel" role="status"><h2>应用已安装，邮件服务待配置</h2><p>目录、容器和端口已由安装工具准备完成。请在下方授权 Stalwart，继续配置邮件服务。</p></section>}
- <section className="console-panel"><h2>1 · 安装访问</h2><PasswordField label="安装令牌（已登录管理员可留空）" purpose="current" value={c.token} onChange={e=>c.setToken(e.target.value)}/><p className="console-hint">令牌由部署脚本生成，也可通过安装链接自动读取。</p></section>
- {c.error&&<div className="console-alert" role="alert">{c.error}<Action variant="quiet" onPress={()=>void c.load()}>重新读取配置</Action></div>}
- {c.job&&<section className="console-panel"><h2>初始化任务 · {c.job.status}</h2><p role="status">当前步骤：{c.job.step}</p>{c.job.error&&<p role="alert">{c.job.error}</p>}<ol>{c.job.completed.map(step=><li key={step}>✓ {step}</li>)}{c.job.skipped?.includes('turnstile')&&<li>首次初始化跳过了 Turnstile，当前状态请查看下方验证配置。</li>}</ol>{c.applied?<><a className="console-link" href="/console/">配置已应用，进入控制台 →</a><Action variant="secondary" onPress={()=>void c.cancel()}>重新授权 / 升级配置权限</Action></>:<Action variant="secondary" disabled={c.pending} onPress={()=>void c.cancel()}>停止后续步骤 / 重新授权继续</Action>}</section>}{c.applied&&<TurnstileSetup token={c.token}/>}
- {!c.job||!['running','applying','completed'].includes(c.job.status)?<><section className="console-panel"><h2>2 · 服务授权</h2><div className="console-form-grid"><TextField label="Stalwart HTTPS 地址" value={c.base} disabled={busy} onChange={e=>c.setBase(e.target.value)}/><SelectField label="授权方式" value={c.mode} options={[{value:'password',label:'管理员账号'},{value:'key',label:'管理员 API Key'}]} onValueChange={c.setMode}/>{c.mode==='password'?<><TextField label="管理员账号" value={c.username} onChange={e=>c.setUsername(e.target.value)}/><PasswordField purpose="current" label="管理员密码" value={c.password} onChange={e=>c.setPassword(e.target.value)}/></>:<PasswordField purpose="current" label="管理员 API Key" value={c.apiKey} onChange={e=>c.setApiKey(e.target.value)}/>}<PasswordField purpose="current" label="Cloudflare API Token" hint="仅用于本次自动配置，不长期保存；程序会生成并保存验证组件密钥" value={c.cfToken} onChange={e=>c.setCfToken(e.target.value)}/></div><Action loading={c.pending} onPress={()=>void c.authorize()}>验证权限并发现资源</Action></section>
- <section className="console-panel"><h2>3 · 站点与运营身份</h2><div className="console-form-grid"><TextField label="站点名称" value={c.spec.brand} onChange={e=>c.change('brand',e.target.value)}/><TextField label="公开访问来源" value={c.spec.publicOrigin} onChange={e=>c.change('publicOrigin',e.target.value)}/><TextField label="邮箱域名" value={c.spec.domain} onChange={e=>c.change('domain',e.target.value)}/><SelectField label="运营身份" value={c.spec.operatorMode} options={[{value:'existing',label:'绑定已有普通邮箱'},{value:'new',label:'创建普通邮箱'}]} onValueChange={v=>c.change('operatorMode',v)}/><TextField label="运营邮箱" value={c.spec.operatorEmail} onChange={e=>c.change('operatorEmail',e.target.value)}/><TextField label="外部恢复邮箱" value={c.spec.recoveryEmail} onChange={e=>c.change('recoveryEmail',e.target.value)}/><PasswordField purpose="current" label="运营邮箱密码" value={c.operatorPassword} onChange={e=>c.setOperatorPassword(e.target.value)}/>{c.accounts.length?<SelectField label="Cloudflare 账号" value={c.spec.cloudflareAccount} options={c.accounts.map(a=>({value:a.id,label:a.name}))} onValueChange={v=>c.change('cloudflareAccount',v)}/>:<TextField label="Cloudflare Account ID" hint="自动配置 Turnstile 时填写账号的 32 位 ID；未提供 Cloudflare Token 时可留空。" value={c.spec.cloudflareAccount} onChange={e=>c.change('cloudflareAccount',e.target.value)}/>}</div><CheckboxField checked={c.spec.createDomain} onCheckedChange={v=>c.change('createDomain',v)} label="域名不存在时自动创建"/><CheckboxField checked={c.spec.directoryQueries} onCheckedChange={v=>c.change('directoryQueries',v)} label="初始化时启用同服务器用户目录（影响此 Stalwart 的全部用户；可在邮件服务中关闭）"/><Action disabled={!c.ticket||busy} onPress={()=>void c.preflight()}>预检自动配置</Action></section>
- {c.preview&&<section className="console-panel"><h2>4 · 执行配置</h2><ul>{c.preview.map(s=><li key={s}>{s}</li>)}</ul><Action loading={c.pending} onPress={()=>void c.start()}>开始自动初始化</Action></section>}</>:null}
- <ConfirmDialog triggerLabel="离开" isOpen={!!c.leave.href} onOpenChange={open=>{if(!open)c.leave.cancel();}} title="离开未保存的配置？" description="当前输入尚未提交。已创建的服务资源会保留。" cancelLabel="继续编辑" confirmLabel="离开" onConfirm={c.leave.leave}/>
- </div>;
+"use client";
+import { useState } from "react";
+import Link from "next/link";
+import {
+  Action,
+  TextField,
+  PasswordField,
+  SelectField,
+  CheckboxField,
+  ConfirmDialog,
+} from "@mail-web/ui";
+import { setupSteps, useAutomaticInstallation } from "./setup-controller";
+
+const jobStates: Record<string, string> = {
+  running: "正在配置邮件服务",
+  applying: "正在应用配置",
+  completed: "邮件服务配置已完成",
+  failed: "配置未完成，可继续重试",
+  cancelled: "配置已暂停",
+};
+
+export function ConsoleSetup() {
+  const c = useAutomaticInstallation({});
+  const [repair, setRepair] = useState(false);
+  const running = c.job?.status === "running" || c.job?.status === "applying";
+  const installed = !!c.status?.configured && !c.status.needsOperator;
+  const showForm =
+    c.loaded &&
+    !running &&
+    (!installed || repair) &&
+    (repair || c.job?.status !== "completed");
+  const authorized = !!c.ticket;
+  const hosts = c.domains.map((domain) => ({
+    value: domain.name,
+    label: domain.name,
+  }));
+  const locked = c.pending || running;
+  const notes = c.job?.completed.map((step) => setupSteps[step] ?? step) ?? [];
+
+  return (
+    <div className="console-setup">
+      {c.pending && !c.status && <p role="status">正在读取安装状态…</p>}
+      {installed && !repair && !running && (
+        <section className="console-panel">
+          <header>
+            <h2>邮件服务已连接</h2>
+            <p>
+              {c.status?.domain} 已可使用邮箱。要改 Webmail
+              地址或开启注册，从对应设置继续。
+            </p>
+          </header>
+          <div className="console-actions">
+            <Link className="console-link" href="/console/site/">
+              设置主地址与 Turnstile →
+            </Link>
+            <Link className="console-link" href="/console/registration/">
+              检查并开放注册 →
+            </Link>
+            <Link className="console-link" href="/">
+              返回邮箱 →
+            </Link>
+          </div>
+          <details>
+            <summary>修复 Stalwart 连接或权限</summary>
+            <p>用于重新授权 Stalwart，补齐此安装所需的权限与邮件服务资源。</p>
+            <Action
+              variant="secondary"
+              disabled={locked || !c.loaded}
+              onPress={() => setRepair(true)}
+            >
+              开始邮件服务修复
+            </Action>
+          </details>
+        </section>
+      )}
+      {(!installed || repair) && (
+        <section className="console-panel">
+          <header>
+            <h2>{repair ? "修复邮件服务" : "安装访问"}</h2>
+            <p>
+              使用部署工具生成的安装链接，或粘贴安装令牌。已登录 Webmail
+              运营管理员可直接继续。
+            </p>
+          </header>
+          <PasswordField
+            label="安装令牌"
+            purpose="current"
+            value={c.token}
+            onChange={(e) => c.setToken(e.target.value)}
+          />
+          {c.pending && <p role="status">正在处理，请稍候…</p>}
+        </section>
+      )}
+      {c.error && (
+        <div className="console-alert" role="alert">
+          {c.error}
+          <Action
+            variant="quiet"
+            disabled={locked}
+            onPress={() => void c.load()}
+          >
+            重新读取配置
+          </Action>
+        </div>
+      )}
+      {c.job &&
+        (!installed || running || (repair && c.job.status !== "completed")) && (
+          <section className="console-panel">
+            <h2>{jobStates[c.job.status] ?? "邮件服务配置状态"}</h2>
+            {running && (
+              <p role="status">
+                当前步骤：{setupSteps[c.job.step] ?? c.job.step}
+              </p>
+            )}
+            {c.job.error && <p role="alert">{c.job.error}</p>}
+            {notes.length > 0 && (
+              <details>
+                <summary>已完成的操作</summary>
+                <ul>
+                  {notes.map((step) => (
+                    <li key={step}>{step}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            {c.applied ? (
+              <Link className="console-link" href="/console/">
+                进入控制台 →
+              </Link>
+            ) : (
+              c.job.status !== "completed" && (
+                <Action
+                  variant="secondary"
+                  disabled={c.pending}
+                  onPress={() => void c.cancel()}
+                >
+                  停止后续步骤
+                </Action>
+              )
+            )}
+          </section>
+        )}
+      {showForm && (
+        <>
+          <section className="console-panel">
+            <header>
+              <h2>连接 Stalwart</h2>
+              <p>
+                这里使用邮件服务器的管理员凭据。下一步再选择实际登录 Webmail
+                的运营邮箱。
+              </p>
+            </header>
+            <div className="console-form-grid">
+              <TextField
+                label="Stalwart HTTPS 地址"
+                hint="例如 https://mail.example.com"
+                value={c.base}
+                disabled={locked}
+                onChange={(e) => c.setBase(e.target.value)}
+              />
+              <SelectField
+                label="授权方式"
+                value={c.mode}
+                disabled={locked}
+                options={[
+                  { value: "password", label: "管理员账号" },
+                  { value: "key", label: "管理员 API Key" },
+                ]}
+                onValueChange={c.setMode}
+              />
+              {c.mode === "password" ? (
+                <>
+                  <TextField
+                    label="Stalwart 管理员账号"
+                    value={c.username}
+                    disabled={locked}
+                    onChange={(e) => c.setUsername(e.target.value)}
+                  />
+                  <PasswordField
+                    purpose="current"
+                    label="Stalwart 管理员密码"
+                    value={c.password}
+                    disabled={locked}
+                    onChange={(e) => c.setPassword(e.target.value)}
+                  />
+                </>
+              ) : (
+                <PasswordField
+                  purpose="current"
+                  label="Stalwart 管理员 API Key"
+                  value={c.apiKey}
+                  disabled={locked}
+                  onChange={(e) => c.setApiKey(e.target.value)}
+                />
+              )}
+            </div>
+            <details>
+              <summary>同时配置公开注册的人机验证（可选）</summary>
+              <p>
+                只使用邮箱时可以跳过。以后可在「站点与默认设置」添加 Turnstile。
+              </p>
+              <PasswordField
+                purpose="current"
+                label="Cloudflare API Token"
+                hint="需要目标 Cloudflare 账号的 Turnstile 编辑权限。"
+                value={c.cfToken}
+                disabled={locked}
+                onChange={(e) => c.setCfToken(e.target.value)}
+              />
+            </details>
+            <Action
+              loading={c.pending && !authorized}
+              disabled={
+                locked ||
+                !c.base.trim() ||
+                (c.mode === "key"
+                  ? !c.apiKey.trim()
+                  : !c.username.trim() || !c.password)
+              }
+              onPress={() => void c.authorize()}
+            >
+              验证 Stalwart 权限
+            </Action>
+            {authorized && (
+              <p role="status">
+                Stalwart 授权已取得。请继续填写站点与运营邮箱。
+              </p>
+            )}
+          </section>
+          {authorized && (
+            <section className="console-panel">
+              <header>
+                <h2>站点与运营邮箱</h2>
+                <p>
+                  运营邮箱必须是所选域名下的普通邮箱。它可以登录 Webmail
+                  管理控制台。
+                </p>
+              </header>
+              <div className="console-form-grid">
+                <TextField
+                  label="站点名称"
+                  value={c.spec.brand}
+                  onChange={(e) => c.change("brand", e.target.value)}
+                  disabled={locked}
+                />
+                <TextField
+                  label="公开访问来源"
+                  hint="填写浏览器打开 Webmail 用的完整地址。"
+                  value={c.spec.publicOrigin}
+                  onChange={(e) => c.change("publicOrigin", e.target.value)}
+                  disabled={locked}
+                />
+                {hosts.length > 0 && !c.spec.createDomain ? (
+                  <SelectField
+                    label="邮箱域名"
+                    value={c.spec.domain}
+                    options={hosts}
+                    onValueChange={(value) => c.change("domain", value)}
+                    disabled={locked}
+                  />
+                ) : (
+                  <TextField
+                    label="邮箱域名"
+                    hint="邮箱地址中 @ 后面的部分。"
+                    value={c.spec.domain}
+                    onChange={(e) => c.change("domain", e.target.value)}
+                    disabled={locked}
+                  />
+                )}
+                <SelectField
+                  label="运营邮箱来源"
+                  value={c.spec.operatorMode}
+                  options={[
+                    { value: "existing", label: "绑定已有普通邮箱" },
+                    { value: "new", label: "创建普通邮箱" },
+                  ]}
+                  onValueChange={(value) => c.change("operatorMode", value)}
+                  disabled={locked}
+                />
+                <TextField
+                  label="运营邮箱"
+                  value={c.spec.operatorEmail}
+                  onChange={(e) => c.change("operatorEmail", e.target.value)}
+                  disabled={locked}
+                />
+                <TextField
+                  label="外部恢复邮箱"
+                  hint="用于找回运营邮箱账号。"
+                  value={c.spec.recoveryEmail}
+                  onChange={(e) => c.change("recoveryEmail", e.target.value)}
+                  disabled={locked}
+                />
+                <PasswordField
+                  purpose="current"
+                  label="运营邮箱密码"
+                  value={c.operatorPassword}
+                  onChange={(e) => c.setOperatorPassword(e.target.value)}
+                  disabled={locked}
+                />
+                {c.cloudflareRequested &&
+                  (c.accounts.length ? (
+                    <SelectField
+                      label="Cloudflare 账号"
+                      value={c.spec.cloudflareAccount}
+                      options={c.accounts.map((account) => ({
+                        value: account.id,
+                        label: account.name,
+                      }))}
+                      onValueChange={(value) =>
+                        c.change("cloudflareAccount", value)
+                      }
+                      disabled={locked}
+                    />
+                  ) : (
+                    <TextField
+                      label="Cloudflare Account ID"
+                      hint="Token 未能列出账号。请从 Cloudflare 后台查找「Copy account ID」，填入 32 位账号 ID。"
+                      value={c.spec.cloudflareAccount}
+                      onChange={(e) =>
+                        c.change("cloudflareAccount", e.target.value)
+                      }
+                      disabled={locked}
+                    />
+                  ))}
+              </div>
+              <details>
+                <summary>域名与用户目录选项</summary>
+                <CheckboxField
+                  checked={c.spec.createDomain}
+                  onCheckedChange={(value) => c.change("createDomain", value)}
+                  disabled={locked}
+                  label="域名不存在时自动创建"
+                />
+                <CheckboxField
+                  checked={c.spec.directoryQueries}
+                  onCheckedChange={(value) =>
+                    c.change("directoryQueries", value)
+                  }
+                  disabled={locked}
+                  label="启用同服务器用户目录（影响该 Stalwart 的全部用户）"
+                />
+              </details>
+              <Action
+                loading={c.pending}
+                disabled={locked}
+                onPress={() => void c.preflight()}
+              >
+                检查安装配置
+              </Action>
+            </section>
+          )}
+          {c.preview && (
+            <section className="console-panel">
+              <h2>确认配置</h2>
+              <ul>
+                {c.preview.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+              <Action
+                loading={c.pending}
+                disabled={locked}
+                onPress={() => void c.start()}
+              >
+                应用配置
+              </Action>
+            </section>
+          )}
+        </>
+      )}
+      <ConfirmDialog
+        triggerLabel="离开"
+        isOpen={!!c.leave.href}
+        onOpenChange={(open) => {
+          if (!open) c.leave.cancel();
+        }}
+        title="离开未保存的配置？"
+        description="当前输入尚未提交。已创建的服务资源会保留。"
+        cancelLabel="继续编辑"
+        confirmLabel="离开"
+        onConfirm={c.leave.leave}
+      />
+    </div>
+  );
 }

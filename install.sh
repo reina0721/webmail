@@ -3,7 +3,7 @@
 # reina0721/dsh-docker@86a6e10 (MIT OR Apache-2.0); see docs/upstream/dsh.
 set -Eeuo pipefail
 umask 077
-bootstrap_version=v0.4.0-alpha.5
+bootstrap_version=v0.4.0-alpha.6
 repository=${MAIL_WEB_REPOSITORY:-reina0721/webmail}
 mirror=
 repo_explicit=0

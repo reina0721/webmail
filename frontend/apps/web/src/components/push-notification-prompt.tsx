@@ -69,7 +69,7 @@ function resyncTargets(
 
 function isExcludedPath(pathname: string): boolean {
   return /(^|\/)settings(?:\/|$)/.test(pathname)
-    || /(^|\/)setup(?:\/|$)/.test(pathname)
+    || /(^|\/)(?:console|setup)(?:\/|$)/.test(pathname)
     || /(^|\/)login(?:\/|$)/.test(pathname);
 }
 

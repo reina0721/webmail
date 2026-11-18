@@ -19,11 +19,13 @@ type Configuration = {
 };
 export function TurnstileSetup({
   token = "",
+  publicOrigin,
   disabled = false,
   onApplied,
   onBusyChange,
 }: {
   token?: string;
+  publicOrigin?: string;
   disabled?: boolean;
   onApplied?: () => void;
   onBusyChange?: (busy: boolean) => void;
@@ -31,7 +33,6 @@ export function TurnstileSetup({
   const [key, setKey] = useState(""),
     [account, setAccount] = useState(""),
     [accounts, setAccounts] = useState<Account[]>([]),
-    [discovered, setDiscovered] = useState(false),
     [configured, setConfigured] = useState<boolean | null>(null),
     [busy, setBusy] = useState(false),
     [phase, setPhase] = useState<"accounts" | "configure" | "">(""),
@@ -39,6 +40,11 @@ export function TurnstileSetup({
     [error, setError] = useState("");
   const alive = useRef(false),
     generation = useRef(0);
+  const hostname = publicOrigin ? new URL(publicOrigin).hostname : "";
+  const usableHostname =
+    publicOrigin === undefined ||
+    (hostname.includes(".") && !/^[\d.]+$/.test(hostname));
+  const blocked = disabled || !usableHostname;
   const leave = useInstallationLeave(!!key && !busy);
   const headers = () =>
     token ? { Authorization: "Bearer " + token } : undefined;
@@ -70,7 +76,7 @@ export function TurnstileSetup({
       alive.current = false;
       generation.current++;
     };
-  }, [token]);
+  }, [token, publicOrigin]);
   useEffect(() => {
     if (!key) return;
     const timer = setTimeout(() => {
@@ -95,7 +101,6 @@ export function TurnstileSetup({
       );
       if (!alive.current || at !== generation.current) return;
       setAccounts(value.accounts);
-      setDiscovered(true);
       if (value.accounts.length === 1) setAccount(value.accounts[0].id);
       setNotice(
         value.accounts.length
@@ -152,13 +157,22 @@ export function TurnstileSetup({
     <section className="console-panel" id="turnstile-setup">
       <header>
         <h2>自动配置 Turnstile 人机验证</h2>
-        <p>真实 Turnstile 需要 Webmail 使用域名访问。当前若通过 IP 访问，请先配置自己的域名，再保存上方“公开访问来源”；IP 访问仍可用于安装和邮箱操作。</p>
         <p>
-          填写有 Turnstile 编辑权限的 Cloudflare API
-          Token，程序自动创建组件并保存 Site Key 和 Secret。无需再次授权
-          Stalwart，也无需手工复制两把密钥。
+          用于公开注册和找回密码。提供 Cloudflare API Token 后，Webmail
+          会创建组件并保存密钥。
         </p>
       </header>
+      {publicOrigin !== undefined && (
+        <p role="status">
+          {usableHostname ? (
+            <>
+              组件绑定域名 <strong>{hostname}</strong>。
+            </>
+          ) : (
+            "请先在上方保存 Webmail 的 HTTPS 域名，然后回来配置 Turnstile。当前 IP 可用于直接访问 Webmail。"
+          )}
+        </p>
+      )}
       {configured === true ? (
         <>
           <p role="status">Turnstile 已配置。</p>
@@ -168,31 +182,33 @@ export function TurnstileSetup({
         </>
       ) : (
         <>
-          <p>API Token 仅临时用于配置；完成后清除，不长期保存。</p>
+          <p>
+            可使用已有的 API Token，需要对目标 Cloudflare 账号有 Turnstile
+            编辑权限。Token 只用于本次配置。
+          </p>
           <div className="console-form-grid">
             <PasswordField
               label="Cloudflare API Token"
               purpose="current"
               value={key}
-              disabled={busy || disabled}
+              disabled={busy || blocked}
               onChange={(e) => {
                 setKey(e.target.value);
-                setDiscovered(false);
                 setAccounts([]);
               }}
             />
             <TextField
               label="Cloudflare Account ID"
               value={account}
-              disabled={busy || disabled}
+              disabled={busy || blocked}
               onChange={(e) => setAccount(e.target.value)}
-              hint="账号的 32 位 ID；没有列账号权限时可从 Cloudflare 后台复制填写。"
+              hint="优先点击「读取 Cloudflare 账号」。没有结果时填写账号的 32 位 ID。"
             />
             {accounts.length > 0 && (
               <SelectField
                 label="可访问的 Cloudflare 账号"
                 value={account}
-                disabled={busy || disabled}
+                disabled={busy || blocked}
                 options={accounts.map((value) => ({
                   value: value.id,
                   label: value.name,
@@ -205,7 +221,7 @@ export function TurnstileSetup({
             <Action
               variant="secondary"
               loading={phase === "accounts"}
-              disabled={!key.trim() || busy || disabled}
+              disabled={!key.trim() || busy || blocked}
               onPress={() => void discover()}
             >
               读取 Cloudflare 账号
@@ -215,20 +231,23 @@ export function TurnstileSetup({
               disabled={
                 !key.trim() ||
                 !/^[a-fA-F0-9]{32}$/.test(account.trim()) ||
-                busy || disabled
+                busy ||
+                blocked
               }
               onPress={() => void configure()}
             >
               自动创建并保存验证配置
             </Action>
           </div>
-          {discovered && !accounts.length && (
-            <p>
-              账号列表为空不会再被当作配置完成；填写 Account ID
-              后可继续使用同一个 Token。
-            </p>
-          )}
-          {disabled && <p>请先保存当前站点修改，再配置验证服务。</p>}
+          <a
+            className="console-link"
+            href="https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            在 Cloudflare 找到 Account ID ↗
+          </a>
+          {disabled && <p>请先保存或清除本页正在编辑的其他配置。</p>}
         </>
       )}
       {busy && <p role="status">正在处理，请稍候…</p>}
@@ -236,7 +255,7 @@ export function TurnstileSetup({
       {error && <p role="alert">{error}</p>}
       <Action
         variant="quiet"
-        disabled={busy || disabled}
+        disabled={busy || blocked}
         onPress={() => {
           void read()
             .then((value) => {

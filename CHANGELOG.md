@@ -4,6 +4,14 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+## [0.4.0-alpha.6] - 2026-11-17
+
+### Fixed
+
+- Save site branding and the public origin independently of stale Turnstile keys and Stalwart availability.
+- Separate first-time installation, mail service repair, and registration verification. Show the target domain for Turnstile and how to continue when account discovery returns no results.
+- Show the verification path before the public registration switch and keep a visible loading state while the mailbox opens.
+
 ## [0.4.0-alpha.5] - 2026-11-17
 
 ### Added

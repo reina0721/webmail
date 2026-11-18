@@ -1,16 +1,16 @@
-Mail Web v0.4.0-alpha.5
+Mail Web v0.4.0-alpha.6
 
-- **IP 备用入口。** 已启用 HTTP 直连并绑定具体 IP 的站点，在设置 HTTPS 主域名后仍可从原 IP 和端口登录、收发邮件和进入控制台。两个入口分别建立会话，注册和找回密码继续使用主地址。通配监听可用 `DIRECT_ACCESS_ORIGIN` 指定备用地址。
-- **控制台版本管理。** 运营管理员可查看运行版本、选择适配本机架构的发布包升级，或确认后恢复旧版快照。宿主机服务继续处理容器重启期间的任务，切换失败时尝试恢复切换前的快照。回退会还原快照中的 Webmail 本地数据和配置。
-- **Linux AMD64 与 ARM64。** 提供离线应用包、独立 CLI、对应源码及 SHA-256 校验清单。公开后的完整验证状态和日志会显示在下方。
+- **站点地址可以单独保存。** 旧版误填的 Turnstile 密钥或暂时无法连接 Stalwart 时，仍可从控制台修复主地址。
+- **安装、修复、注册分步操作。** 已安装的站点直接显示邮件服务状态和下一步入口。首次安装说明 Stalwart 管理员和 Webmail 运营邮箱各自在哪里使用。
+- **Turnstile 与收信验证。** 自动配置显示要绑定的域名、账号发现结果和 Account ID 获取入口。先完成自动检查、人机和收信验证，再开启公开注册。
+- **邮箱打开时显示加载状态。** 通知提示避开安装和控制台页面。
 
-在原安装目录升级。建议先留下旧版快照，以便登记为回退目标。
+在控制台打开「版本管理」，选择 `v0.4.0-alpha.6` 更新。尚未启用宿主机服务的安装，可以在原安装目录执行：
 
 ```sh
-./mailweb backup &&
-./mailweb self-update --version v0.4.0-alpha.5 &&
-./mailweb update --version v0.4.0-alpha.5 --yes &&
+./mailweb self-update --version v0.4.0-alpha.6 &&
+./mailweb update --version v0.4.0-alpha.6 --yes &&
 ./mailweb status --json
 ```
 
-由 root 管理的标准 Compose 和 systemd 部署可执行 `sudo ./mailweb version-manager enable`，再打开控制台的「版本管理」。IP 修复入口可通过 `./mailweb setup --direct` 查看。[操作说明](https://github.com/reina0721/webmail/blob/v0.4.0-alpha.5/docs/cli.md#在控制台切换版本)
+AMD64 与 ARM64 提供离线应用包和独立 CLI。版本切换与恢复请参阅[升级指南](https://github.com/reina0721/webmail/blob/v0.4.0-alpha.6/docs/cli.md)。

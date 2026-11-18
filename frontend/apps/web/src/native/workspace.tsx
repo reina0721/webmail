@@ -11,7 +11,8 @@ import {Auth,type Session} from './auth';
 import {Button} from '@/components/ui/button';
 import {selectedNativeSession} from './session-selection';
 import {linkNativeAccount} from './account-link';
-const Mail=dynamic(()=>import('@/components/mail/mail-app').then(m=>m.MailApp),{ssr:false});
+function WorkspaceLoading(){return <main className="native-loading" role="status" aria-busy="true"><span className="native-mark" aria-hidden="true">✦</span><p>正在打开邮箱工作区…</p></main>;}
+const Mail=dynamic(()=>import('@/components/mail/mail-app').then(m=>m.MailApp),{ssr:false,loading:WorkspaceLoading});
 const Calendar=dynamic(()=>import('@/components/calendar/calendar-app').then(m=>m.CalendarApp),{ssr:false});
 const Contacts=dynamic(()=>import('@/components/contacts/contacts-app').then(m=>m.ContactsApp),{ssr:false});
 const Files=dynamic(()=>import('@/components/files/files-app').then(m=>m.FilesApp),{ssr:false});
@@ -39,7 +40,7 @@ function WorkspaceContent({surface='mail'}:{surface?:SurfaceName}){
  const ready=useAuthStore(s=>s.isAuthenticated && !!s.client);
  useEffect(()=>{let live=true;void selectedNativeSession(adding).then(async s=>{if(!live)return;setSession(s);localStorage.setItem('mail-web-last-session',JSON.stringify({...s,operator:false}));if(!await openSession(s))throw new Error(useAuthStore.getState().error||'无法连接邮件工作区');}).catch(async e=>{if(!live)return;if(e.status===401&&!adding){const active=useAccountStore.getState().getActiveAccount();if(active)try{await api<Session>('/auth/session',{account:'primary',signal:AbortSignal.timeout(2500)});if(live)router.replace('/login/?mode=add-account&username='+encodeURIComponent(active.username));return;}catch{/* The primary session also needs a normal sign-in. */}}if(e.status!==401 && await restoreNativeOffline()){const saved=localStorage.getItem('mail-web-last-session');if(saved)setSession(JSON.parse(saved));return;}if(live)setError(e.status===401?'':e instanceof Error?e.message:errorMessage(e));}).finally(()=>{if(live)setPending(false);});return()=>{live=false;};},[attempt,adding,router]);
  async function signedIn(s:Session){setSession(s);setPending(true);setError('');try{if(!await openSession(s))throw new Error(useAuthStore.getState().error||'无法连接邮件工作区');}catch(e){setError(e instanceof Error?e.message:'连接失败');}finally{setPending(false);}}
- if(pending)return <main className="native-loading" aria-busy="true"><span className="native-mark">✦</span><p>正在打开邮箱工作区…</p></main>;
+ if(pending)return <WorkspaceLoading/>;
  if(adding&&session)return <AddAccount onDone={()=>{router.replace("/");}}/>;
  if(error || (session && !ready))return <main className="native-loading" role="alert"><h1>邮件工作区暂时无法连接</h1><p>{error}</p><Button onClick={()=>{setPending(true);setError('');setAttempt(n=>n+1);}}>重新连接</Button></main>;
  if(!session)return <Auth onLogin={signedIn}/>;

@@ -721,7 +721,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        patch: operations["update_site"];
         trace?: never;
     };
     "/api/v1/installation/connections": {
@@ -1471,6 +1471,11 @@ export interface components {
             id: string;
             operator: boolean;
         };
+        SiteUpdate: {
+            brand?: string | null;
+            publicOrigin?: string | null;
+            turnstile?: null | components["schemas"]["TurnstileKeys"];
+        };
         Snapshot: {
             /** Format: int64 */
             createdAt: number;
@@ -1484,6 +1489,10 @@ export interface components {
             operation: components["schemas"]["Operation"];
             /** @description Exact release tag for an update, registered snapshot ID for a rollback. */
             target: string;
+        };
+        TurnstileKeys: {
+            secret: string;
+            siteKey: string;
         };
         UploadView: {
             blobId: string;
@@ -3217,6 +3226,50 @@ export interface operations {
             };
             /** @description Authorization required */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_site: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteUpdate"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Invalid site settings */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authorization required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Initialization running */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

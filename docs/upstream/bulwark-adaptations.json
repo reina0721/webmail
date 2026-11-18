@@ -2,6 +2,11 @@
   "commit": "7cdedb60cc157cfeaf19623732b1135da6d3dc28",
   "files": [
     {
+      "local": "frontend/apps/web/src/components/push-notification-prompt.tsx",
+      "upstream": "components/push-notification-prompt.tsx",
+      "sha256": "352de98d2c0e50995883e4947dc97265dde0d6f101ad44b9c94ba4cea49ed937"
+    },
+    {
       "local": "frontend/apps/web/src/components/mail/mail-app.tsx",
       "upstream": "components/mail/mail-app.tsx",
       "sha256": "2b9e4ff35b908cddd17abde2e6f0a86c5d2e5819b2f050f0a89efa486a93ef12"

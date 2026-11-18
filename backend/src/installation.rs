@@ -138,7 +138,10 @@ pub fn configured(app: &App) -> bool {
 pub fn routes() -> Router<Arc<App>> {
     Router::new()
         .route("/installation", get(status))
-        .route("/installation/config", get(read_config).put(save_config))
+        .route(
+            "/installation/config",
+            get(read_config).put(save_config).patch(update_site),
+        )
         .route("/installation/operator", post(enroll_operator))
         .route("/installation/discover", post(discovery::discover))
         .merge(initialize::routes())
@@ -304,14 +307,8 @@ fn retain_secret(input: Option<String>, old: &str) -> String {
         .map(|s| s.trim().to_owned())
         .unwrap_or_else(|| old.to_owned())
 }
-#[utoipa::path(put,path="/api/v1/installation/config",request_body=ConfigurationInput,responses((status=200,body=Value),(status=400,description="Invalid configuration"),(status=401,description="Authorization required")))]
-pub(super) async fn save_config(
-    State(app): State<Arc<App>>,
-    headers: HeaderMap,
-    Json(input): Json<ConfigurationInput>,
-) -> Result<Json<Value>> {
-    authorize(&app, &headers, true).await?;
-    if input.turnstile_site_key.starts_with("1x000000")
+fn validate_turnstile(site_key: &str, secret: Option<&str>) -> Result<()> {
+    if site_key.starts_with("1x000000")
         && std::env::var("MAIL_WEB_TEST_MODE").as_deref() != Ok("true")
     {
         return Err(Error(
@@ -319,9 +316,8 @@ pub(super) async fn save_config(
             "verification_test_keys_forbidden",
         ));
     }
-    if (!input.turnstile_site_key.is_empty()
-        && !config::turnstile_key_valid(&input.turnstile_site_key))
-        || input.turnstile_secret.as_ref().is_some_and(|value| {
+    if (!site_key.is_empty() && !config::turnstile_key_valid(site_key))
+        || secret.is_some_and(|value| {
             !value.trim().is_empty() && !config::turnstile_key_valid(value.trim())
         })
     {
@@ -330,6 +326,94 @@ pub(super) async fn save_config(
             "turnstile_configuration_invalid",
         ));
     }
+    Ok(())
+}
+
+#[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct SiteUpdate {
+    brand: Option<String>,
+    public_origin: Option<String>,
+    turnstile: Option<TurnstileKeys>,
+}
+
+#[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct TurnstileKeys {
+    site_key: String,
+    secret: String,
+}
+
+#[utoipa::path(patch,path="/api/v1/installation/config",request_body=SiteUpdate,responses((status=200,body=Value),(status=400,description="Invalid site settings"),(status=401,description="Authorization required"),(status=409,description="Initialization running")))]
+pub(super) async fn update_site(
+    State(app): State<Arc<App>>,
+    headers: HeaderMap,
+    Json(input): Json<SiteUpdate>,
+) -> Result<Json<Value>> {
+    authorize(&app, &headers, true).await?;
+    let _lock = CONFIG_LOCK.lock().await;
+    if initialize::active(&app).await? {
+        return Err(Error(StatusCode::CONFLICT, "initialization_running"));
+    }
+    let mut saved = load(&app.vault)
+        .map_err(|_| internal("configuration_read"))?
+        .or_else(|| {
+            configured(&app).then(|| RuntimeConfig {
+                version: 1,
+                origin: app.origin.clone(),
+                stalwart_url: app.upstream.base.clone(),
+                services: app.services.clone(),
+            })
+        })
+        .ok_or(Error(StatusCode::BAD_REQUEST, "setup_required"))?;
+    apply_site_update(&mut saved, input)?;
+    save_runtime_and_reload(&app, &saved)
+}
+
+fn apply_site_update(saved: &mut RuntimeConfig, input: SiteUpdate) -> Result<()> {
+    let brand = input.brand.as_deref().map(str::trim);
+    if brand.is_some_and(|brand| {
+        brand.is_empty() || brand.len() > 80 || brand.chars().any(char::is_control)
+    }) {
+        return Err(Error(StatusCode::BAD_REQUEST, "site_configuration_invalid"));
+    }
+    let origin = input
+        .public_origin
+        .as_deref()
+        .map(|value| config::validate_origin(value.trim()))
+        .transpose()
+        .map_err(|_| Error(StatusCode::BAD_REQUEST, "public_origin_invalid"))?;
+    if let Some(keys) = input.turnstile {
+        let site_key = keys.site_key.trim();
+        let secret = keys.secret.trim();
+        if site_key.is_empty() || secret.is_empty() {
+            return Err(Error(
+                StatusCode::BAD_REQUEST,
+                "turnstile_configuration_invalid",
+            ));
+        }
+        validate_turnstile(site_key, Some(secret))?;
+        saved.services.turnstile_site_key = site_key.to_owned();
+        saved.services.turnstile_secret = secret.to_owned();
+    }
+    if let Some(brand) = brand {
+        saved.services.brand = brand.to_owned();
+    }
+    if let Some(origin) = origin {
+        saved.services.policy_verified &= origin == saved.origin;
+        saved.origin = origin;
+    }
+    Ok(())
+}
+
+#[utoipa::path(put,path="/api/v1/installation/config",request_body=ConfigurationInput,responses((status=200,body=Value),(status=400,description="Invalid configuration"),(status=401,description="Authorization required")))]
+pub(super) async fn save_config(
+    State(app): State<Arc<App>>,
+    headers: HeaderMap,
+    Json(input): Json<ConfigurationInput>,
+) -> Result<Json<Value>> {
+    authorize(&app, &headers, true).await?;
+    validate_turnstile(&input.turnstile_site_key, input.turnstile_secret.as_deref())?;
     let _lock = CONFIG_LOCK.lock().await;
     if initialize::active(&app).await? {
         return Err(Error(StatusCode::CONFLICT, "initialization_running"));
@@ -449,15 +533,19 @@ pub(super) async fn save_config(
         && services.hook_id == app.services.hook_id
         && services.hook_secret == app.services.hook_secret
         && services.provisioning_key == app.services.provisioning_key;
-    persist(
-        &app.vault,
+    save_runtime_and_reload(
+        &app,
         &RuntimeConfig {
             version: 1,
             origin,
             stalwart_url: upstream.base,
             services,
         },
-    )?;
+    )
+}
+
+fn save_runtime_and_reload(app: &App, saved: &RuntimeConfig) -> Result<Json<Value>> {
+    persist(&app.vault, saved)?;
     tokio::spawn(async {
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;
         RELOAD.notify_one();
@@ -568,6 +656,58 @@ mod tests {
     use super::*;
     use axum::{body::Body, http::Request};
     use tower::ServiceExt;
+
+    #[test]
+    fn updating_the_site_address_works_with_invalid_legacy_keys() {
+        let mut saved = RuntimeConfig {
+            version: 1,
+            origin: "https://old.example".into(),
+            stalwart_url: "https://stalwart.example".into(),
+            services: config::Services {
+                brand: "Old".into(),
+                provisioning_key: "directory-key".into(),
+                notification_key: "sender-key".into(),
+                hook_secret: "hook-key".into(),
+                turnstile_site_key: "http://192.0.2.12:8088".into(),
+                turnstile_secret: "legacy-secret".into(),
+                policy_verified: true,
+                ..Default::default()
+            },
+        };
+        apply_site_update(
+            &mut saved,
+            serde_json::from_value(json!({
+                "brand": "New",
+                "publicOrigin": "https://new.example/"
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(saved.origin, "https://new.example");
+        assert_eq!(saved.services.brand, "New");
+        assert!(!saved.services.policy_verified);
+        assert_eq!(saved.services.provisioning_key, "directory-key");
+        assert_eq!(saved.services.notification_key, "sender-key");
+        assert_eq!(saved.services.hook_secret, "hook-key");
+        assert_eq!(saved.services.turnstile_site_key, "http://192.0.2.12:8088");
+        assert_eq!(saved.services.turnstile_secret, "legacy-secret");
+
+        let invalid = serde_json::from_value(json!({
+            "brand": "Do not save",
+            "turnstile": {"siteKey": "https://new.example", "secret": "new-secret"}
+        }))
+        .unwrap();
+        assert!(apply_site_update(&mut saved, invalid).is_err());
+        assert_eq!(saved.services.brand, "New");
+        let keys = serde_json::from_value(json!({
+            "turnstile": {"siteKey": "widget-id", "secret": "new-secret"}
+        }))
+        .unwrap();
+        apply_site_update(&mut saved, keys).unwrap();
+        assert!(saved.services.turnstile_ready());
+        assert_eq!(saved.origin, "https://new.example");
+        assert_eq!(saved.stalwart_url, "https://stalwart.example");
+    }
 
     #[test]
     fn origin_maintenance_preserves_all_upstream_fields_and_rejects_invalid_input() {

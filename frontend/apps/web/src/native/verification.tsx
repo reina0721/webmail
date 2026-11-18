@@ -8,17 +8,16 @@ export function ConsoleVerification() {
   return (
     <main className="auth-shell">
       <section className="auth-card">
-        <p className="console-eyebrow">REGISTRATION / VERIFICATION</p>
         <h1 style={{ fontSize: 24, marginBlock: 20 }}>验证人机与收信服务</h1>
         <p className="muted">
-          完成后记录首次验证结果，注册开放策略由管理员单独控制。
+          填写能收信的外部邮箱，完成页面上的人机验证，然后输入收到的六位验证码。
         </p>
         {c.done ? (
           <div role="status">
             <h2>验证已通过</h2>
-            <p>可以返回控制台查看健康报告。</p>
+            <p>返回「注册与验证」后，可以开启公开注册。</p>
             <a className="console-link" href="/console/registration/">
-              返回注册策略 →
+              返回注册与验证 →
             </a>
           </div>
         ) : (
@@ -59,9 +58,9 @@ export function ConsoleVerification() {
             <Action
               type="submit"
               loading={c.pending}
-              disabled={!c.ticket || (!c.sent && !c.captcha)}
+              disabled={!c.ticket || (!c.sent && (!c.captcha || !c.email.trim()))}
             >
-              {c.sent ? "核对验证码" : "发送检查邮件"}
+              {c.sent ? "核对验证码" : "发送验证码"}
             </Action>
           </form>
         )}

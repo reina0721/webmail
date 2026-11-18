@@ -6,7 +6,7 @@
     "license": {
       "name": ""
     },
-    "version": "0.4.0-alpha.5"
+    "version": "0.4.0-alpha.6"
   },
   "paths": {
     "/api/push/action": {
@@ -1574,6 +1574,41 @@
           },
           "401": {
             "description": "Authorization required"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "installation"
+        ],
+        "operationId": "update_site",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid site settings"
+          },
+          "401": {
+            "description": "Authorization required"
+          },
+          "409": {
+            "description": "Initialization running"
           }
         }
       }
@@ -3649,6 +3684,34 @@
           }
         }
       },
+      "SiteUpdate": {
+        "type": "object",
+        "properties": {
+          "brand": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "publicOrigin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "turnstile": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TurnstileKeys"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "Snapshot": {
         "type": "object",
         "required": [
@@ -3694,6 +3757,22 @@
           "target": {
             "type": "string",
             "description": "Exact release tag for an update, registered snapshot ID for a rollback."
+          }
+        },
+        "additionalProperties": false
+      },
+      "TurnstileKeys": {
+        "type": "object",
+        "required": [
+          "siteKey",
+          "secret"
+        ],
+        "properties": {
+          "secret": {
+            "type": "string"
+          },
+          "siteKey": {
+            "type": "string"
           }
         },
         "additionalProperties": false

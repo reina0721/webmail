@@ -46,7 +46,7 @@ export function useVerification() {
   function widgetError() {
     setCaptcha("");
     setError(
-      "人机验证组件加载失败。请检查 Turnstile Site Key、组件允许的主机名和网络连接，然后重新加载此页；此时尚未发送检查邮件。",
+      "人机验证组件加载失败。请检查 Turnstile Site Key、组件允许的主机名和网络连接，然后重新加载此页；此时尚未发送验证码。",
     );
     return true;
   }

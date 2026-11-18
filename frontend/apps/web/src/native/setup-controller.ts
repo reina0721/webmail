@@ -11,7 +11,7 @@ import { ConfirmDialog } from "@mail-web/ui/overlays";
 import { useSetupAccess } from "@platform/host/use-setup-access";
 import { useInstallationLeave } from "@platform/host/use-installation-leave";
 import { api, errorMessage, ApiError } from "@platform/lib/api";
-import {normalizeStalwart} from "@platform/host/stalwart-origin";
+import { normalizeStalwart } from "@platform/host/stalwart-origin";
 
 type Spec = {
   brand: string;
@@ -53,7 +53,7 @@ const resourceNames: Record<string, string> = {
   turnstile: "Turnstile Site Key",
   operator: "运营邮箱",
 };
-const steps: Record<string, string> = {
+export const setupSteps: Record<string, string> = {
   domain: "邮箱域名",
   directory: "专用服务身份与密钥",
   notification: "验证码发件邮箱与密钥",
@@ -61,11 +61,17 @@ const steps: Record<string, string> = {
   turnstile: "Turnstile",
   operator: "运营邮箱",
   scope: "账号策略同步",
+  "automatic-gateway": "自动邮件服务",
+  "automatic-gateway-v2": "自动邮件投递检查",
   verify: "连接检查",
   apply: "应用配置",
   completed: "配置完成",
 };
-export function useAutomaticInstallation({ initialStatus }: { initialStatus?: Status }) {
+export function useAutomaticInstallation({
+  initialStatus,
+}: {
+  initialStatus?: Status;
+}) {
   const { token, setToken, origin } = useSetupAccess();
   const [connectionsDirty, setConnectionsDirty] = useState(false);
   const [site, setSite] = useState({ brand: "", origin: "" });
@@ -93,6 +99,7 @@ export function useAutomaticInstallation({ initialStatus }: { initialStatus?: St
     recoveryEmail: "",
     cloudflareAccount: "",
   });
+  const [cloudflareRequested, setCloudflareRequested] = useState(false);
   const [ticket, setTicket] = useState(""),
     [domains, setDomains] = useState<{ id: string; name: string }[]>([]),
     [accounts, setAccounts] = useState<{ id: string; name: string }[]>([]),
@@ -134,7 +141,8 @@ export function useAutomaticInstallation({ initialStatus }: { initialStatus?: St
       const current = initialStatus ?? (await api<Status>("/installation"));
       if (!active()) return;
       setStatus(current);
-      if (!current.configured) setSpec((s) => ({ ...s, publicOrigin: s.publicOrigin || origin }));
+      if (!current.configured)
+        setSpec((s) => ({ ...s, publicOrigin: s.publicOrigin || origin }));
       const prior = await api<{ job: Job | null }>(
         "/installation/initialize/job",
         { headers: auth() },
@@ -154,7 +162,10 @@ export function useAutomaticInstallation({ initialStatus }: { initialStatus?: St
       setStatus(current);
       setJob(prior.job);
       if (prior.job) {
-        setSpec({...prior.job.spec,directoryQueries:prior.job.spec.directoryQueries??false});
+        setSpec({
+          ...prior.job.spec,
+          directoryQueries: prior.job.spec.directoryQueries ?? false,
+        });
         setBase(prior.job.base);
       }
       if (value) {
@@ -175,9 +186,13 @@ export function useAutomaticInstallation({ initialStatus }: { initialStatus?: St
       setLoaded(true);
     } catch (e) {
       if (active()) {
-        setError(e instanceof ApiError && e.status === 401
-          ? token ? "安装令牌无效或已轮换，请重新获取本安装的管理链接" : "请填写安装令牌，或使用安装工具提供的管理链接继续"
-          : errorMessage(e));
+        setError(
+          e instanceof ApiError && e.status === 401
+            ? token
+              ? "安装令牌无效或已轮换，请重新获取本安装的管理链接"
+              : "请填写安装令牌，或使用安装工具提供的管理链接继续"
+            : errorMessage(e),
+        );
         setLoaded(false);
       }
     } finally {
@@ -256,11 +271,13 @@ export function useAutomaticInstallation({ initialStatus }: { initialStatus?: St
       });
       if (at !== generation.current || !alive.current) return;
       setTicket(value.ticket);
+      setCloudflareRequested(!!cfToken.trim());
       if (value.missingPermissions.length)
         setError("缺少管理员权限：" + value.missingPermissions.join("、"));
-      else if(cfToken.trim()&&!value.cloudflareAccounts.length)
-        setError("Cloudflare Token 无法列出账号。请在下方填写 Account ID 后继续，Turnstile 尚未配置。");
+
       setDomains(value.domains);
+      if (value.domains.length === 1)
+        setSpec((s) => ({ ...s, domain: s.domain || value.domains[0].name }));
       setAccounts(value.cloudflareAccounts);
       if (value.cloudflareAccounts.length === 1)
         change("cloudflareAccount", value.cloudflareAccounts[0].id);
@@ -320,6 +337,7 @@ export function useAutomaticInstallation({ initialStatus }: { initialStatus?: St
       clearSecrets();
       setPreview(null);
       if (job?.status !== "running") {
+        setApplied(false);
         setJob(null);
         setDirty(false);
       }
@@ -329,5 +347,42 @@ export function useAutomaticInstallation({ initialStatus }: { initialStatus?: St
       setPending(false);
     }
   }
-  return {token,setToken,origin,status,loaded,pending,error,base,setBase,mode,setMode,username,setUsername,password,setPassword,apiKey,setApiKey,cfToken,setCfToken,operatorPassword,setOperatorPassword,spec,change,ticket,domains,accounts,preview,job,applied,leave,authorize,preflight,start,cancel,load};
+  return {
+    token,
+    setToken,
+    origin,
+    status,
+    loaded,
+    pending,
+    error,
+    base,
+    setBase,
+    mode,
+    setMode,
+    username,
+    setUsername,
+    password,
+    setPassword,
+    apiKey,
+    setApiKey,
+    cfToken,
+    setCfToken,
+    operatorPassword,
+    setOperatorPassword,
+    spec,
+    change,
+    ticket,
+    domains,
+    accounts,
+    cloudflareRequested,
+    preview,
+    job,
+    applied,
+    leave,
+    authorize,
+    preflight,
+    start,
+    cancel,
+    load,
+  };
 }

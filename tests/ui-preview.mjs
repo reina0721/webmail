@@ -85,6 +85,13 @@ http.createServer(async(req,res)=>{try{
   }
   if(key==='/installation/initialize/cancel'){initializationGrant='';if(initializationJob?.status==='running')initializationJob.status='cancelled';return json(res,{cancelRequested:true,resourcesDeleted:false});}
   if(key==='/installation/config'&&req.method==='GET')return json(res,{settings:mode.setupConfigured?{...setup,turnstileSiteKey:mode.turnstileSiteKey??setup.turnstileSiteKey}:{brand:'Mail Web',domain:'',publicOrigin:'',stalwartUrl:'',domainId:'',notificationAccount:'',notificationEmail:'',hookId:'',turnstileSiteKey:''},provisioningKeySet:mode.setupConfigured,notificationKeySet:false,hookSecretSet:false,turnstileSecretSet:!!mode.turnstileSecretSet,policyVerified:false,missingRequirements:['验证邮件账号','验证邮件密钥','Turnstile Site Key','Turnstile Secret','本部署专用 MTA Hook','Hook 共享密钥','SMTP／JMAP 提交协议验收声明'],documentationUrl:setupDocs});
+  if(key==='/installation/config'&&req.method==='PATCH'){
+   if(input.brand!==undefined)setup.brand=input.brand;
+   if(input.publicOrigin!==undefined)setup.publicOrigin=input.publicOrigin;
+   if(input.turnstile){mode.turnstileSiteKey=input.turnstile.siteKey;mode.turnstileSecretSet=!!input.turnstile.secret;mode.readinessFailure='';}
+   mode.setupEpoch++;
+   return json(res,{saved:true,restartRequired:true});
+  }
   if(key==='/installation/config'){setup=Object.fromEntries(Object.entries(input).filter(([k])=>!['provisioningKey','notificationKey','hookSecret','turnstileSecret'].includes(k)));mode.setupConfigured=true;mode.setupEpoch++;return json(res,{saved:true,restartRequired:true});}
   if(key==='/installation/operator'){mode.setupNeedsOperator=false;return json(res,{});}
   if(key==='/installation/discover'){

@@ -50,3 +50,33 @@ it('protects both selectors while directory edits are unsaved',async()=>{
  expect(screen.getByRole('combobox',{name:'管理域名'})).toHaveAttribute('aria-disabled','true');
  expect(screen.getByRole('combobox',{name:'邮件服务'})).toHaveAttribute('aria-disabled','true');
 });
+
+it('lets an installed operator save a new address even when domain administration is unavailable and a legacy Site Key is invalid', async()=>{
+ const previous=request.getMockImplementation()!;
+ request.mockImplementation(async(path:string, options?:RequestInit)=>{
+  if(path.startsWith('/admin/')||path==='/installation/connections')throw new Error('Independent service unavailable');
+  if(path==='/installation/config'&&options?.method==='PATCH')return {saved:true};
+  if(path==='/installation/config')return {settings:{brand:'Mail',publicOrigin:'http://192.0.2.7:8088',turnstileSiteKey:'http://192.0.2.7:8088'},turnstileSecretSet:true};
+  return previous(path,options);
+ });
+ render(<Console section="site"/>);
+ const origin=await screen.findByRole('textbox',{name:/公开访问来源/});
+ fireEvent.change(origin,{target:{value:'https://webmail.example.net/'}});
+ fireEvent.click(screen.getByRole('button',{name:'保存站点配置'}));
+ await screen.findByText(/站点地址已保存/);
+ expect(request).toHaveBeenCalledWith('/installation/config',expect.objectContaining({
+  method:'PATCH',body:JSON.stringify({brand:'Mail',publicOrigin:'https://webmail.example.net'}),
+ }));
+ expect(screen.getByRole('link',{name:/打开已保存的主地址/})).toHaveAttribute('href','https://webmail.example.net');
+});
+
+it('keeps deployment controls hidden from ordinary mailbox users', async()=>{
+ request.mockImplementation(async(path:string)=>{
+  if(path==='/auth/session')return {id:'ordinary',email:'reader@a.example',operator:false};
+  if(path==='/health/ready')return {version:'1',revision:'test'};
+  throw new Error('Unexpected request: '+path);
+ });
+ render(<Console section="versions"/>);
+ expect(await screen.findByRole('heading',{name:'需要控制台权限'})).toBeInTheDocument();
+ expect(request.mock.calls.some(([path])=>path.startsWith('/admin/'))).toBe(false);
+});

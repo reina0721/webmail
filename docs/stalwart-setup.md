@@ -45,6 +45,10 @@ Webmail 网站来源、Stalwart 来源和邮箱域名是三项独立信息。Clo
 2. 在「注册与验证」点击「检查注册条件」。如果 Webmail 回调连接失败，从 Webmail 宿主机检查主地址能否连接，核对 DNS、反代和完整证书链。可用 `curl -fsS https://webmail.example.com/api/v1/installation` 检查 TLS 与反代。若连接正常但回调认证失败，请检查反代是否转发回调路径和 `Authorization` 请求头。
 3. Webmail 回调连接与认证通过后，若 Stalwart 专用 Hook 仍指向旧地址，点击「更新 Stalwart 回调地址」。Webmail 会再验证主地址，并仅更新本安装专用 Hook 的回调地址。Stalwart 应用失败时，Webmail 会尝试恢复旧地址。
 
+若浏览器可打开网站但控制台报告 HTTPS 证书校验失败，请核对公网反代实际发送的证书链。把反代指向证书提供商交付的完整链（例如 `fullchain.pem`），重新加载反代，再用 `curl -fsS https://webmail.example.com/api/v1/installation` 验证。
+
+Stalwart 隐藏 Hook 的 Bearer 密钥时，Webmail 可根据已完成的加密初始化记录核对该 Hook 的 ID、原始回调地址和归属。如果控制台仍提示归属无法确认，请打开 Stalwart 的 **Settings → MTA → Filters → MTA Hooks**，核对 Webmail「邮件服务与域名」高级配置里记录的 Hook ID，只将该 Hook 的 URL 改为新主地址及原回调路径，再重新检查注册条件。
+
 自动初始化不改 DNS、反向代理或证书，也不自动开放公开注册。新建邮件域名后，邮件 DNS 与外部投递仍需按 Stalwart 部署要求完成。无 Cloudflare Token 时保留已有 Turnstile 配置，未配置则保持相关公开功能不可用。
 
 <a id="multiple-services"></a>

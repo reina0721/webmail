@@ -47,6 +47,10 @@ pub(crate) async fn active(app: &App) -> Result<bool> {
     Ok(journal::read(app)?.is_some_and(|job| job.status == "applying"))
 }
 
+pub(crate) fn initialized_hook_matches(app: &App, previous_url: &str) -> Result<bool> {
+    Ok(journal::read(app)?.is_some_and(|job| job.matches_hook(app, previous_url)))
+}
+
 // The same capability list drives preflight and the owned runtime identity.
 // Official Stalwart rejects granting permissions the administrator does not hold.
 fn directory_permissions(automatic_gateway: bool) -> Vec<&'static str> {

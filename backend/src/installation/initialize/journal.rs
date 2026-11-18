@@ -1,4 +1,5 @@
 use super::*;
+use subtle::ConstantTimeEq;
 
 #[derive(Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -68,6 +69,19 @@ impl Job {
     pub fn secret(&self, key: &str) -> String {
         self.secrets.get(key).cloned().unwrap_or_default()
     }
+
+    pub fn matches_hook(&self, app: &App, previous_url: &str) -> bool {
+        self.status == "completed"
+            && self.base == app.upstream.base
+            && !app.services.hook_id.is_empty()
+            && self.resources.get("hook") == Some(&app.services.hook_id)
+            && self.secrets.get("hook").is_some_and(|secret| {
+                !secret.is_empty()
+                    && bool::from(secret.as_bytes().ct_eq(app.services.hook_secret.as_bytes()))
+            })
+            && (previous_url == app.hook_url_at(&self.spec.public_origin)
+                || previous_url == app.hook_url())
+    }
 }
 fn path(app: &App) -> PathBuf {
     config_path().with_file_name(if app.service_id == "default" {
@@ -134,6 +148,57 @@ pub(super) fn write_at(app: &App, job: &Job, path: &std::path::Path) -> Result<(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn masked_hook_ownership_is_bound_to_the_completed_installation() {
+        let spec = serde_json::from_value(json!({
+            "brand":"Mail", "domain":"example.com", "publicOrigin":"http://192.0.2.10:8088"
+        }))
+        .unwrap();
+        let mut app = App {
+            root: None,
+            revision: 0,
+            service_id: "second-service".into(),
+            domain_id: "example.com".into(),
+            db: sqlx::SqlitePool::connect_lazy("sqlite::memory:").unwrap(),
+            upstream: Stalwart {
+                http: reqwest::Client::new(),
+                base: "https://mail.example.com".into(),
+            },
+            origin: "https://webmail.example.com".into(),
+            direct_origin: None,
+            vault: Vault::new(&[3; 32]).unwrap(),
+            services: config::Services {
+                hook_id: "dedicated".into(),
+                hook_secret: "fixture-secret".into(),
+                ..Default::default()
+            },
+        };
+        let mut job = Job::new("owner".into(), app.upstream.base.clone(), spec);
+        job.resources
+            .insert("hook".into(), app.services.hook_id.clone());
+        job.secrets
+            .insert("hook".into(), app.services.hook_secret.clone());
+        let previous = app.hook_url_at(&job.spec.public_origin);
+        assert!(!job.matches_hook(&app, &previous));
+        job.status = "completed".into();
+        assert!(job.matches_hook(&app, &previous));
+        assert!(job.matches_hook(&app, &app.hook_url()));
+        assert!(!job.matches_hook(&app, "http://192.0.2.10:8088/internal/mta-hook"));
+        assert!(!job.matches_hook(
+            &app,
+            "https://unrelated.example/internal/mta-hook/second-service"
+        ));
+        app.services.hook_secret = "replacement-secret".into();
+        assert!(!job.matches_hook(&app, &previous));
+        app.services.hook_secret = "fixture-secret".into();
+        app.services.hook_id = "other-hook".into();
+        assert!(!job.matches_hook(&app, &previous));
+        app.services.hook_id = "dedicated".into();
+        app.upstream.base = "https://another-service.example.com".into();
+        assert!(!job.matches_hook(&app, &previous));
+    }
+
     #[test]
     fn skipped_turnstile_is_not_reported_as_completed() {
         let spec:Spec=serde_json::from_value(json!({"brand":"Mail","domain":"example.com","publicOrigin":"https://webmail.example.com"})).unwrap();

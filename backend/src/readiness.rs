@@ -246,7 +246,7 @@ async fn probe_callback(app: &App) -> Result<()> {
         .json(&json!({"context":{"stage":"data"}}))
         .send()
         .await
-        .map_err(|_| Error(StatusCode::BAD_GATEWAY, "callback_unreachable"))?;
+        .map_err(|error| Error(StatusCode::BAD_GATEWAY, callback_connection_failure(&error)))?;
     if !response.status().is_success()
         || response
             .json::<Value>()
@@ -260,6 +260,24 @@ async fn probe_callback(app: &App) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+fn callback_connection_failure(error: &(dyn std::error::Error + 'static)) -> &'static str {
+    let mut cause = Some(error);
+    while let Some(error) = cause {
+        if matches!(
+            error.downcast_ref::<tokio_rustls::rustls::Error>(),
+            Some(tokio_rustls::rustls::Error::InvalidCertificate(_))
+        ) {
+            return "callback_certificate_untrusted";
+        }
+        cause = error
+            .downcast_ref::<std::io::Error>()
+            .and_then(std::io::Error::get_ref)
+            .map(|inner| inner as &dyn std::error::Error)
+            .or_else(|| error.source());
+    }
+    "callback_unreachable"
 }
 
 #[utoipa::path(post,path="/api/v1/installation/readiness/hook",params(("domainId"=Option<String>,Query,description="Stable local domain ID")),responses((status=200,body=Value),(status=400,description="No eligible dedicated Hook"),(status=502,description="Callback verification or Stalwart reload failed")))]
@@ -305,11 +323,19 @@ async fn switch_hook_callback(app: &App) -> Result<()> {
             "hook_configuration_mismatch",
         ))?;
     let auth = &hook["httpAuth"]["bearerToken"];
-    if auth["@type"] != "Value"
-        || !auth["secret"].as_str().is_some_and(|secret| {
-            bool::from(secret.as_bytes().ct_eq(app.services.hook_secret.as_bytes()))
-        })
-    {
+    let owned = if auth["@type"] == "Value" {
+        match auth["secret"].as_str() {
+            // Stalwart masks write-only secrets on configuration reads.
+            Some("****") => installation::initialize::initialized_hook_matches(app, previous)?,
+            Some(secret) => {
+                bool::from(secret.as_bytes().ct_eq(app.services.hook_secret.as_bytes()))
+            }
+            None => false,
+        }
+    } else {
+        false
+    };
+    if !owned {
         return Err(Error(StatusCode::CONFLICT, "hook_ownership_unverified"));
     }
     probe_callback(app).await?;
@@ -531,6 +557,24 @@ pub async fn worker(app: Arc<App>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn callback_probe_distinguishes_tls_certificate_errors_from_transport_errors() {
+        use tokio_rustls::rustls::{CertificateError, Error as TlsError};
+        let certificate = std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            TlsError::InvalidCertificate(CertificateError::UnknownIssuer),
+        );
+        assert_eq!(
+            callback_connection_failure(&certificate),
+            "callback_certificate_untrusted"
+        );
+        let refused = std::io::Error::from(std::io::ErrorKind::ConnectionRefused);
+        assert_eq!(
+            callback_connection_failure(&refused),
+            "callback_unreachable"
+        );
+    }
 
     #[tokio::test]
     async fn hook_url_changes_only_after_an_authenticated_probe_and_restores_on_reload_failure() {

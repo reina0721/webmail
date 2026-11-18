@@ -57,10 +57,14 @@ struct App {
 }
 impl App {
     fn hook_url(&self) -> String {
+        self.hook_url_at(&self.origin)
+    }
+
+    fn hook_url_at(&self, origin: &str) -> String {
         if self.service_id == "default" {
-            format!("{}/internal/mta-hook", self.origin)
+            format!("{origin}/internal/mta-hook")
         } else {
-            format!("{}/internal/mta-hook/{}", self.origin, self.service_id)
+            format!("{origin}/internal/mta-hook/{}", self.service_id)
         }
     }
 }

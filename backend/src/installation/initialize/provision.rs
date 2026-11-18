@@ -328,14 +328,7 @@ async fn hook(app: &App, job: &mut Job, access: &Grant) -> Result<()> {
     if !job.resource("hook").is_empty() {
         return Ok(());
     }
-    let callback = if app.service_id == "default" {
-        format!("{}/internal/mta-hook", job.spec.public_origin)
-    } else {
-        format!(
-            "{}/internal/mta-hook/{}",
-            job.spec.public_origin, app.service_id
-        )
-    };
+    let callback = app.hook_url_at(&job.spec.public_origin);
     let values = access.call(app, "x:MtaHook/get", json!({})).await?;
     let list: Vec<_> = values["list"].as_array().into_iter().flatten().collect();
     let secret = job

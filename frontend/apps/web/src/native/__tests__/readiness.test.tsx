@@ -108,7 +108,7 @@ it("directs a failed callback to certificate diagnostics and enables Hook repair
     ...report,
     items: [
       mismatch,
-      { ...callback, status: "failed", reason: "callback_unreachable" },
+      { ...callback, status: "failed", reason: "callback_certificate_untrusted" },
     ],
   };
   const reachable = { ...report, items: [mismatch, callback] };
@@ -125,7 +125,7 @@ it("directs a failed callback to certificate diagnostics and enables Hook repair
     name: "更新 Stalwart 回调地址",
   });
   expect(repair).toBeDisabled();
-  expect(screen.getByText(/HTTPS 完整证书链/)).toBeInTheDocument();
+  expect(screen.getByText(/HTTPS 证书校验失败/)).toHaveTextContent("fullchain.pem");
   fireEvent.click(screen.getByRole("button", { name: "检查注册条件" }));
   await waitFor(() => expect(repair).toBeEnabled());
   fireEvent.click(repair);

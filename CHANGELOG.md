@@ -4,6 +4,14 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+## [0.4.0-alpha.9] - 2026-11-18
+
+### Fixed
+
+- Identify HTTPS certificate validation failures during registration readiness checks.
+- Repair a Stalwart callback with a masked bearer secret when the encrypted initialization record confirms the service, Hook ID and original callback.
+- Exercise the documented CLI-first upgrade from v0.4.0-alpha.2 and use matching Host and Origin headers in the isolated setup checks.
+
 ## [0.4.0-alpha.8] - 2026-11-18
 
 ### Changed

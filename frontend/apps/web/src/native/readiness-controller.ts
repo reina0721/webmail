@@ -29,6 +29,8 @@ const reasons: Record<string, string> = {
     "请在 Stalwart 核对专用 Hook 的认证、处理阶段和账号范围。",
   hook_callback_mismatch:
     "Stalwart 专用 Hook 仍指向旧地址。主地址回调通过后可在此更新。",
+  callback_certificate_untrusted:
+    "主地址的 HTTPS 证书校验失败。请在反代部署匹配域名且有效的完整证书链（fullchain.pem），再重新检查。",
   callback_unreachable:
     "Webmail 服务器无法连接主地址。请检查反代、DNS 和 HTTPS 完整证书链，再重新检查。",
   callback_authentication_failed:

@@ -240,12 +240,10 @@ export function Versions() {
                   size="small"
                   openOnFocus
                   options={view.inventory.releases}
-                  value={release}
-                  onChange={(_, item) => setTarget(item?.version ?? "")}
+                  value={release?.version ?? null}
+                  onChange={(_, version) => setTarget(version ?? "")}
                   getOptionLabel={(item) => item.version}
-                  isOptionEqualToValue={(item, value) =>
-                    item.version === value.version
-                  }
+                  getOptionValue={(item) => item.version}
                   getOptionDisabled={(item) =>
                     Boolean(releaseUnavailable(item))
                   }

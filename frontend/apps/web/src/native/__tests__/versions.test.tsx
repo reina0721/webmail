@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { components } from "@platform/lib/generated-api";
 import { Versions } from "../versions";
@@ -103,4 +103,26 @@ it("offers recovery only when there is a local snapshot and opens its confirmati
   expect(
     await screen.findByRole("dialog", { name: "恢复版本快照" }),
   ).toHaveTextContent("数据库和配置");
+});
+
+it("keeps the search text while the selected release is refreshed in the background", async () => {
+  vi.useFakeTimers();
+  try {
+    request.mockImplementation(async () => inventory(26));
+    await act(async () => {
+      render(<Versions />);
+    });
+    const field = screen.getByRole("combobox", { name: "选择版本" });
+    act(() => field.focus());
+    fireEvent.change(field, { target: { value: ".4" } });
+    fireEvent.click(screen.getByRole("option", { name: /alpha\.4/ }));
+    fireEvent.change(field, { target: { value: ".2" } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(field).toHaveValue(".2");
+  } finally {
+    vi.useRealTimers();
+  }
 });

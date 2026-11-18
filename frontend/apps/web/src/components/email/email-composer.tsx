@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
 import { useCloseBesideControls } from "@/hooks/use-close-beside-controls";
+import { useTimeoutWhileMounted } from "@/hooks/use-timeout-while-mounted";
 import { useMvComposeWindow } from "@/components/email/mv-compose-context";
 import { useLocale, useTranslations } from "next-intl";
 import { isServerOutage } from "@/lib/jmap/offline-hooks";
@@ -1220,6 +1221,7 @@ export function EmailComposer({
   const [draftLocalAccountId, setDraftLocalAccountId] = useState<string | undefined>(initialData?.draftLocalAccountId);
   const draftLocalAccountIdRef = useRef<string | undefined>(initialData?.draftLocalAccountId);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const scheduleWhileMounted = useTimeoutWhileMounted();
   // The last save stayed on this device: the server wasn't there.
   const [savedOnDevice, setSavedOnDevice] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -3597,7 +3599,7 @@ export function EmailComposer({
       draftSaved(savedDraftId, savedDraft.subject);
 
       // Reset status after 2 seconds
-      setTimeout(() => setSaveStatus('idle'), 2000);
+      scheduleWhileMounted(() => setSaveStatus(status => status === 'saved' ? 'idle' : status), 2000);
 
       return savedDraftId;
     } catch (error) {
@@ -3607,7 +3609,7 @@ export function EmailComposer({
       // apart - closing the composer on a failed save is worth a warning.
       saveFailedRef.current = true;
       setSaveStatus('error');
-      setTimeout(() => setSaveStatus('idle'), 3000);
+      scheduleWhileMounted(() => setSaveStatus(status => status === 'error' ? 'idle' : status), 3000);
       return null;
     }
   };
@@ -4316,7 +4318,7 @@ export function EmailComposer({
 
       if (errors.to) {
         setShakeField('to');
-        setTimeout(() => setShakeField(null), 400);
+        scheduleWhileMounted(() => setShakeField(null), 400);
         toInputRef.current?.focus();
       }
       return;
@@ -5513,7 +5515,7 @@ export function EmailComposer({
           void saveDraft({ announce: true }).then((id) => {
             if (!id || saveFailedRef.current) return;
             setSaveStatus('saved');
-            setTimeout(() => setSaveStatus((status) => (status === 'saved' ? 'idle' : status)), 2000);
+            scheduleWhileMounted(() => setSaveStatus(status => status === 'saved' ? 'idle' : status), 2000);
           });
         }
         return;

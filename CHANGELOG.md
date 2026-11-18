@@ -4,6 +4,13 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+## [0.4.0-alpha.11] - 2026-11-18
+
+### Fixed
+
+- Cancel queued toolbar and draft status callbacks when the relevant view closes.
+- Keep a prior draft status timer from clearing the status of a different save in progress.
+
 ## [0.4.0-alpha.10] - 2026-11-18
 
 ### Fixed

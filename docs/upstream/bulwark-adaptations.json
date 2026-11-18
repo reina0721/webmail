@@ -84,7 +84,7 @@
     {
       "local": "frontend/apps/web/src/components/email/email-composer.tsx",
       "upstream": "components/email/email-composer.tsx",
-      "sha256": "e10bb17fb74c6f1261a7717afc7b7c109acc6035361f4ddc6d1d166634ea9a87"
+      "sha256": "1025ce8fa9618c1b14f29754cdff1d1bab0c06eb8397dc49e3adca5d7c0c21a6"
     },
     {
       "local": "frontend/apps/web/src/components/mail-transfer/mail-import-dialog.tsx",

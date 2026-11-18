@@ -6,7 +6,7 @@ pub(super) mod initialize;
 
 pub static RELOAD: tokio::sync::Notify = tokio::sync::Notify::const_new();
 static INSTANCE_ID: std::sync::LazyLock<String> = std::sync::LazyLock::new(token);
-static CONFIG_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+pub(crate) static CONFIG_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct RuntimeConfig {

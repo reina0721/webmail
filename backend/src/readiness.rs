@@ -17,6 +17,7 @@ async fn check_lock(app: &App) -> tokio::sync::OwnedMutexGuard<()> {
 pub fn routes() -> Router<Arc<App>> {
     Router::new()
         .route("/installation/readiness", get(report).post(run))
+        .route("/installation/readiness/hook", post(repair_hook))
         .route("/installation/readiness/link", post(link))
         .route("/readiness/session", post(interaction))
         .route("/readiness/send", post(readiness_send))
@@ -212,6 +213,141 @@ fn hook_scope_matches(enable: &Value, expected: &str) -> bool {
         })
     }) && scope_matches(enable["else"].as_str().unwrap_or_default(), expected)
 }
+
+async fn read_hook(app: &App) -> Result<Value> {
+    let s = &app.services;
+    let result = app.upstream.call(
+        &s.provisioning_key,
+        "x:MtaHook/get",
+        json!({"ids":[s.hook_id],"properties":["id","url","enable","stages","tempFailOnError","httpAuth"]}),
+    ).await?;
+    let hook = &result["list"][0];
+    if s.hook_id.is_empty()
+        || hook["id"] != s.hook_id
+        || hook["stages"]["data"] != true
+        || hook["tempFailOnError"] != true
+        || hook["httpAuth"]["@type"] != "Bearer"
+        || !hook_scope_matches(&hook["enable"], &policy::scope_expression(app).await?)
+    {
+        return Err(Error(
+            StatusCode::BAD_REQUEST,
+            "hook_configuration_mismatch",
+        ));
+    }
+    Ok(hook.clone())
+}
+
+async fn probe_callback(app: &App) -> Result<()> {
+    let response = app
+        .upstream
+        .http
+        .post(app.hook_url())
+        .bearer_auth(&app.services.hook_secret)
+        .json(&json!({"context":{"stage":"data"}}))
+        .send()
+        .await
+        .map_err(|_| Error(StatusCode::BAD_GATEWAY, "callback_unreachable"))?;
+    if !response.status().is_success()
+        || response
+            .json::<Value>()
+            .await
+            .ok()
+            .is_none_or(|body| body["action"] != "accept")
+    {
+        return Err(Error(
+            StatusCode::BAD_GATEWAY,
+            "callback_authentication_failed",
+        ));
+    }
+    Ok(())
+}
+
+#[utoipa::path(post,path="/api/v1/installation/readiness/hook",params(("domainId"=Option<String>,Query,description="Stable local domain ID")),responses((status=200,body=Value),(status=400,description="No eligible dedicated Hook"),(status=502,description="Callback verification or Stalwart reload failed")))]
+pub(crate) async fn repair_hook(
+    State(app): State<Arc<App>>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
+) -> Result<Json<Value>> {
+    installation::authorize(&app, &headers, true).await?;
+    let app = connections::for_domain(
+        &app,
+        query
+            .get("domainId")
+            .map(String::as_str)
+            .unwrap_or("default"),
+    )
+    .await?;
+    {
+        let _configuration = installation::CONFIG_LOCK.lock().await;
+        let _scope = policy::scope_lock(&app).await;
+        if !app.origin.starts_with("https://") {
+            return Err(Error(StatusCode::BAD_REQUEST, "hook_https_required"));
+        }
+        if !app.services.mail_ready()
+            || !current(&app).await
+            || installation::initialize::active(&app).await?
+        {
+            return Err(Error(StatusCode::CONFLICT, "configuration_fields_missing"));
+        }
+        switch_hook_callback(&app).await?;
+    }
+    check(&app).await?;
+    Ok(Json(view(&app).await?))
+}
+
+async fn switch_hook_callback(app: &App) -> Result<()> {
+    let hook = read_hook(app).await?;
+    let previous = hook["url"]
+        .as_str()
+        .filter(|url| !url.is_empty())
+        .ok_or(Error(
+            StatusCode::BAD_REQUEST,
+            "hook_configuration_mismatch",
+        ))?;
+    let auth = &hook["httpAuth"]["bearerToken"];
+    if auth["@type"] != "Value"
+        || !auth["secret"].as_str().is_some_and(|secret| {
+            bool::from(secret.as_bytes().ct_eq(app.services.hook_secret.as_bytes()))
+        })
+    {
+        return Err(Error(StatusCode::CONFLICT, "hook_ownership_unverified"));
+    }
+    probe_callback(app).await?;
+    let target = app.hook_url();
+    if previous == target {
+        return Ok(());
+    }
+    if set_hook_url(app, &target).await.is_err() || reload_hook(app).await.is_err() {
+        if set_hook_url(app, previous).await.is_err() || reload_hook(app).await.is_err() {
+            return Err(Error(StatusCode::BAD_GATEWAY, "hook_rollback_failed"));
+        }
+        return Err(Error(StatusCode::BAD_GATEWAY, "hook_reload_failed"));
+    }
+    Ok(())
+}
+
+async fn set_hook_url(app: &App, url: &str) -> Result<()> {
+    app.upstream
+        .call(
+            &app.services.provisioning_key,
+            "x:MtaHook/set",
+            json!({"update":{(&app.services.hook_id):{"url":url}}}),
+        )
+        .await?;
+    Ok(())
+}
+
+async fn reload_hook(app: &App) -> Result<()> {
+    app.upstream
+        .call(
+            &app.services.provisioning_key,
+            "x:Action/set",
+            json!({"create":{"reload":{"@type":"ReloadSettings"}}}),
+        )
+        .await?;
+    Ok(())
+}
+
 pub async fn check(app: &App) -> Result<()> {
     let _guard = check_lock(app).await;
     let revision = fingerprint(app);
@@ -324,35 +460,22 @@ pub async fn check(app: &App) -> Result<()> {
         }
         .await
     );
-    item!("hook","专用 Hook 配置与账号作用范围",async{let value=app.upstream.call(&s.provisioning_key,"x:MtaHook/get",json!({"ids":[s.hook_id],"properties":["id","url","enable","stages","tempFailOnError","httpAuth"]})).await?;let h=&value["list"][0];if h["url"]!=app.hook_url()||h["stages"]["data"]!=true||h["tempFailOnError"]!=true||h["httpAuth"]["@type"]!="Bearer"||!hook_scope_matches(&h["enable"],&policy::scope_expression(app).await?){return Err(Error(StatusCode::BAD_REQUEST,"hook_configuration_mismatch"));}Ok(())}.await);
     item!(
-        "callback",
-        "网站回调认证（不代表协议实测）",
+        "hook",
+        "Stalwart 回调地址与账号范围",
         async {
-            let response = app
-                .upstream
-                .http
-                .post(app.hook_url())
-                .bearer_auth(&s.hook_secret)
-                .json(&json!({"context":{"stage":"data"}}))
-                .send()
-                .await
-                .map_err(|_| Error(StatusCode::BAD_GATEWAY, "callback_unreachable"))?;
-            if !response.status().is_success()
-                || response
-                    .json::<Value>()
-                    .await
-                    .map_err(|_| internal("callback_invalid"))?["action"]
-                    != "accept"
-            {
-                return Err(Error(
-                    StatusCode::BAD_GATEWAY,
-                    "callback_authentication_failed",
-                ));
+            let hook = read_hook(app).await?;
+            if hook["url"] != app.hook_url() {
+                return Err(Error(StatusCode::BAD_REQUEST, "hook_callback_mismatch"));
             }
             Ok(())
         }
         .await
+    );
+    item!(
+        "callback",
+        "Webmail 回调连接与认证",
+        probe_callback(app).await
     );
     item!(
         "turnstile",
@@ -408,6 +531,131 @@ pub async fn worker(app: Arc<App>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn hook_url_changes_only_after_an_authenticated_probe_and_restores_on_reload_failure() {
+        struct Fixture {
+            hook: Value,
+            callback_ok: bool,
+            reject_reload_once: bool,
+            updates: Vec<String>,
+        }
+        let old_url = "http://192.0.2.10:8088/internal/mta-hook";
+        let db = db::connect(
+            &std::env::temp_dir()
+                .join(Uuid::new_v4().to_string())
+                .join("test.sqlite"),
+        )
+        .await
+        .unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        let app = App {
+            root: None,
+            revision: 0,
+            service_id: "default".into(),
+            domain_id: "default".into(),
+            db,
+            upstream: Stalwart {
+                http: reqwest::Client::new(),
+                base: origin.clone(),
+            },
+            vault: Vault::new(&[7; 32]).unwrap(),
+            origin,
+            direct_origin: None,
+            services: config::Services {
+                hook_id: "dedicated".into(),
+                hook_secret: "fixture-hook-secret".into(),
+                provisioning_key: "fixture-provisioning".into(),
+                ..Default::default()
+            },
+        };
+        let hook = json!({
+            "id":"dedicated", "url":old_url, "enable":{"else":policy::scope_expression(&app).await.unwrap()},
+            "stages":{"data":true}, "tempFailOnError":true,
+            "httpAuth":{"@type":"Bearer","bearerToken":{"@type":"Value","secret":"fixture-hook-secret"}}
+        });
+        let fixture = Arc::new(tokio::sync::Mutex::new(Fixture {
+            hook,
+            callback_ok: false,
+            reject_reload_once: false,
+            updates: Vec::new(),
+        }));
+        let server = Router::new()
+            .route(
+                "/jmap/",
+                post(
+                    |State(fixture): State<Arc<tokio::sync::Mutex<Fixture>>>,
+                     Json(body): Json<Value>| async move {
+                        let mut f = fixture.lock().await;
+                        let method = body["methodCalls"][0][0].as_str().unwrap();
+                        let args = &body["methodCalls"][0][1];
+                        let result = match method {
+                            "x:MtaHook/get" => json!({"list":[f.hook]}),
+                            "x:MtaHook/set" => {
+                                let update = &args["update"]["dedicated"];
+                                assert_eq!(update.as_object().unwrap().len(), 1);
+                                let url = update["url"].as_str().unwrap().to_owned();
+                                f.hook["url"] = json!(&url);
+                                f.updates.push(url);
+                                json!({"updated":{"dedicated":null}})
+                            }
+                            "x:Action/set" if f.reject_reload_once => {
+                                f.reject_reload_once = false;
+                                json!({"notCreated":{"reload":{"type":"forbidden"}}})
+                            }
+                            "x:Action/set" => json!({"created":{"reload":{"id":"action"}}}),
+                            _ => unreachable!(),
+                        };
+                        Json(json!({"methodResponses":[[method,result,"c"]]}))
+                    },
+                ),
+            )
+            .route(
+                "/internal/mta-hook",
+                post(
+                    |State(fixture): State<Arc<tokio::sync::Mutex<Fixture>>>,
+                     headers: HeaderMap| async move {
+                        if fixture.lock().await.callback_ok
+                            && headers["authorization"] == "Bearer fixture-hook-secret"
+                        {
+                            (StatusCode::OK, Json(json!({"action":"accept"})))
+                        } else {
+                            (StatusCode::UNAUTHORIZED, Json(json!({})))
+                        }
+                    },
+                ),
+            )
+            .with_state(fixture.clone());
+        let task = tokio::spawn(async move { axum::serve(listener, server).await.unwrap() });
+
+        assert!(matches!(
+            switch_hook_callback(&app).await,
+            Err(Error(_, "callback_authentication_failed"))
+        ));
+        assert!(fixture.lock().await.updates.is_empty());
+        {
+            let mut f = fixture.lock().await;
+            f.callback_ok = true;
+            f.reject_reload_once = true;
+        }
+        assert!(matches!(
+            switch_hook_callback(&app).await,
+            Err(Error(_, "hook_reload_failed"))
+        ));
+        assert_eq!(
+            fixture.lock().await.updates,
+            [app.hook_url(), old_url.into()]
+        );
+        assert_eq!(fixture.lock().await.hook["url"], old_url);
+
+        switch_hook_callback(&app).await.unwrap();
+        assert_eq!(fixture.lock().await.hook["url"], app.hook_url());
+        switch_hook_callback(&app).await.unwrap();
+        assert_eq!(fixture.lock().await.updates.len(), 3);
+        task.abort();
+    }
+
     #[test]
     fn scope_checks_accept_equivalent_sets_but_reject_extra_accounts_and_rules() {
         let expected = "!is_empty(authenticated_as) && contains([\"a\",\"a@example.com\"], to_lowercase(authenticated_as))";

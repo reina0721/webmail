@@ -1,7 +1,7 @@
 use super::*;
 use subtle::ConstantTimeEq;
 
-async fn scope_lock(app: &App) -> tokio::sync::OwnedMutexGuard<()> {
+pub(crate) async fn scope_lock(app: &App) -> tokio::sync::OwnedMutexGuard<()> {
     static LOCKS: std::sync::LazyLock<
         std::sync::Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     > = std::sync::LazyLock::new(Default::default);

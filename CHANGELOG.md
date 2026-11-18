@@ -4,6 +4,15 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+## [0.4.0-alpha.7] - 2026-11-17
+
+### Fixed
+
+- Diagnose a stale Stalwart submission callback independently of Webmail connectivity and authentication.
+- Update the dedicated callback from the console after testing the configured HTTPS address. Restore the previous callback if Stalwart rejects the switch.
+- Keep registration checks and verification links visible at the top of the page.
+- Run the account-context check with native Node type stripping and use the classic Docker store for the historical AMD64 installer fixture.
+
 ## [0.4.0-alpha.6] - 2026-11-17
 
 ### Fixed

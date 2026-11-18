@@ -38,6 +38,13 @@ Webmail 网站来源、Stalwart 来源和邮箱域名是三项独立信息。Clo
 
 配置生效后，进入 **注册与验证 → 检查注册条件**，页面明确显示通过项数与缺项。全部自动检查通过后，点击 **生成收信验证链接 → 打开人机与收信验证页面**，由真人完成 Turnstile 与验证码收信。保存配置、通过自动检查和完成真人收信验证是三个独立状态；这些操作不会自动开放公开注册。
 
+<a id="callback-repair"></a>
+### 更换主地址后的 Stalwart 回调
+
+1. 在「站点与默认设置」保存 HTTPS 主地址。
+2. 在「注册与验证」点击「检查注册条件」。如果 Webmail 回调连接失败，从 Webmail 宿主机检查主地址能否连接，核对 DNS、反代和完整证书链。可用 `curl -fsS https://webmail.example.com/api/v1/installation` 检查 TLS 与反代。若连接正常但回调认证失败，请检查反代是否转发回调路径和 `Authorization` 请求头。
+3. Webmail 回调连接与认证通过后，若 Stalwart 专用 Hook 仍指向旧地址，点击「更新 Stalwart 回调地址」。Webmail 会再验证主地址，并仅更新本安装专用 Hook 的回调地址。Stalwart 应用失败时，Webmail 会尝试恢复旧地址。
+
 自动初始化不改 DNS、反向代理或证书，也不自动开放公开注册。新建邮件域名后，邮件 DNS 与外部投递仍需按 Stalwart 部署要求完成。无 Cloudflare Token 时保留已有 Turnstile 配置，未配置则保持相关公开功能不可用。
 
 <a id="multiple-services"></a>

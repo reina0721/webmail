@@ -712,6 +712,7 @@ async fn health(State(app): State<Arc<App>>) -> Result<Json<Value>> {
         installation::discovery::discover,
         readiness::report,
         readiness::run,
+        readiness::repair_hook,
         readiness::link,
         readiness::interaction,
         readiness::readiness_send,

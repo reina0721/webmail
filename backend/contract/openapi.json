@@ -6,7 +6,7 @@
     "license": {
       "name": ""
     },
-    "version": "0.4.0-alpha.6"
+    "version": "0.4.0-alpha.7"
   },
   "paths": {
     "/api/push/action": {
@@ -1999,6 +1999,41 @@
                 "schema": {}
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/installation/readiness/hook": {
+      "post": {
+        "tags": [
+          "readiness"
+        ],
+        "operationId": "repair_hook",
+        "parameters": [
+          {
+            "name": "domainId",
+            "in": "query",
+            "description": "Stable local domain ID",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "400": {
+            "description": "No eligible dedicated Hook"
+          },
+          "502": {
+            "description": "Callback verification or Stalwart reload failed"
           }
         }
       }

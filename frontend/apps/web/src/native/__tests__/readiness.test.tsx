@@ -91,3 +91,47 @@ it("exposes the real human-and-mail verification link after all automatic checks
   );
   expect(screen.getByText(/验证链接已生成/)).toBeInTheDocument();
 });
+
+it("directs a failed callback to certificate diagnostics and enables Hook repair only after a passing probe", async () => {
+  const mismatch = {
+    id: "hook",
+    label: "Stalwart 回调地址与账号范围",
+    status: "failed",
+    reason: "hook_callback_mismatch",
+  };
+  const callback = {
+    id: "callback",
+    label: "Webmail 回调连接与认证",
+    status: "passed",
+  };
+  const failed = {
+    ...report,
+    items: [
+      mismatch,
+      { ...callback, status: "failed", reason: "callback_unreachable" },
+    ],
+  };
+  const reachable = { ...report, items: [mismatch, callback] };
+  const repaired = {
+    ...report,
+    items: [{ ...mismatch, status: "passed" }, callback],
+  };
+  request.mockImplementation(async (path: string, options?: RequestInit) => {
+    if (path.includes("/readiness/hook")) return repaired;
+    return options?.method === "POST" ? reachable : failed;
+  });
+  render(<RegistrationReadiness domainId="mail-domain" />);
+  const repair = await screen.findByRole("button", {
+    name: "更新 Stalwart 回调地址",
+  });
+  expect(repair).toBeDisabled();
+  expect(screen.getByText(/HTTPS 完整证书链/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "检查注册条件" }));
+  await waitFor(() => expect(repair).toBeEnabled());
+  fireEvent.click(repair);
+  await screen.findByText(/Stalwart 回调已更新/);
+  expect(request).toHaveBeenCalledWith(
+    "/installation/readiness/hook?domainId=mail-domain",
+    expect.objectContaining({ method: "POST" }),
+  );
+});

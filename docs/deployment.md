@@ -46,7 +46,7 @@ curl -fsSL https://raw.githubusercontent.com/reina0721/webmail/main/install.sh |
 
 IPv6 使用 `--bind ::1 --port 18090`；旧写法 `--bind '[::1]:18090'` 和 `--name` 仍兼容。同机多实例选择不同目录、名称及端口。通配监听输出可用的本地诊断地址，远程使用服务器实际 IP；不会把 `0.0.0.0` 或 `::` 当作访问地址。
 
-默认选择最高 SemVer 已发布版本，包含预发布并排除草稿；仅稳定版使用 `--channel stable`，精确版本使用 `--version v0.4.0-alpha.6`。选定版本缺少产物或校验失败会停止，不回退。引导 CLI 固定到已验收版本，应用版本由 Rust 解析 Release 列表。Fork 使用 `--repository OWNER/REPO`；下载代理使用 `--download-mirror HTTPS_URL`，始终校验同一 SHA-256。
+默认选择最高 SemVer 已发布版本，包含预发布并排除草稿；仅稳定版使用 `--channel stable`，精确版本使用 `--version v0.4.0-alpha.7`。选定版本缺少产物或校验失败会停止，不回退。引导 CLI 固定到已验收版本，应用版本由 Rust 解析 Release 列表。Fork 使用 `--repository OWNER/REPO`；下载代理使用 `--download-mirror HTTPS_URL`，始终校验同一 SHA-256。
 
 安装完成后运行：
 
@@ -162,8 +162,8 @@ INSTALL_DIR="$HOME/apps/mail-web"
 "$INSTALL_DIR/mailweb" doctor --json
 "$INSTALL_DIR/mailweb" logs --tail 100
 "$INSTALL_DIR/mailweb" backup
-"$INSTALL_DIR/mailweb" self-update --version v0.4.0-alpha.6
-"$INSTALL_DIR/mailweb" update --version v0.4.0-alpha.6 --yes
+"$INSTALL_DIR/mailweb" self-update --version v0.4.0-alpha.7
+"$INSTALL_DIR/mailweb" update --version v0.4.0-alpha.7 --yes
 "$INSTALL_DIR/mailweb" restore "$INSTALL_DIR/backups/SNAPSHOT" --yes
 ```
 

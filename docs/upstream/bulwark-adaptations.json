@@ -367,6 +367,16 @@
       "sha256": "696cce9fe713c4d7b50f3c6ded953f4b460a8ef5478c6c812c4bfbe605fbb293"
     },
     {
+      "local": "frontend/apps/web/src/hooks/use-timeout-while-mounted.ts",
+      "upstream": "hooks/use-timeout-while-mounted.ts",
+      "sha256": "a21d967200f376d90ef484d17a05dc6f960e619279fcaf3c417d05e0475c0ea7"
+    },
+    {
+      "local": "frontend/apps/web/src/hooks/__tests__/use-timeout-while-mounted.test.tsx",
+      "upstream": "hooks/__tests__/use-timeout-while-mounted.test.tsx",
+      "sha256": "dfaf3c3ef03a06426dcd057e585466ec6fb53ddc260269cd84a0774b1675d8c3"
+    },
+    {
       "local": "frontend/apps/web/src/i18n/navigation.ts",
       "upstream": "i18n/navigation.ts",
       "sha256": "3d76edfa25258f3ca4b7ca6f861a4fc47eccedb532923233c0fb989000d71a92"

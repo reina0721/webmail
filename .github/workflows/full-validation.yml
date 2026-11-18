@@ -132,7 +132,7 @@ jobs:
           assets="$RUNNER_TEMP/published-install-assets"
           mkdir -p "$assets"
           gh release download "$VERSION" --repo "$GITHUB_REPOSITORY" --dir "$assets"
-          sudo MAIL_WEB_RELEASE_ASSET_DIR="$assets" sh tests/release-install.sh "$VERSION"
+          sudo MAIL_WEB_RELEASE_ASSET_DIR="$assets" sh tests/release-install.sh "$VERSION" --published
   checks:
     name: Full validation (${{ matrix.architecture }})
     needs: metadata

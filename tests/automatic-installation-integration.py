@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import http.server
 import threading
@@ -58,8 +59,10 @@ class LostKeyResponseProxy(http.server.BaseHTTPRequestHandler):
 def docker(*args):
     return subprocess.check_output(["docker", *args], text=True).strip()
 
-def request(path, method="GET", body=None, capability=None, origin=ORIGIN, opener=None, csrf=None):
+def request(path, method="GET", body=None, capability=None, origin=ORIGIN, opener=None, csrf=None, host=None):
     headers = {"Origin": origin}
+    if host:
+        headers["Host"] = host
     if capability:
         headers["Authorization"] = "Bearer " + capability
     if csrf:
@@ -199,9 +202,11 @@ def exercise(mode):
             if secret:
                 assert secret.encode() not in (ROOT / "config/initialization.enc").read_bytes()
         restart_after_save()
-        # Requests now require the configured browser Origin, not the test client URL.
+        # Dial the local port while sending the same Host as the configured browser Origin.
+        public_origin = spec["publicOrigin"]
+        public_host = urllib.parse.urlsplit(public_origin).netloc
         for _ in range(60):
-            code, result = request(path + "job", capability=capability, origin=spec["publicOrigin"])
+            code, result = request(path + "job", capability=capability, origin=public_origin, host=public_host)
             job = result["job"]
             if job["status"] == "completed":
                 break
@@ -225,10 +230,11 @@ def exercise(mode):
             assert credential["permissions"]["@type"] == ("Inherit" if kind == "directory" else "Replace")
             assert len(values) == 1, "An unreachable orphan API key was not reconciled"
         # Same operation cannot create a second set of resources after completion.
-        code, reauthorized = request(path + "authorize", "POST", credentials, capability, spec["publicOrigin"])
-        assert code == 200
+        assert request(path + "authorize", "POST", credentials, capability, public_origin)[0] == 403
+        code, reauthorized = request(path + "authorize", "POST", credentials, capability, public_origin, host=public_host)
+        assert code == 200, (code, reauthorized.get("error"))
         body["ticket"] = reauthorized["ticket"]
-        code, repeated = request(path + "job", "POST", body, capability, spec["publicOrigin"])
+        code, repeated = request(path + "job", "POST", body, capability, public_origin, host=public_host)
         assert code == 200 and repeated["job"]["resources"] == job["resources"]
         print("PASS: automatic setup", mode, "authorization, cancellation, creation, encrypted capture, restart, callback activation and idempotence")
     finally:

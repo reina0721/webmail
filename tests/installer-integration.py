@@ -2,7 +2,12 @@
 Run as root with Docker access, never changes application database contents directly.
 """
 import argparse,datetime,hashlib,json,os,pathlib,secrets,shutil,socket,sqlite3,subprocess,tarfile,tempfile,time,urllib.request
-p=argparse.ArgumentParser();p.add_argument('bundle',type=pathlib.Path);p.add_argument('--state-fixture',type=pathlib.Path);p.add_argument('--legacy',action='store_true');args=p.parse_args()
+p=argparse.ArgumentParser()
+p.add_argument('bundle',type=pathlib.Path)
+p.add_argument('--state-fixture',type=pathlib.Path)
+p.add_argument('--legacy',action='store_true')
+p.add_argument('--published',action='store_true',help='Exercise the online CLI and application upgrade for the published candidate')
+args=p.parse_args()
 repo=pathlib.Path(__file__).resolve().parents[1];bundle=args.bundle.resolve();stamp=str(int(time.time()));root=repo/'tests/runtime'/('installer-'+stamp);root.mkdir(parents=True);evidence=[];bootstrap=bundle.parent/'install.sh';assert bootstrap.is_file();PUBLIC=urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 def check(message):
@@ -125,9 +130,8 @@ try:
  run([a/'mailweb','restore',recovery[0],'--yes']);assert status(a)['healthy'] and dbstate(a)==before and sha(a/'secrets/session.key')==key
  check('Startup failure after a verified update returns nonzero, retains a matching snapshot and restores with its reported command without database downgrade')
  if args.legacy:
-  # Exercise the user's actual previous Rust installer, not just a candidate
-  # reinstall. The current bootstrap prepares the old image's portable identity;
-  # its unmodified embedded v0.4.0-alpha.2 CLI performs the actual update.
+  # Exercise the actual previous installation and documented upgrade sequence.
+  # The old CLI can fetch its replacement before handling a newer image format.
   # Historical releases only provide this AMD64 application bundle.
   previous=root/'previous-rust-release';previous.mkdir();oldtag='v0.4.0-alpha.2';oldname='mail-web-linux-amd64.tar.gz'
   for asset in ['SHA256SUMS',oldname]:
@@ -143,11 +147,17 @@ try:
   assert run([upgraded/'bin/mailwebctl','--version']).strip()=='mailwebctl 0.4.0-alpha.2'
   assert status(upgraded)['version']==oldtag
   oldkey=sha(upgraded/'secrets/session.key');oldstate=dbstate(upgraded)
-  run([upgraded/'mailweb','update','--yes','--bundle',bundle],timeout=600)
+  if args.published:
+   run([upgraded/'mailweb','self-update','--version',candidate_version],timeout=600)
+   assert run([upgraded/'bin/mailwebctl','--version']).strip()=='mailwebctl '+candidate_version.removeprefix('v')
+   assert status(upgraded)['version']==oldtag and dbstate(upgraded)==oldstate
+   run([upgraded/'mailweb','update','--yes','--version',candidate_version],timeout=600)
+  else:
+   run(['bash',bootstrap,'--dir',upgraded,'--yes','--bundle',bundle],env=env,timeout=600)
   current=status(upgraded);assert current['healthy'] and current['version']==candidate_version and current['container']==oldcontainer and current['port']==oldport
   assert sha(upgraded/'secrets/session.key')==oldkey and dbstate(upgraded)==oldstate
   assert run([upgraded/'bin/mailwebctl','--version']).strip()=='mailwebctl '+candidate_version.removeprefix('v')
-  check('Actual published v0.4.0-alpha.2 Rust CLI upgrades the candidate application and itself in place, preserving data, keys, listener and container ownership')
+  check('Actual published v0.4.0-alpha.2 installation upgrades in place, preserving data, keys, listener and container ownership')
   oldsnapshot=next(path for path in (upgraded/'backups').iterdir() if path.is_dir() and (path/'.env').exists() and 'MAIL_WEB_VERSION=0.4.0-alpha.2' in (path/'.env').read_text())
   run([upgraded/'mailweb','restore',oldsnapshot,'--yes']);assert status(upgraded)['healthy'] and status(upgraded)['version']==oldtag and dbstate(upgraded)==oldstate and sha(upgraded/'secrets/session.key')==oldkey
   run([upgraded/'mailweb','update','--yes','--bundle',bundle],timeout=600);assert status(upgraded)['healthy'] and status(upgraded)['version']==candidate_version

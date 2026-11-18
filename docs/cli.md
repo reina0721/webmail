@@ -32,7 +32,7 @@ curl -fsSL https://raw.githubusercontent.com/reina0721/webmail/main/install.sh |
 
 HTTP 直连额外传 `--allow-http`，公开来源填实际服务器 IP；IPv6 URL 使用方括号。安装器不会创建反代、DNS、证书或防火墙规则。端口冲突时交互重选，无人值守直接失败；不接管其他安装的同名容器，也不覆盖未登记的非空目录或其他项目配置。
 
-默认选择整个 Release 列表中 SemVer 最高的非草稿版本，不按发布时间或 GitHub stable/latest API 排序。最高版本缺少必要资产或校验失败直接停止。引导 CLI 固定 `v0.4.0-alpha.4`，应用版本由 CLI 独立选择。没有稳定版时 stable 渠道明确失败。
+默认选择整个 Release 列表中 SemVer 最高的非草稿版本，不按发布时间或 GitHub stable/latest API 排序。最高版本缺少必要资产或校验失败直接停止。引导 CLI 固定 `v0.4.0-alpha.5`，应用版本由 CLI 独立选择。没有稳定版时 stable 渠道明确失败。
 
 应用安装后 `/console/setup/` 显示“应用已安装，邮件服务待配置”。所有 Stalwart 授权、域名、账号、Hook 和 Turnstile 操作继续在网页完成，安装器没有相关凭据参数。
 
@@ -123,7 +123,7 @@ sudo ./mailweb version-manager import '/安装目录/backups/实际快照目录'
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/reina0721/webmail/main/install.sh | bash -s -- \
-  --dir /srv/mail-web --yes --version v0.4.0-alpha.4
+  --dir /srv/mail-web --yes --version v0.4.0-alpha.5
 ```
 
 ## 从 v0.4.0-alpha.2 升级（逐步操作）
@@ -165,17 +165,17 @@ pwd
 
 ### 3. 先更新管理工具，再更新应用
 
-先确认 [GitHub Release 页面](https://github.com/reina0721/webmail/releases/tag/v0.4.0-alpha.4) 已公开且有 `SHA256SUMS` 和本机架构附件；草稿或正在构建的版本无法下载。
+先确认 [GitHub Release 页面](https://github.com/reina0721/webmail/releases/tag/v0.4.0-alpha.5) 已公开且有 `SHA256SUMS` 和本机架构附件；草稿或正在构建的版本无法下载。
 
 ```bash
-./mailweb self-update --version v0.4.0-alpha.4
+./mailweb self-update --version v0.4.0-alpha.5
 ./mailweb --version
 ```
 
-第二条应输出 `mailwebctl 0.4.0-alpha.4`。这一步只更新管理工具，网站仍运行旧版。若下载失败或版本未改变，先处理终端错误，不继续下一条。
+第二条应输出 `mailwebctl 0.4.0-alpha.5`。这一步只更新管理工具，网站仍运行旧版。若下载失败或版本未改变，先处理终端错误，不继续下一条。
 
 ```bash
-./mailweb update --version v0.4.0-alpha.4 --yes
+./mailweb update --version v0.4.0-alpha.5 --yes
 ```
 
 管理工具会自动识别 AMD64／ARM64、下载并校验应用包，在升级前另存一致性快照，再短暂停止本实例并启动新版本。**不需要重装，不需要重新填写 Stalwart，不需要修改端口、DNS 或域名。** 原账号数据、加密配置、安装密钥和监听参数会保留。先执行 `self-update` 是为了获得 Docker classic／containerd 镜像标识兼容修复。
@@ -187,7 +187,7 @@ pwd
 ./mailweb --version
 ```
 
-应看到 `version: "v0.4.0-alpha.4"`、`running: true`、`healthy: true`，管理工具版本也为 `0.4.0-alpha.4`。浏览器刷新原网站，检查页面底部版本；原来的访问地址不变。健康状态异常时查看：
+应看到 `version: "v0.4.0-alpha.5"`、`running: true`、`healthy: true`，管理工具版本也为 `0.4.0-alpha.5`。浏览器刷新原网站，检查页面底部版本；原来的访问地址不变。健康状态异常时查看：
 
 ```bash
 ./mailweb logs --tail 100
@@ -230,8 +230,8 @@ tar -xzf mailwebctl-linux-amd64.tar.gz -C upgrade-cli
 
 ```bash
 ./mailweb backup
-./mailweb self-update --version v0.4.0-alpha.4
-./mailweb update --version v0.4.0-alpha.4 --yes
+./mailweb self-update --version v0.4.0-alpha.5
+./mailweb update --version v0.4.0-alpha.5 --yes
 ./mailweb restore /absolute/install/backups/SNAPSHOT --yes
 ```
 

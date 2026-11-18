@@ -4,6 +4,15 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+## [0.4.0-alpha.5] - 2026-11-17
+
+### Added
+
+- Keep a configured IP and port available for mail and administration when the public reverse proxy or domain is unavailable.
+- View the installed version, upgrade to a published release, and restore a matching snapshot from the operator console.
+- Run version changes in a separate host service that records progress and can recover from an interrupted switch.
+- Show the direct address in status output and open the repair wizard at that address with `mailweb setup --direct`.
+
 ## [0.4.0-alpha.4] - 2026-11-17
 
 ### Added

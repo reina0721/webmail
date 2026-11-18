@@ -4,6 +4,12 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+## [0.4.0-alpha.8] - 2026-11-18
+
+### Changed
+
+- Discover a single Cloudflare account, create its Turnstile widget and save its keys from one console action. Explain missing account-read permission or ask for a choice when the token can list multiple accounts.
+
 ## [0.4.0-alpha.7] - 2026-11-17
 
 ### Fixed

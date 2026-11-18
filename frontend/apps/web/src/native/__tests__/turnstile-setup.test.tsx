@@ -46,8 +46,13 @@ it("repairs a missing account listing with an Account ID and only a Cloudflare t
   fireEvent.change(screen.getByLabelText("Cloudflare API Token"), {
     target: { value: "isolated-token" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "读取 Cloudflare 账号" }));
-  await screen.findByText(/Token 未能列出账号/);
+  fireEvent.click(
+    screen.getByRole("button", { name: "自动创建并保存验证配置" }),
+  );
+  await screen.findByText(/此 Token 未能读取 Cloudflare 账号/);
+  expect(
+    request.mock.calls.some(([path]) => path === "/installation/turnstile"),
+  ).toBe(false);
   expect(screen.getByLabelText("Cloudflare API Token")).toHaveValue(
     "isolated-token",
   );
@@ -91,7 +96,7 @@ it("requires an account and displays an explicit provider error without discardi
     target: { value: "isolated-token" },
   });
   const button = screen.getByRole("button", { name: "自动创建并保存验证配置" });
-  expect(button).toBeDisabled();
+  expect(button).toBeEnabled();
   fireEvent.change(screen.getByLabelText("Cloudflare Account ID"), {
     target: { value: "not-an-account" },
   });
@@ -105,24 +110,60 @@ it("requires an account and displays an explicit provider error without discardi
     "isolated-token",
   );
 });
-it("automatically selects a single discovered account", async () => {
-  request.mockImplementation(async (path: string) =>
-    path === "/installation/config"
-      ? { settings: {}, turnstileSecretSet: false }
-      : { accounts: [{ id: account, name: "My account" }] },
+it("discovers the single account and automatically configures Turnstile with one button", async () => {
+  const provider = request.getMockImplementation()!;
+  request.mockImplementation(async (path: string, options?: RequestInit) =>
+    path === "/installation/turnstile/accounts"
+      ? { accounts: [{ id: account, name: "My account" }] }
+      : provider(path, options),
   );
   render(<TurnstileSetup />);
   fireEvent.change(screen.getByLabelText("Cloudflare API Token"), {
     target: { value: "isolated-token" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "读取 Cloudflare 账号" }));
-  await waitFor(() =>
-    expect(screen.getByLabelText("Cloudflare Account ID")).toHaveValue(account),
+  fireEvent.click(
+    screen.getByRole("button", { name: "自动创建并保存验证配置" }),
   );
+  await screen.findByText("Turnstile 已配置。", {}, { timeout: 3000 });
+  expect(request).toHaveBeenCalledWith(
+    "/installation/turnstile",
+    expect.objectContaining({
+      body: JSON.stringify({
+        cloudflareToken: "isolated-token",
+        cloudflareAccount: account,
+      }),
+    }),
+  );
+});
+
+it("creates nothing if the token exposes multiple accounts and no account is selected", async () => {
+  const provider = request.getMockImplementation()!;
+  request.mockImplementation(async (path: string, options?: RequestInit) =>
+    path === "/installation/turnstile/accounts"
+      ? {
+          accounts: [
+            { id: account, name: "Account A" },
+            { id: "b".repeat(32), name: "Account B" },
+          ],
+        }
+      : provider(path, options),
+  );
+  render(<TurnstileSetup />);
+  fireEvent.change(screen.getByLabelText("Cloudflare API Token"), {
+    target: { value: "isolated-token" },
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: "自动创建并保存验证配置" }),
+  );
+  await screen.findByText(/请选择要安装 Turnstile/);
   expect(
     screen.getByRole("button", { name: "自动创建并保存验证配置" }),
-  ).toBeEnabled();
+  ).toBeDisabled();
+  expect(
+    request.mock.calls.some(([path]) => path === "/installation/turnstile"),
+  ).toBe(false);
 });
+
 it("ignores a discovery result after leaving the configuration page", async () => {
   let resolve!: (value: unknown) => void;
   request.mockImplementation(async (path: string) =>
@@ -136,7 +177,9 @@ it("ignores a discovery result after leaving the configuration page", async () =
   fireEvent.change(screen.getByLabelText("Cloudflare API Token"), {
     target: { value: "isolated-token" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "读取 Cloudflare 账号" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "自动创建并保存验证配置" }),
+  );
   view.unmount();
   await act(async () =>
     resolve({ accounts: [{ id: account, name: "Late account" }] }),

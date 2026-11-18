@@ -32,7 +32,7 @@ export function TurnstileSetup({
 }) {
   const [key, setKey] = useState(""),
     [account, setAccount] = useState(""),
-    [accounts, setAccounts] = useState<Account[]>([]),
+    [accounts, setAccounts] = useState<Account[] | null>(null),
     [configured, setConfigured] = useState<boolean | null>(null),
     [busy, setBusy] = useState(false),
     [phase, setPhase] = useState<"accounts" | "configure" | "">(""),
@@ -85,46 +85,44 @@ export function TurnstileSetup({
     }, 600_000);
     return () => clearTimeout(timer);
   }, [key]);
-  async function discover() {
-    const at = generation.current;
-    pending(true, "accounts");
-    setError("");
-    setNotice("");
-    try {
-      const value = await api<{ accounts: Account[] }>(
-        "/installation/turnstile/accounts",
-        {
-          ...request,
-          method: "POST",
-          body: JSON.stringify({ cloudflareToken: key }),
-        },
-      );
-      if (!alive.current || at !== generation.current) return;
-      setAccounts(value.accounts);
-      if (value.accounts.length === 1) setAccount(value.accounts[0].id);
-      setNotice(
-        value.accounts.length
-          ? "已读取 Cloudflare 账号，请创建并保存验证配置。"
-          : "Token 未能列出账号。请填写目标 Cloudflare Account ID；无需重新登录 Cloudflare。",
-      );
-    } catch (e) {
-      if (alive.current && at === generation.current) setError(errorMessage(e));
-    } finally {
-      if (alive.current && at === generation.current) pending(false);
-    }
-  }
   async function configure() {
     const at = generation.current;
-    pending(true, "configure");
+    const active = () => alive.current && at === generation.current;
+    const cloudflareToken = key.trim();
+    let cloudflareAccount = account.trim();
+    pending(true, cloudflareAccount ? "configure" : "accounts");
     setError("");
     setNotice("");
     try {
+      if (!cloudflareAccount) {
+        const found = await api<{ accounts: Account[] }>(
+          "/installation/turnstile/accounts",
+          {
+            ...request,
+            method: "POST",
+            body: JSON.stringify({ cloudflareToken }),
+          },
+        );
+        if (!active()) return;
+        setAccounts(found.accounts);
+        if (found.accounts.length !== 1) {
+          setNotice(
+            found.accounts.length
+              ? "请选择要安装 Turnstile 的 Cloudflare 账号。"
+              : "此 Token 未能读取 Cloudflare 账号。要只用 Token 完成，请在目标账号授权 Account Settings: Read 和 Turnstile: Edit 后重试。",
+          );
+          return;
+        }
+        cloudflareAccount = found.accounts[0].id;
+        setAccount(cloudflareAccount);
+        pending(true, "configure");
+      }
       await api("/installation/turnstile", {
         ...request,
         method: "POST",
         body: JSON.stringify({
-          cloudflareToken: key,
-          cloudflareAccount: account.trim(),
+          cloudflareToken,
+          cloudflareAccount,
         }),
       });
       if (!alive.current || at !== generation.current) return;
@@ -183,8 +181,9 @@ export function TurnstileSetup({
       ) : (
         <>
           <p>
-            可使用已有的 API Token，需要对目标 Cloudflare 账号有 Turnstile
-            编辑权限。Token 只用于本次配置。
+            填写目标 Cloudflare 账号的 API
+            Token，点击下方按钮。单一账号会自动选中并创建组件。Token
+            只用于本次配置。
           </p>
           <div className="console-form-grid">
             <PasswordField
@@ -194,19 +193,15 @@ export function TurnstileSetup({
               disabled={busy || blocked}
               onChange={(e) => {
                 setKey(e.target.value);
-                setAccounts([]);
+                setAccount("");
+                setAccounts(null);
+                setNotice("");
+                setError("");
               }}
             />
-            <TextField
-              label="Cloudflare Account ID"
-              value={account}
-              disabled={busy || blocked}
-              onChange={(e) => setAccount(e.target.value)}
-              hint="优先点击「读取 Cloudflare 账号」。没有结果时填写账号的 32 位 ID。"
-            />
-            {accounts.length > 0 && (
+            {accounts && accounts.length > 1 && (
               <SelectField
-                label="可访问的 Cloudflare 账号"
+                label="Cloudflare 账号"
                 value={account}
                 disabled={busy || blocked}
                 options={accounts.map((value) => ({
@@ -219,34 +214,43 @@ export function TurnstileSetup({
           </div>
           <div className="console-actions">
             <Action
-              variant="secondary"
-              loading={phase === "accounts"}
-              disabled={!key.trim() || busy || blocked}
-              onPress={() => void discover()}
-            >
-              读取 Cloudflare 账号
-            </Action>
-            <Action
-              loading={phase === "configure"}
+              loading={busy}
               disabled={
                 !key.trim() ||
-                !/^[a-fA-F0-9]{32}$/.test(account.trim()) ||
                 busy ||
-                blocked
+                blocked ||
+                (accounts !== null && accounts.length > 1 && !account) ||
+                (!!account.trim() && !/^[a-fA-F0-9]{32}$/.test(account.trim()))
               }
               onPress={() => void configure()}
             >
-              自动创建并保存验证配置
+              {phase === "accounts"
+                ? "正在读取 Cloudflare 账号"
+                : phase === "configure"
+                  ? "正在创建验证组件"
+                  : "自动创建并保存验证配置"}
             </Action>
           </div>
-          <a
-            className="console-link"
-            href="https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            在 Cloudflare 找到 Account ID ↗
-          </a>
+          {(accounts === null || accounts.length <= 1) && (
+            <details>
+              <summary>使用已有的 Cloudflare Account ID</summary>
+              <TextField
+                label="Cloudflare Account ID"
+                value={account}
+                disabled={busy || blocked}
+                onChange={(e) => setAccount(e.target.value)}
+                hint="可填写已有的 32 位 Account ID，继续使用同一个 Token。"
+              />
+              <a
+                className="console-link"
+                href="https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/"
+                target="_blank"
+                rel="noreferrer"
+              >
+                在 Cloudflare 找到 Account ID ↗
+              </a>
+            </details>
+          )}
           {disabled && <p>请先保存或清除本页正在编辑的其他配置。</p>}
         </>
       )}

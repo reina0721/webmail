@@ -32,7 +32,7 @@ Webmail 网站来源、Stalwart 来源和邮箱域名是三项独立信息。Clo
 
 **字段含义：** Site Key 是 Cloudflare 为验证组件生成的公开标识，不能填写 Webmail 地址；Secret 是同一组件的服务端密钥，不能填写 Cloudflare API Token。通常无需手工处理这两项，使用下面的自动配置即可。格式检查只排除明显错误，组件能否使用仍需实际验证。
 
-已完成邮件服务初始化时，进入 **站点与默认设置 → 自动配置 Turnstile 人机验证**。填写有 Turnstile 编辑权限的 Cloudflare API Token，点击 **读取 Cloudflare 账号**；只有一个账号时自动选中，没有列账号权限时填写目标账号的 32 位 Account ID，再点击 **自动创建并保存验证配置**。
+已完成邮件服务初始化时，进入 **站点与默认设置 → 自动配置 Turnstile 人机验证**。填写 Cloudflare API Token，点击 **自动创建并保存验证配置**。Token 在同一目标账号具有 **Account Settings: Read** 和 **Turnstile: Edit**，且只读到一个账号时，Webmail 会自动选择该账号并创建组件。可访问多个账号时需选择目标账号。没有列账号权限时，可展开 **使用已有的 Cloudflare Account ID**，填写 32 位 ID 并继续使用同一个 Token。
 
 这里不要求再次填写 Stalwart 管理员凭据，也不重建邮件服务身份、发件账号或 Hook。API Token 只在本次请求和页面临时使用，不长期保存；程序自动取得并加密保存 Site Key 和 Secret。创建结果未知时保留加密的归属记录，使用同一账号和网站来源重试可核对已有组件，避免重复创建。
 

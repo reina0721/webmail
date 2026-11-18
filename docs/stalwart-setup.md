@@ -1,12 +1,24 @@
 # Stalwart 自动配置与高级排错教程
 
 <a id="automatic"></a>
-## 推荐：一次授权自动配置
+## 首次接入邮件服务
 
 正常安装不需要手工创建服务账号、抄写 ID、配置 Hook 或复制 Turnstile Site Key／Secret。进入 `/console/setup/`，以安装令牌或本安装运营身份管理配置。
 
+### 三个地址不能混用
+
+| 字段 | 示例 | 用途 |
+|---|---|---|
+| Stalwart HTTPS 地址 | `https://mail.example.com:8443` | Webmail 连接已有邮件服务器 |
+| 邮箱域名 | `example.com` | 邮箱地址 `person@example.com` 中 `@` 后的部分 |
+| 公开访问来源 | `https://webmail.example.com` | 用户打开 Webmail 的地址 |
+
+Stalwart 栏可输入裸主机名，向导会补上 `https://` 并保留端口。如果粘贴带 `/admin/` 或 `/account/` 的 Stalwart 入口，向导会去掉路径。
+
+### 配置向导
+
 1. **连接授权：** 输入 Stalwart 服务来源，例如 `https://mail.example.com:8443`；默认填写管理员账号和密码，也可以选择管理员 API 密钥。双重验证开启后，普通密码不能用于 HTTP Basic，请选择 API 密钥。凭据只在服务器内存中临时使用，不写入配置、日志、数据库或浏览器存储。
-2. **可选 Turnstile：** 在 Cloudflare **My Profile → API Tokens → Create Token → Create Custom Token** 创建仅针对目标账号、具有 **Account → Turnstile → Edit**（API 名称 `Turnstile Sites Write`）的 Token，粘贴到向导。不需要 Global API Key、DNS 写入权限或手工创建 Widget。验证后只有一个可访问账号会自动选中；多个账号需选择；没有列账号权限时可直接补填 Account ID。
+2. **可选的人机验证。** 要开放注册时，展开「同时配置公开注册的人机验证（可选）」，粘贴具有目标账号 **Account → Turnstile → Edit** 权限的 Cloudflare API Token。要让 Webmail 读取账号列表，为同一个 Token 添加 **Account Settings → Read**。只查到一个账号时会自动选中，多个账号时请选择目标账号，无法列出时可补填 Account ID。也可以先接通邮件服务，随后在「站点与默认设置」配置。[Cloudflare 创建 API Token 指南](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/)
 3. **验证并读取：** 点击“验证 Stalwart 权限”。程序读取管理员有效权限和域名；不足时显示缺失权限。管理员需要域名读取、账号读取／创建／更新、Hook 读取／创建、Action 创建及 ReloadSettings 权限；新建域名还需域名创建权限。管理员输入框成功后清空，临时授权闲置十分钟失效。
 4. **选择与绑定：** 明确选择邮箱域名，或勾选“域名不存在时自动创建”。填写真实 Webmail 网站访问来源和站点名称。默认绑定已有普通邮箱，填写原密码与外部恢复邮箱；也可以选择新建普通运营邮箱并设置至少十二位密码。管理员和服务身份不能充当普通运营邮箱；已有账号的服务器或域名迁移不能通过初始化覆盖。
 5. **检查与执行：** 点击“检查安装配置”，核对资源清单，再点击“应用配置”。程序为本安装创建独立服务身份和受限 API 密钥、验证码发件账号及密钥、共享密钥和禁用的 MTA Hook；启用 Turnstile 自动配置时创建 `managed` Widget，并自动保存返回的 Site Key／Secret。所有内部 ID 自动填写。
@@ -20,8 +32,8 @@ Webmail 网站来源、Stalwart 来源和邮箱域名是三项独立信息。Clo
 
 | 要做什么 | 从哪里开始 |
 | --- | --- |
-| 更换 Webmail 域名 | 「站点与默认设置」填写并保存主地址 |
-| 开放邮箱注册 | 保存主地址，配置 Turnstile，再到「注册与验证」完成收信验证 |
+| 更换 Webmail 域名 | 「站点与默认设置」填写「公开访问来源（主地址）」，点击「保存站点配置」 |
+| 开放邮箱注册 | 保存 HTTPS 主地址并配置 Turnstile，再完成下方的[收信验证与开放注册](#enable-registration) |
 | 修复 Stalwart 权限 | 「安装与修复」展开「修复 Stalwart 连接或权限」 |
 
 保存主地址无需补填 Turnstile 密钥。已启用 IP 备用入口的实例还能从原 IP 和端口进入控制台。
@@ -36,7 +48,12 @@ Webmail 网站来源、Stalwart 来源和邮箱域名是三项独立信息。Clo
 
 这里不要求再次填写 Stalwart 管理员凭据，也不重建邮件服务身份、发件账号或 Hook。API Token 只在本次请求和页面临时使用，不长期保存；程序自动取得并加密保存 Site Key 和 Secret。创建结果未知时保留加密的归属记录，使用同一账号和网站来源重试可核对已有组件，避免重复创建。
 
-配置生效后，进入 **注册与验证 → 检查注册条件**，页面明确显示通过项数与缺项。全部自动检查通过后，点击 **生成收信验证链接 → 打开人机与收信验证页面**，由真人完成 Turnstile 与验证码收信。保存配置、通过自动检查和完成真人收信验证是三个独立状态；这些操作不会自动开放公开注册。
+<a id="enable-registration"></a>
+### 收信验证与开放注册
+
+1. 进入「注册与验证」，点击「检查注册条件」。页面会显示通过项数和待处理项目。
+2. 全部通过后，点击「生成收信验证链接」，再点击「打开人机与收信验证页面」。填写可收信的外部邮箱，完成人机验证并点击「发送验证码」。输入邮件中的六位验证码，点击「核对验证码」。页面会显示「验证已通过」。
+3. 返回「注册与验证」，勾选「允许公开注册」，点击「保存注册策略」。在退出登录的浏览器中打开 HTTPS 主地址，确认出现「注册」标签。
 
 如果应用内浏览器反复加载不了人机组件，请在「注册与验证」点击「复制验证链接」，用普通浏览器打开。发送请求连接中断后，可重新加载验证页查看是否已进入验证码输入步骤。
 
@@ -77,28 +94,18 @@ Stalwart 隐藏 Hook 的 Bearer 密钥时，Webmail 可根据已完成的加密�
 
 本教程适用于 Stalwart 1.0.1 管理对象接口。界面为英文；其他版本请以实际 WebUI 的菜单和 schema 为准。配置面板会读取该服务器的 schema 生成对应入口；无法确认时进入管理首页，并保留下面的菜单路径供手动查找。
 
-## 先选一条配置路线
+## 高级手工配置路线
 
 **仅使用已有邮箱：** 获取安装管理令牌或登录运营身份 → 填写 Stalwart 服务地址 → 创建并填写目录服务密钥 → 验证并读取 → 选择已有邮箱域名 → 填写站点名称和 Webmail 网站地址 → 保存并等待重启 → 首次安装绑定已有普通邮箱。验证邮件、Turnstile、Hook 不影响已有邮箱的登录和阅读；没有配置并验收提交策略时，不宣称跨协议限额已生效，公开注册保持关闭。
 
 **开放注册和密码找回：** 先完成上述连接 → 准备验证码发件邮箱及其密钥 → 配置 Turnstile → 准备仅属于本部署的 MTA Hook → 保存 → 页面内检查注册条件 → 完成真实人机验证与验证码收信 → 运营后台开放注册。连接成功不等于这条路线已经完成。
-
-## 三个地址不能混用
-
-| 示例 | 是什么 | 填到哪里 |
-|---|---|---|
-| `https://mail.example.com:8443` | 已部署的 Stalwart HTTPS 服务 | Stalwart 服务地址 |
-| `example.com` | 邮箱地址 `person@example.com` 的域名 | 邮箱域名选择器 |
-| `https://webmail.example.com` | 用户访问本项目的地址 | Webmail 网站访问地址 |
-
-示例不代表项目默认域名。输入裸主机名会补 `https://`，保留端口；可粘贴 `/console/`、`/account/` 入口并归一化为来源。其他子路径、登录信息、查询参数不能作为服务地址。SSH 本地管理代理地址不等于正式 Webmail 地址。
 
 <a id="access"></a>
 ## 安装管理令牌
 
 - **用途与必填条件：** 首次安装、运营登录不可用时管理当前 Webmail。已登录的运营身份可直接读取配置。
 - **在哪里：** Webmail 的安装目录，不在 Stalwart 管理后台。
-- **获取步骤：** SSH 登录部署服务器，运行 `sh "$INSTALL_DIR/deploy/mail-web.sh" setup`。复制输出链接中 `setup_token=` 后的内容，或使用完整安装链接打开面板。`INSTALL_DIR` 必须换成自己安装时选择的目录。
+- SSH 登录部署服务器，在 Webmail 安装目录运行 `./mailweb setup --show-token`。直接打开输出的管理链接，或复制 `setup_token=` 后的值填入「安装令牌」。主地址不可用时，使用已启用的 IP 备用入口 `./mailweb setup --direct --show-token`。
 - **复制哪个值：** `secrets/setup.key` 中的安装令牌；不是 `session.key`、邮箱密码或 Stalwart API 密钥。
 - **权限与验证：** 它能管理本安装。输入后应回读配置；已有配置读取失败时不能直接提交空白表单。
 - **常见错误：** 复制了另一套安装的令牌、带入多余空格。可使用 CLI `rotate-setup-token` 轮换，旧令牌随后失效。
@@ -107,8 +114,7 @@ Stalwart 隐藏 Hook 的 Bearer 密钥时，Webmail 可根据已完成的加密�
 ## Stalwart 服务地址
 
 - **用途与必填条件：** 必填，供 Webmail 通过 HTTPS JMAP 连接已有邮件服务。
-- **在哪里：** 部署 Stalwart 时设置的 HTTPS 管理入口；先用浏览器确认能进入 `/console/` 或 `/account/`。
-- **填写步骤：** 例如填 `mail.example.com:8443`，离开输入框后归一化为 `https://mail.example.com:8443`。不用追加 `/jmap/`。
+- **填写地址。** 例如 `mail.example.com:8443`，向导会归一化为 `https://mail.example.com:8443`。使用部署 Stalwart 时设置的 HTTPS 管理入口。
 - **自动生成：** 地址有效即出现对应管理入口和本 GitHub 教程。提供目录密钥后，点击“验证并重新读取”，或填写密钥后离开输入框自动读取。
 - **验证方法：** 域名列表出现且显示连接成功。此操作只读，不保存、不重启，也不会创建远程对象。
 - **常见错误：** 填成邮箱域名、Webmail 地址、HTTP 来源、无效证书或未开放的端口。服务器必须能访问该 HTTPS 来源。更换来源必须重新提供新服务器的密钥，旧密钥不会自动发送过去。

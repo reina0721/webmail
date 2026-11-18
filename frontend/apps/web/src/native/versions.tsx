@@ -1,14 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Action, ConfirmDialog, SelectField } from "@mail-web/ui";
+import {
+  Action,
+  Autocomplete,
+  ConfirmDialog,
+  SelectField,
+  TextField,
+} from "@mail-web/ui";
 import { api, ApiError, errorMessage } from "@platform/lib/api";
 import type { components } from "@platform/lib/generated-api";
+import styles from "./versions.module.css";
 
 type View = components["schemas"]["DeploymentView"];
 type Job = components["schemas"]["Job"];
 type Submit = components["schemas"]["Submit"];
 type Snapshot = components["schemas"]["Snapshot"];
+type Release = components["schemas"]["PublishedVersion"];
 type Selection = { expectedVersion: string } & (
   | { operation: "update" | "install_historical"; target: string }
   | { operation: "rollback"; target: Snapshot }
@@ -41,6 +49,7 @@ const phases: Record<Job["phase"], string> = {
 export function Versions() {
   const [view, setView] = useState<View | null>(null);
   const [job, setJob] = useState<Job | null>(null);
+  const [target, setTarget] = useState("");
   const [rollback, setRollback] = useState("");
   const [confirm, setConfirm] = useState<Selection | null>(null);
   const [busy, setBusy] = useState(false);
@@ -90,6 +99,7 @@ export function Versions() {
                     version: job.targetVersion,
                     revision: health.revision ?? old.revision,
                     managerOnline: false,
+                    managerIssue: null,
                   },
               );
               setJob({
@@ -148,6 +158,7 @@ export function Versions() {
           body: JSON.stringify(body),
         }),
       );
+      setTarget("");
       setRollback("");
     } catch (error) {
       // A lost response can follow successful submission. Reading the known ID
@@ -167,180 +178,201 @@ export function Versions() {
   );
   const blocked = active || busy || !view?.managerOnline;
   const historicalEnabled = view?.inventory.historicalSwitch;
+  const release =
+    view?.inventory.releases.find((item) => item.version === target) ?? null;
+  const releaseUnavailable = (item: Release) =>
+    item.version === view?.version
+      ? "正在运行"
+      : item.unavailableReason
+        ? (unavailable[item.unavailableReason] ?? "暂不可安装")
+        : "";
+  const connectionMessage =
+    view?.managerIssue === "permission_denied"
+      ? "容器无法访问管理套接字。请在宿主机重新启用版本管理以修复权限。"
+      : view?.managerIssue === "unavailable"
+        ? "管理服务未响应。请检查宿主机服务状态后刷新。"
+        : "宿主机管理服务未连接。请先在安装目录启用，再刷新。";
   return (
     <>
-      <section className="console-panel">
-        <h2>运行版本</h2>
+      <section className={`console-panel ${styles.panel}`}>
+        <header className={styles.header}>
+          <h2>运行版本</h2>
+          <Action
+            variant="quiet"
+            size="sm"
+            onPress={() => setRefresh((value) => value + 1)}
+          >
+            刷新版本状态
+          </Action>
+        </header>
         {view ? (
-          <dl className="console-form-grid">
-            <div>
-              <dt className="console-hint">版本</dt>
-              <dd>{view.version}</dd>
+          <>
+            <dl className={styles.summary}>
+              <div>
+                <dt>版本</dt>
+                <dd>{view.version}</dd>
+              </div>
+              <div>
+                <dt>平台</dt>
+                <dd>{view.architecture}</dd>
+              </div>
+              <div>
+                <dt>宿主机版本管理</dt>
+                <dd>
+                  <span
+                    className={`console-badge${view.managerOnline ? " good" : ""}`}
+                  >
+                    {view.managerOnline ? "在线" : "未连接"}
+                  </span>
+                </dd>
+              </div>
+            </dl>
+            <details className={styles.build}>
+              <summary>构建信息</summary>
+              <p>
+                源码提交 <code>{view.revision}</code>
+              </p>
+            </details>
+            <div className={styles.controls}>
+              <div className={styles.row}>
+                <Autocomplete
+                  className={styles.field}
+                  size="small"
+                  openOnFocus
+                  options={view.inventory.releases}
+                  value={release}
+                  onChange={(_, item) => setTarget(item?.version ?? "")}
+                  getOptionLabel={(item) => item.version}
+                  isOptionEqualToValue={(item, value) =>
+                    item.version === value.version
+                  }
+                  getOptionDisabled={(item) =>
+                    Boolean(releaseUnavailable(item))
+                  }
+                  filterOptions={(options, { inputValue }) => {
+                    const query = inputValue.trim().toLowerCase();
+                    const exact = options.find(
+                      ({ version }) => version.toLowerCase() === query,
+                    );
+                    if (exact) return [exact];
+                    return options.filter(({ version }) =>
+                      /^\.\d+$/.test(query)
+                        ? version.endsWith(query)
+                        : version.toLowerCase().includes(query),
+                    );
+                  }}
+                  renderOption={({ key, ...props }, item) => {
+                    const reason = releaseUnavailable(item);
+                    const detail =
+                      (item.prerelease ? "预发布" : "稳定版") +
+                      (reason ? ` · ${reason}` : "");
+                    return (
+                      <li
+                        key={key}
+                        {...props}
+                        aria-label={`${item.version} ${detail}`}
+                      >
+                        <span className={styles.option}>
+                          <span>{item.version}</span>
+                          <span className={styles.optionDetail}>{detail}</span>
+                        </span>
+                      </li>
+                    );
+                  }}
+                  slotProps={{
+                    listbox: { sx: { maxHeight: "min(16rem, 45vh)" } },
+                  }}
+                  loading={view.inventory.releasesStatus === "loading"}
+                  loadingText="正在读取 GitHub 发布版本…"
+                  noOptionsText="没有匹配的版本"
+                  openText="展开版本"
+                  closeText="收起版本"
+                  clearText="清除版本"
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="选择版本"
+                      placeholder="搜索版本号"
+                    />
+                  )}
+                />
+                {release && (
+                  <Action
+                    variant="secondary"
+                    disabled={
+                      blocked ||
+                      !!releaseUnavailable(release) ||
+                      (release.historical && !historicalEnabled)
+                    }
+                    onPress={() =>
+                      setConfirm({
+                        operation: release.historical
+                          ? "install_historical"
+                          : "update",
+                        target: release.version,
+                        expectedVersion: view.version,
+                      })
+                    }
+                  >
+                    {release.historical ? "准备安装旧版" : "准备升级"}
+                  </Action>
+                )}
+              </div>
+              {!view.managerOnline && (
+                <p role="status">
+                  {connectionMessage}{" "}
+                  <code>sudo ./mailweb version-manager enable</code>
+                </p>
+              )}
+              {release?.historical &&
+                view.managerOnline &&
+                !historicalEnabled && (
+                  <p role="status">
+                    宿主机管理服务需要更新。更新 CLI 后请运行{" "}
+                    <code>sudo ./mailweb version-manager enable</code>。
+                  </p>
+                )}
+              {view.inventory.releasesStatus === "unavailable" && (
+                <p role="status">
+                  {view.inventory.releases.length
+                    ? "GitHub 暂时不可用，正在显示上次读取的版本。"
+                    : "暂时无法读取 GitHub 发布版本。"}
+                </p>
+              )}
+              {view.inventory.snapshots.length > 0 && (
+                <div className={styles.row}>
+                  <SelectField
+                    label="选择本机快照"
+                    value={rollback}
+                    disabled={blocked}
+                    onValueChange={setRollback}
+                    options={view.inventory.snapshots.map((item) => ({
+                      value: item.id,
+                      label: item.version + " · " + date(item.createdAt),
+                    }))}
+                  />
+                  <Action
+                    variant="secondary"
+                    disabled={blocked || !snapshot}
+                    onPress={() => {
+                      if (snapshot)
+                        setConfirm({
+                          operation: "rollback",
+                          target: snapshot,
+                          expectedVersion: view.version,
+                        });
+                    }}
+                  >
+                    恢复快照
+                  </Action>
+                </div>
+              )}
             </div>
-            <div>
-              <dt className="console-hint">平台</dt>
-              <dd>{view.architecture}</dd>
-            </div>
-            <div>
-              <dt className="console-hint">源码提交</dt>
-              <dd>
-                <code>{view.revision}</code>
-              </dd>
-            </div>
-            <div>
-              <dt className="console-hint">宿主机版本管理</dt>
-              <dd>{view.managerOnline ? "在线" : "未连接"}</dd>
-            </div>
-          </dl>
+          </>
         ) : (
           <p role="status">正在读取运行版本…</p>
         )}
-        {view && !view.managerOnline && (
-          <p>
-            版本列表可以查看。要执行切换，请在宿主机安装目录运行{" "}
-            <code>sudo ./mailweb version-manager enable</code>，然后刷新。
-          </p>
-        )}
-        {view?.managerOnline && !historicalEnabled && (
-          <p>
-            宿主机管理服务需要更新才支持安装历史版本。先将本机 CLI
-            更新到当前版本，再运行{" "}
-            <code>sudo ./mailweb version-manager enable</code>。
-          </p>
-        )}
-        <Action
-          variant="quiet"
-          onPress={() => setRefresh((value) => value + 1)}
-        >
-          刷新版本状态
-        </Action>
       </section>
-      {view && (
-        <section className="console-panel">
-          <header>
-            <h2>GitHub 发布版本</h2>
-            <p>
-              共 {view.inventory.releases.length}{" "}
-              个公开发行版。历史版本可以使用全新的本地数据启动。
-            </p>
-          </header>
-          {view.inventory.releasesStatus !== "ready" && (
-            <p role="status">
-              {view.inventory.releasesStatus === "loading"
-                ? "正在读取 GitHub 发布版本…"
-                : view.inventory.releases.length
-                  ? "GitHub 暂时不可用，正在显示上次读取的列表。"
-                  : "暂时无法读取 GitHub 发布版本。"}
-            </p>
-          )}
-          {view.inventory.releases.length > 0 && (
-            <div className="console-table-scroll">
-              <table className="console-table">
-                <thead>
-                  <tr>
-                    <th>版本</th>
-                    <th>渠道</th>
-                    <th>本机状态</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {view.inventory.releases.map((item) => {
-                    const current = item.version === view.version;
-                    const reason = item.unavailableReason;
-                    const available = !current && !reason;
-                    return (
-                      <tr key={item.version}>
-                        <td>
-                          <code>{item.version}</code>
-                        </td>
-                        <td>{item.prerelease ? "预发布" : "稳定版"}</td>
-                        <td>
-                          {current
-                            ? "正在运行"
-                            : reason
-                              ? (unavailable[reason] ?? "暂不可安装")
-                              : item.historical
-                                ? "可安装历史版本"
-                                : "可升级"}
-                        </td>
-                        <td>
-                          {available && (
-                            <Action
-                              variant="secondary"
-                              disabled={
-                                blocked ||
-                                (item.historical && !historicalEnabled)
-                              }
-                              aria-label={
-                                item.historical
-                                  ? `准备安装历史版 ${item.version}`
-                                  : `准备升级到 ${item.version}`
-                              }
-                              onPress={() =>
-                                setConfirm({
-                                  operation: item.historical
-                                    ? "install_historical"
-                                    : "update",
-                                  target: item.version,
-                                  expectedVersion: view.version,
-                                })
-                              }
-                            >
-                              {item.historical ? "准备安装" : "准备升级"}
-                            </Action>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      )}
-      {view?.managerOnline && (
-        <section className="console-panel">
-          <header>
-            <h2>本机版本快照</h2>
-            <p>恢复对应版本的数据库与配置，也可用来升回切换前的版本。</p>
-          </header>
-          {view.inventory.snapshots.length > 0 ? (
-            <div className="console-form-grid">
-              <SelectField
-                label="选择快照"
-                value={rollback}
-                disabled={blocked}
-                onValueChange={setRollback}
-                options={view.inventory.snapshots.map((item) => ({
-                  value: item.id,
-                  label: item.version + " · " + date(item.createdAt),
-                }))}
-              />
-              <Action
-                variant="secondary"
-                disabled={blocked || !snapshot}
-                onPress={() => {
-                  if (snapshot)
-                    setConfirm({
-                      operation: "rollback",
-                      target: snapshot,
-                      expectedVersion: view.version,
-                    });
-                }}
-              >
-                准备恢复
-              </Action>
-            </div>
-          ) : (
-            <p>
-              暂无本机快照。第一次切换前，Webmail
-              会自动保留当前版本的数据库与配置。
-            </p>
-          )}
-        </section>
-      )}
       {job && (
         <section className="console-panel" aria-live="polite">
           <h2>最近的版本任务</h2>

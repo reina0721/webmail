@@ -4,6 +4,16 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+## [0.4.0-alpha.16] - 2026-11-18
+
+### Changed
+
+- Show releases in a searchable version picker with a bounded list and keep local snapshots on the same card.
+
+### Fixed
+
+- Repair version manager socket directory permissions on startup and verify the running application can connect before reporting successful activation.
+
 ## [0.4.0-alpha.15] - 2026-11-18
 
 ### Added

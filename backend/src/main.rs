@@ -919,6 +919,10 @@ async fn revocations(app: Arc<App>) {
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     use utoipa::OpenApi;
     let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == "--check-version-manager") {
+        deployment::check_manager().await?;
+        return Ok(());
+    }
     if args.iter().any(|a| a == "--healthcheck") {
         reqwest::Client::new()
             .get(format!(
@@ -938,7 +942,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let sqlite = db::version().await?;
         println!(
             "{}",
-            json!({"version":env!("CARGO_PKG_VERSION"),"sqlite":sqlite,"revision":option_env!("MAIL_WEB_REVISION").unwrap_or("development")})
+            json!({"version":env!("CARGO_PKG_VERSION"),"sqlite":sqlite,"revision":option_env!("MAIL_WEB_REVISION").unwrap_or("development"),"versionManagerCheck":true})
         );
         return Ok(());
     }

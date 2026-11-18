@@ -1,7 +1,7 @@
 """Actual release-archive install/restore/network regression. Dedicated directories only.
 Run as root with Docker access, never changes application database contents directly.
 """
-import argparse,datetime,hashlib,json,os,pathlib,secrets,shutil,socket,sqlite3,subprocess,tarfile,tempfile,time,urllib.request
+import argparse,datetime,hashlib,json,os,pathlib,secrets,shutil,socket,sqlite3,stat,subprocess,tarfile,tempfile,time,urllib.request
 p=argparse.ArgumentParser()
 p.add_argument('bundle',type=pathlib.Path)
 p.add_argument('--state-fixture',type=pathlib.Path)
@@ -34,6 +34,39 @@ def dbstate(directory):
   rows=db.execute('SELECT * FROM "'+table+'"').fetchall();result[table]=hashlib.sha256(repr(sorted(rows,key=repr)).encode()).hexdigest()
  db.close();return result
 
+def check_manager_socket(cli, version):
+ for uid,gid in [(10001,10001),(23456,24567)]:
+  # Short path keeps the socket usable on runners with deeply nested workspaces.
+  with tempfile.TemporaryDirectory(prefix='mailweb-vm-') as temporary:
+   installation=pathlib.Path(temporary)
+   (installation/'.env').write_text(f'MAIL_WEB_VERSION={version.removeprefix("v")}\nAPP_UID={uid}\nAPP_GID={gid}\n')
+   (installation/'compose.yaml').write_text('services: {}\n')
+   for name in ['bin','releases','version-manager-socket']:
+    (installation/name).mkdir(mode=0o700)
+   directory=installation/'version-manager-socket'
+   daemon=subprocess.Popen([cli,'--dir',installation,'version-manager','serve'],umask=0o077)
+   try:
+    endpoint=directory/'control.sock'
+    deadline=time.monotonic()+10
+    while True:
+     assert daemon.poll() is None and time.monotonic()<deadline, 'Version manager socket did not start'
+     if endpoint.is_socket() and endpoint.stat().st_gid==gid and stat.S_IMODE(endpoint.stat().st_mode)==0o660:
+      break
+     time.sleep(0.05)
+    assert (directory.stat().st_uid,directory.stat().st_gid,stat.S_IMODE(directory.stat().st_mode))==(0,gid,0o710)
+    image='mail-web:'+version.removeprefix('v')
+    def probe(user,success):
+     run(['docker','run','--rm','--pull','never','--network','none','--user',user,
+          '-v',f'{directory}:/run/mailweb-manager:ro','--entrypoint','/app/mail-web',
+          image,'--check-version-manager'],success,timeout=20)
+    probe(f'{uid}:{gid}',True)
+    probe(f'{uid+1}:{gid+1}',False)
+    probe(f'{uid+1}:{gid}',False)
+   finally:
+    daemon.terminate()
+    daemon.wait(timeout=10)
+ check('Version manager repairs restrictive directory permissions and only accepts the configured container user')
+
 a=root/'installation with spaces';b=root/'ipv6-instance';pa=port();pb=port('::1');namea='mailweb-cli-'+stamp+'-a';nameb='mailweb-cli-'+stamp+'-b';created=[]
 # Bootstrap accepts local authenticated/draft assets only via an explicit QA env.
 env={**os.environ,'MAIL_WEB_BOOTSTRAP_DIR':str(bundle.parent)}
@@ -43,6 +76,7 @@ try:
  for document in ['README.md','README_ZH.md','CONTRIBUTING.md','CHANGELOG.md','SECURITY.md','llms.txt','.env.example','docs/deployment.md','docs/releasing.md','examples/install-unattended.sh']:
   assert (a/document).is_file(), 'Missing installed documentation: '+document
  check('Actual bootstrap CLI and release image install in a spaced directory; host HTTP, container health and pending web setup are valid')
+ check_manager_socket(a/'mailweb',candidate_version)
  key=sha(a/'secrets/session.key');reinstalled=run([a/'mailweb','install','--yes','--bundle',bundle]);assert str(a) in reinstalled;assert sha(a/'secrets/session.key')==key and status(a)['port']==pa
  check('Repeated install preserves generated keys and custom listener without manual configuration')
  run([a/'mailweb','configure','--bind','0.0.0.0','--port',pa,'--allow-http','--yes']);s=status(a);assert s['bind']=='0.0.0.0' and s['healthy'] and '0.0.0.0' not in s['accessUrl'];assert sha(a/'secrets/session.key')==key

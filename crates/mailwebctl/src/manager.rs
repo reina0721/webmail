@@ -20,7 +20,7 @@ use std::{
     fs::{self, File, OpenOptions},
     io::{BufRead, BufReader, Read, Write},
     os::unix::{
-        fs::{MetadataExt, OpenOptionsExt, PermissionsExt, chown},
+        fs::{FileTypeExt, MetadataExt, OpenOptionsExt, PermissionsExt, chown, fchown},
         net::{UnixListener, UnixStream},
     },
     path::{Path, PathBuf},
@@ -31,7 +31,9 @@ use std::{
 };
 
 const PRIVATE: &str = ".version-manager";
+const SOCKET_DIR: &str = "version-manager-socket";
 const SOCKET: &str = "version-manager-socket/control.sock";
+const CONTAINER_SOCKET: &str = "/run/mailweb-manager/control.sock";
 const SNAPSHOT_FILES: [&str; 4] = [
     "mail-web.sqlite",
     ".env",
@@ -185,6 +187,43 @@ fn app_gid(s: &Settings) -> Result<u32> {
         .map_or("10001", String::as_str)
         .parse()?)
 }
+fn prepare_socket_directory(path: &Path, gid: u32) -> Result<()> {
+    let directory = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
+        .open(path)?;
+    let metadata = directory.metadata()?;
+    ensure!(
+        metadata.uid() == 0 && metadata.mode() & 0o022 == 0,
+        "版本管理套接字目录必须由宿主机 root 独占写入"
+    );
+    fchown(&directory, Some(0), Some(gid))?;
+    // The application group may traverse to the known socket name.
+    directory.set_permissions(fs::Permissions::from_mode(0o710))?;
+    Ok(())
+}
+
+fn check_container_socket(s: &Settings) -> Result<()> {
+    let mut args = vec!["exec", "-T", "mail-web"];
+    let mut info = args.clone();
+    info.extend(["/app/mail-web", "--runtime-info"]);
+    let runtime: Value = serde_json::from_str(&docker::compose(s, &info, true)?)?;
+    if runtime["versionManagerCheck"] == true {
+        args.extend(["/app/mail-web", "--check-version-manager"]);
+    } else {
+        // Older application images have no protocol probe. The root listener
+        // check and these tests still verify access under the container user.
+        args.extend([
+            "sh",
+            "-c",
+            "test -S \"$1\" && test -w \"$1\"",
+            "sh",
+            CONTAINER_SOCKET,
+        ]);
+    }
+    docker::compose(s, &args, true).context("Webmail 容器无法连接版本管理套接字")?;
+    Ok(())
+}
 fn store<T: Serialize>(path: &Path, value: &T) -> Result<()> {
     config::atomic(path, &serde_json::to_vec(value)?, 0o600)?;
     if let Some(parent) = path.parent() {
@@ -257,7 +296,9 @@ fn enable(s: &Settings) -> Result<()> {
             thread::sleep(Duration::from_millis(100));
         }
         let _lock = s.lock()?;
-        docker::start(&instance(&s.root)?)
+        let instance = instance(&s.root)?;
+        docker::start(&instance)?;
+        check_container_socket(&instance)
     })();
     if let Err(error) = activate {
         config::atomic(&s.root.join("compose.yaml"), &old, 0o600)?;
@@ -275,8 +316,8 @@ pub fn run(s: &Settings, action: &Action) -> Result<()> {
         "请以宿主机 root 运行版本管理命令"
     );
     owned_path(&s.root, true)?;
-    if matches!(action, Action::Enable) && !s.root.join("version-manager-socket").exists() {
-        fs::create_dir(s.root.join("version-manager-socket"))?;
+    if matches!(action, Action::Enable) && !s.root.join(SOCKET_DIR).exists() {
+        fs::create_dir(s.root.join(SOCKET_DIR))?;
     }
     let s = instance(&s.root)?;
     private_dir(&state(&s.root))?;
@@ -801,7 +842,6 @@ fn connection(s: &Settings, releases: &Listings, mut stream: UnixStream) -> Resu
     Ok(())
 }
 fn serve(s: &Settings) -> Result<()> {
-    use std::os::unix::fs::FileTypeExt;
     let _daemon = {
         let file = OpenOptions::new()
             .create(true)
@@ -817,6 +857,8 @@ fn serve(s: &Settings) -> Result<()> {
         let _lock = s.lock()?;
         recover(s, &mut record, "上次任务被宿主机重启中断")?;
     }
+    let gid = app_gid(s)?;
+    prepare_socket_directory(&s.root.join(SOCKET_DIR), gid)?;
     let path = s.root.join(SOCKET);
     if let Ok(meta) = fs::symlink_metadata(&path) {
         ensure!(meta.file_type().is_socket(), "版本管理套接字路径已被占用");
@@ -824,7 +866,7 @@ fn serve(s: &Settings) -> Result<()> {
     }
     let listener = UnixListener::bind(&path)?;
     fs::set_permissions(&path, fs::Permissions::from_mode(0o660))?;
-    chown(&path, Some(0), Some(app_gid(s)?))?;
+    chown(&path, Some(0), Some(gid))?;
     let releases = Arc::new(Mutex::new(("loading".into(), Vec::new())));
     let catalog = releases.clone();
     let root = s.root.clone();

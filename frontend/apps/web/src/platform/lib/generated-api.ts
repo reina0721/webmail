@@ -1345,6 +1345,7 @@ export interface components {
         DeploymentView: {
             architecture: string;
             inventory: components["schemas"]["Inventory"];
+            managerIssue?: null | components["schemas"]["ManagerIssue"];
             managerOnline: boolean;
             revision: string;
             version: string;
@@ -1414,6 +1415,8 @@ export interface components {
         MailboxInput: {
             name: string;
         };
+        /** @enum {string} */
+        ManagerIssue: "socket_missing" | "permission_denied" | "unavailable";
         MessagePatch: {
             mailbox?: string | null;
             read?: boolean | null;

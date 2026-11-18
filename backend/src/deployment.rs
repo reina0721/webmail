@@ -5,6 +5,7 @@ use mailweb_shared::deployment::{
 };
 use serde::de::DeserializeOwned;
 use std::{
+    io,
     sync::LazyLock,
     time::{Duration, Instant},
 };
@@ -85,7 +86,36 @@ pub(super) struct DeploymentView {
     revision: String,
     architecture: String,
     manager_online: bool,
+    manager_issue: Option<ManagerIssue>,
     inventory: Inventory,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+enum ManagerIssue {
+    SocketMissing,
+    PermissionDenied,
+    Unavailable,
+}
+
+impl From<io::Error> for ManagerIssue {
+    fn from(error: io::Error) -> Self {
+        match error.kind() {
+            io::ErrorKind::NotFound => Self::SocketMissing,
+            io::ErrorKind::PermissionDenied => Self::PermissionDenied,
+            _ => Self::Unavailable,
+        }
+    }
+}
+
+impl From<ManagerIssue> for Error {
+    fn from(issue: ManagerIssue) -> Self {
+        let code = match issue {
+            ManagerIssue::PermissionDenied => "version_manager_permission_denied",
+            _ => "version_manager_unavailable",
+        };
+        Error(StatusCode::SERVICE_UNAVAILABLE, code)
+    }
 }
 
 #[derive(Deserialize)]
@@ -112,11 +142,13 @@ async fn operator(app: &App, headers: &HeaderMap, write: bool) -> Result<Identit
     Ok(actor)
 }
 
-async fn host<T: DeserializeOwned>(request: Request) -> Result<Reply<T>> {
-    tokio::time::timeout(std::time::Duration::from_secs(6), async move {
+async fn host<T: DeserializeOwned>(
+    request: Request,
+) -> std::result::Result<Reply<T>, ManagerIssue> {
+    tokio::time::timeout(Duration::from_secs(6), async move {
         let mut stream =
             tokio::net::UnixStream::connect("/run/mailweb-manager/control.sock").await?;
-        let mut bytes = serde_json::to_vec(&request)?;
+        let mut bytes = serde_json::to_vec(&request).map_err(|_| ManagerIssue::Unavailable)?;
         bytes.push(b'\n');
         stream.write_all(&bytes).await?;
         stream.shutdown().await?;
@@ -126,17 +158,30 @@ async fn host<T: DeserializeOwned>(request: Request) -> Result<Reply<T>> {
             .read_to_end(&mut result)
             .await?;
         if result.len() as u64 > MAX_RESPONSE {
-            return Err(std::io::Error::other("host response too large").into());
+            return Err(ManagerIssue::Unavailable);
         }
-        Ok(serde_json::from_slice(&result)?)
+        serde_json::from_slice(&result).map_err(|_| ManagerIssue::Unavailable)
     })
     .await
-    .ok()
-    .and_then(std::result::Result::<_, Box<dyn std::error::Error + Send + Sync>>::ok)
-    .ok_or(Error(
-        StatusCode::SERVICE_UNAVAILABLE,
-        "version_manager_unavailable",
-    ))
+    .unwrap_or(Err(ManagerIssue::Unavailable))
+}
+
+async fn host_inventory() -> std::result::Result<Inventory, ManagerIssue> {
+    // Older host helpers understand Status but may reject Catalog.
+    if let Some(inventory) = host::<Inventory>(Request::Catalog).await?.data {
+        return Ok(inventory);
+    }
+    host::<Inventory>(Request::Status)
+        .await?
+        .data
+        .ok_or(ManagerIssue::Unavailable)
+}
+
+pub(super) async fn check_manager() -> std::result::Result<(), String> {
+    host_inventory()
+        .await
+        .map(|_| ())
+        .map_err(|issue| Error::from(issue).1.to_owned())
 }
 
 #[utoipa::path(get,path="/api/v1/admin/deployment",operation_id="deployment_status",responses((status=200,body=DeploymentView),(status=403,description="Operator required")))]
@@ -145,17 +190,9 @@ pub(super) async fn status(
     headers: HeaderMap,
 ) -> Result<Json<DeploymentView>> {
     operator(&app, &headers, false).await?;
-    let mut inventory = host::<Inventory>(Request::Catalog)
-        .await
-        .ok()
-        .and_then(|reply| reply.data);
-    if inventory.is_none() {
-        inventory = host::<Inventory>(Request::Status)
-            .await
-            .ok()
-            .and_then(|reply| reply.data);
-    }
-    let manager_online = inventory.is_some();
+    let inventory = host_inventory().await;
+    let manager_online = inventory.is_ok();
+    let manager_issue = inventory.as_ref().err().copied();
     let mut inventory = inventory.unwrap_or_default();
     let architecture = match std::env::consts::ARCH {
         "x86_64" => "linux/amd64",
@@ -179,6 +216,7 @@ pub(super) async fn status(
             .into(),
         architecture: architecture.into(),
         manager_online,
+        manager_issue,
         inventory,
     }))
 }

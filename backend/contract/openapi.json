@@ -6,7 +6,7 @@
     "license": {
       "name": ""
     },
-    "version": "0.4.0-alpha.15"
+    "version": "0.4.0-alpha.16"
   },
   "paths": {
     "/api/push/action": {
@@ -3159,6 +3159,16 @@
           "inventory": {
             "$ref": "#/components/schemas/Inventory"
           },
+          "managerIssue": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ManagerIssue"
+              }
+            ]
+          },
           "managerOnline": {
             "type": "boolean"
           },
@@ -3465,6 +3475,14 @@
             "type": "string"
           }
         }
+      },
+      "ManagerIssue": {
+        "type": "string",
+        "enum": [
+          "socket_missing",
+          "permission_denied",
+          "unavailable"
+        ]
       },
       "MessagePatch": {
         "type": "object",

@@ -4,7 +4,7 @@
 
 ## 版本与权限准备
 
-本次候选版本为 `v0.4.0-alpha.15`。每次发布前先检查 [Releases](https://github.com/reina0721/webmail/releases) 和远端标签，使用尚未绑定其他提交的新版本。
+本次候选版本为 `v0.4.0-alpha.16`。每次发布前先检查 [Releases](https://github.com/reina0721/webmail/releases) 和远端标签，使用尚未绑定其他提交的新版本。
 
 每次准备版本时，同步以下值并提交：
 
@@ -118,7 +118,7 @@ gh run rerun FULL_RUN_ID --repo reina0721/webmail
 手动公开现有草稿后，可针对该版本启动第二阶段，不重新执行第一阶段：
 
 ```bash
-gh workflow run full-validation.yml --repo reina0721/webmail --ref main -f release-version=v0.4.0-alpha.15
+gh workflow run full-validation.yml --repo reina0721/webmail --ref main -f release-version=v0.4.0-alpha.16
 ```
 
 也可在 Actions → Full validation → Run workflow 填写 `release-version`。流程按公开标签检出确切源码，验证版本与标签归属并下载实际附件；结果更新该 Release。留空时只检查所选分支／标签，不写发布状态。

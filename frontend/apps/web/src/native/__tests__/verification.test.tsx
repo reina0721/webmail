@@ -89,7 +89,7 @@ it("handles asynchronous provider errors and failed cleanup without losing the p
   const view = render(<ConsoleVerification />);
   fireEvent.click(await screen.findByRole("button", { name: "加载验证脚本" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(
-    "此时尚未发送验证码",
+    "请核对 Turnstile Site Key 和组件允许的主机名",
   );
   await waitFor(() => expect(renderWidget).toHaveBeenCalledTimes(1));
   expect(() => view.unmount()).not.toThrow();
@@ -100,5 +100,35 @@ it("reports blocked or unavailable Turnstile scripts in the form", async () => {
     await screen.findByRole("button", { name: "模拟脚本网络失败" }),
   );
   expect(await screen.findByRole("alert")).toHaveTextContent("网络连接");
+  expect(screen.getByRole("alert")).toHaveTextContent("在普通浏览器打开");
+  expect(screen.queryByRole("link", { name: /返回站点设置修复/ })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "发送验证码" })).toBeDisabled();
+});
+
+it("preserves an interrupted send result when resetting the widget also fails", async () => {
+  request.mockImplementation(async (path: string) => {
+    if (path === "/readiness/send") throw new TypeError("Failed to fetch");
+    return { siteKey: "owned-site-key", mailSent: false };
+  });
+  let onWidgetError: ((code: string) => boolean | void) | undefined;
+  window.turnstile = {
+    render: vi.fn((_target, options) => {
+      onWidgetError = options["error-callback"];
+      options.callback("isolated-token");
+      return "test-widget";
+    }),
+    remove: vi.fn(),
+    reset: vi.fn(() => { onWidgetError?.("200500"); }),
+  };
+  render(<ConsoleVerification />);
+  fireEvent.click(await screen.findByRole("button", { name: "加载验证脚本" }));
+  fireEvent.change(screen.getByLabelText("接收验证码的外部邮箱"), {
+    target: { value: "recipient@example.net" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "发送验证码" }));
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("暂时无法确认发送结果");
+  expect(alert).toHaveTextContent("在普通浏览器打开");
+  expect(alert).not.toHaveTextContent("尚未发送验证码");
+  expect(screen.getByLabelText("接收验证码的外部邮箱")).toHaveValue("recipient@example.net");
 });

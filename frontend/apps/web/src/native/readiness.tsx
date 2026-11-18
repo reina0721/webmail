@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Action } from "@mail-web/ui";
 import { useReadiness } from "./readiness-controller";
 
@@ -23,6 +23,10 @@ export function RegistrationReadiness({
   });
   const v = c.value;
   const openVerification = useRef<HTMLAnchorElement>(null);
+  const [copyResult, setCopyResult] = useState<{
+    url: string;
+    message: string;
+  } | null>(null);
   const format = (time?: number) =>
     time ? new Date(time).toLocaleString() : "尚无记录";
   const failed = v?.items.filter((item) => item.status !== "passed") ?? [];
@@ -38,6 +42,19 @@ export function RegistrationReadiness({
   useEffect(() => {
     if (c.url) openVerification.current?.focus();
   }, [c.url]);
+
+  async function copyVerification() {
+    const url = openVerification.current?.href;
+    if (!url) return;
+    let message: string;
+    try {
+      await navigator.clipboard.writeText(url);
+      message = "验证链接已复制，可以在普通浏览器打开。";
+    } catch {
+      message = "浏览器无法写入剪贴板。请右键打开验证页的链接，选择复制链接地址。";
+    }
+    setCopyResult({ url: c.url, message });
+  }
 
   return (
     <section className="console-panel">
@@ -69,15 +86,20 @@ export function RegistrationReadiness({
           刷新结果
         </Action>
         {c.url && (
-          <a
-            ref={openVerification}
-            className="console-link"
-            href={c.url}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            打开人机与收信验证页面 →
-          </a>
+          <>
+            <a
+              ref={openVerification}
+              className="console-link"
+              href={c.url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              打开人机与收信验证页面 →
+            </a>
+            <Action variant="quiet" onPress={() => void copyVerification()}>
+              复制验证链接
+            </Action>
+          </>
         )}
       </div>
       {c.operation === "check" && (
@@ -87,6 +109,9 @@ export function RegistrationReadiness({
         <p role="status">正在验证主地址并更新 Stalwart 回调…</p>
       )}
       {c.notice && <p role="status">{c.notice}</p>}
+      {c.url && copyResult?.url === c.url && (
+        <p role="status">{copyResult.message}</p>
+      )}
       {c.error && <p role="alert">{c.error}</p>}
       {!canVerify && v && (
         <p>

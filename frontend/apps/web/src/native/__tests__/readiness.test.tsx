@@ -90,6 +90,17 @@ it("exposes the real human-and-mail verification link after all automatic checks
     "https://webmail.example/console/verification/#check=isolated",
   );
   expect(screen.getByText(/验证链接已生成/)).toBeInTheDocument();
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  const clipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  try {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    fireEvent.click(screen.getByRole("button", { name: "复制验证链接" }));
+    expect(await screen.findByText(/验证链接已复制/)).toBeInTheDocument();
+    expect(writeText).toHaveBeenCalledWith("https://webmail.example/console/verification/#check=isolated");
+  } finally {
+    if (clipboard) Object.defineProperty(navigator, "clipboard", clipboard);
+    else Reflect.deleteProperty(navigator, "clipboard");
+  }
 });
 
 it("directs a failed callback to certificate diagnostics and enables Hook repair only after a passing probe", async () => {

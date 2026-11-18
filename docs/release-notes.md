@@ -1,8 +1,7 @@
-Mail Web v0.4.0-alpha.9
+Mail Web v0.4.0-alpha.10
 
-- 注册条件检查会指出 HTTPS 证书校验失败，并提示检查反代上的完整证书链。
-- Stalwart 遮蔽 Hook 认证密钥时，Webmail 可用加密初始化记录确认该 Hook 的归属，再检测新地址并迁移回调。
-- 历史版本验收采用先更新 CLI、再升级应用的步骤。
+- 验证页区分发送失败、人机组件连接故障和组件配置问题。组件重置失败时保留发送结果提示。
+- 「注册与验证」提供「复制验证链接」。应用内浏览器无法加载人机组件时，可将同一个链接带到普通浏览器继续。
 - Linux AMD64 和 ARM64 均提供离线包、独立 CLI、对应源码与 SHA-256 校验清单。
 
-在控制台「版本管理」选择 `v0.4.0-alpha.9` 更新。[升级与恢复指南](https://github.com/reina0721/webmail/blob/v0.4.0-alpha.9/docs/cli.md)
+在控制台「版本管理」选择 `v0.4.0-alpha.10` 更新。[升级与恢复指南](https://github.com/reina0721/webmail/blob/v0.4.0-alpha.10/docs/cli.md)

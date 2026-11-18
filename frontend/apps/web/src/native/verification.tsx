@@ -64,17 +64,25 @@ export function ConsoleVerification() {
             </Action>
           </form>
         )}
-        {c.error && (
-          <div role="alert">
-            <p>{c.error}</p>
-            <a className="console-link" href="/console/site/#turnstile-setup">
-              返回站点设置修复人机验证 →
-            </a>
-            <p>
-              <button type="button" onClick={() => location.reload()}>
-                重新加载验证页
-              </button>
-            </p>
+        {(c.error || c.widgetIssue) && (
+          <div role="alert" className="console-alert">
+            {c.error && <p>{c.error}</p>}
+            {c.widgetIssue === "configuration" && (
+              <>
+                <p>人机验证配置错误。请核对 Turnstile Site Key 和组件允许的主机名。</p>
+                <a className="console-link" href="/console/site/#turnstile-setup">
+                  返回站点设置修复人机验证 →
+                </a>
+              </>
+            )}
+            {c.widgetIssue === "connection" && (
+              <p>
+                人机验证组件加载失败。请检查网络连接。若在应用内浏览器中反复失败，请返回「注册与验证」复制链接，在普通浏览器打开。
+              </p>
+            )}
+            <Action variant="secondary" onPress={() => location.reload()}>
+              重新加载验证页
+            </Action>
           </div>
         )}
       </section>

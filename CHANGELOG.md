@@ -4,6 +4,13 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+## [0.4.0-alpha.10] - 2026-11-18
+
+### Fixed
+
+- Keep the send result visible when the Turnstile widget fails during a retry.
+- Distinguish widget configuration errors from connection failures and let operators copy the verification link for another browser.
+
 ## [0.4.0-alpha.9] - 2026-11-18
 
 ### Fixed

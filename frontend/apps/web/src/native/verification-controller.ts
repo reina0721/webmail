@@ -1,9 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import Script from "next/script";
-import { Action } from "@mail-web/ui/action";
-import { TextField } from "@mail-web/ui/form-field";
-import { api, errorMessage } from "@platform/lib/api";
+import { ApiError, api, errorMessage } from "@platform/lib/api";
 import type {} from "./auth-controller";
 import {
   turnstileKeyValid,
@@ -20,6 +17,9 @@ export function useVerification() {
     [done, setDone] = useState(false),
     [pending, setPending] = useState(false),
     [error, setError] = useState("");
+  const [widgetIssue, setWidgetIssue] = useState<
+    "configuration" | "connection" | null
+  >(null);
   const target = useRef<HTMLDivElement>(null),
     widget = useRef<string | undefined>(undefined);
   useEffect(() => {
@@ -38,15 +38,19 @@ export function useVerification() {
       .then((r) => {
         setSiteKey(r.siteKey);
         setSent(r.mailSent);
-        if (!r.mailSent && !turnstileKeyValid(r.siteKey))
+        if (!r.mailSent && !turnstileKeyValid(r.siteKey)) {
           setError(turnstileConfigurationError);
+          setWidgetIssue("configuration");
+        }
       })
       .catch((e) => setError(errorMessage(e)));
   }, []);
-  function widgetError() {
+  function widgetError(code?: unknown) {
     setCaptcha("");
-    setError(
-      "人机验证组件加载失败。请检查 Turnstile Site Key、组件允许的主机名和网络连接，然后重新加载此页；此时尚未发送验证码。",
+    setWidgetIssue(
+      code === "110100" || code === "110110" || code === "110200"
+        ? "configuration"
+        : "connection",
     );
     return true;
   }
@@ -64,7 +68,7 @@ export function useVerification() {
         sitekey: siteKey,
         callback: (value) => {
           setCaptcha(value);
-          setError("");
+          setWidgetIssue(null);
         },
         "expired-callback": () => setCaptcha(""),
         "error-callback": widgetError,
@@ -101,9 +105,16 @@ export function useVerification() {
           "",
           location.pathname,
         );
-      } else setSent(true);
+      } else {
+        setSent(true);
+        setWidgetIssue(null);
+      }
     } catch (e) {
-      setError(errorMessage(e));
+      setError(
+        !sent && !(e instanceof ApiError)
+          ? "发送连接中断，暂时无法确认发送结果。请重新加载验证页，查看是否已进入验证码输入步骤。"
+          : errorMessage(e),
+      );
       if (!sent) {
         setCaptcha("");
         if (widget.current) {
@@ -132,6 +143,7 @@ export function useVerification() {
     done,
     pending,
     error,
+    widgetIssue,
     target,
     submit,
     widgetError,

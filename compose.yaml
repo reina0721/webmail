@@ -34,6 +34,7 @@ services:
       - ./backups:/app/backups
       - ./config:/app/config
       - ./secrets:/app/secrets:ro
+      - ./version-manager-socket:/run/mailweb-manager:ro
     tmpfs:
       - /tmp:size=32m,mode=1777
     healthcheck:

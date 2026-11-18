@@ -36,7 +36,7 @@ async fn owner(app: &App, headers: &HeaderMap, write: bool) -> Result<Identity> 
     {
         return Err(Error(StatusCode::FORBIDDEN, "archive_owner_required"));
     }
-    let site = format!("{}/api/v1/native", app.origin);
+    let site = format!("{}/api/v1/native", access::request(app, headers)?.origin);
     if headers
         .get("x-archive-server")
         .and_then(|h| h.to_str().ok())

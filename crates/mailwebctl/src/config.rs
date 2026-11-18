@@ -115,6 +115,20 @@ pub fn safe_tree(path: &Path) -> Result<()> {
     }
     Ok(())
 }
+fn lock_file(path: &Path) -> Result<File> {
+    use std::os::unix::fs::OpenOptionsExt;
+    let file = OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .mode(0o600)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(path)?;
+    ensure!(file.metadata()?.is_file(), "部署锁必须是普通文件");
+    fs2::FileExt::try_lock_exclusive(&file).context("已有安装或维护操作正在运行")?;
+    Ok(file)
+}
+
 impl Settings {
     pub fn load(root: &Path) -> Result<Self> {
         let root = if root.exists() {
@@ -199,6 +213,7 @@ impl Settings {
                     .all(|b| b.is_ascii_alphanumeric() || b"_-".contains(&b)),
             "Compose 项目名无效"
         );
+        self.direct_access_url()?;
         validate_repo(&self.repository)
     }
     pub fn guard_directory(&self, restoring: bool) -> Result<()> {
@@ -222,8 +237,18 @@ impl Settings {
                 || restoring && name == "backups"
                 || partial
                     && [
-                        "bin", "deploy", "data", "config", "secrets", "logs", "backups",
-                        "releases", "docs", "mailweb",
+                        "bin",
+                        "deploy",
+                        "data",
+                        "config",
+                        "secrets",
+                        "logs",
+                        "backups",
+                        "releases",
+                        "docs",
+                        "mailweb",
+                        "version-manager-socket",
+                        ".deployment.lock",
                     ]
                     .contains(&name.as_ref());
             ensure!(
@@ -246,6 +271,7 @@ impl Settings {
             "logs",
             "backups",
             "releases",
+            "version-manager-socket",
             "docs",
         ] {
             let p = self.root.join(n);
@@ -254,16 +280,10 @@ impl Settings {
         }
         Ok(())
     }
-    pub fn lock(&self) -> Result<File> {
-        let p = self.root.join("config/deployment.lock");
-        safe_tree(&p)?;
-        let f = OpenOptions::new()
-            .create(true)
-            .truncate(false)
-            .write(true)
-            .open(p)?;
-        fs2::FileExt::try_lock_exclusive(&f).context("已有安装或维护操作正在运行")?;
-        Ok(f)
+    pub fn lock(&self) -> Result<(File, File)> {
+        let host = lock_file(&self.root.join(".deployment.lock"))?;
+        let legacy = lock_file(&self.root.join("config/deployment.lock"))?;
+        Ok((host, legacy))
     }
     pub fn save(&mut self) -> Result<()> {
         for (k, v) in [
@@ -308,6 +328,15 @@ impl Settings {
         } else {
             self.bind
         }
+    }
+    pub fn direct_access_url(&self) -> Result<Option<String>> {
+        let configured = self
+            .values
+            .get("DIRECT_ACCESS_ORIGIN")
+            .map(String::as_str)
+            .unwrap_or_default();
+        mailweb_shared::direct_origin(self.bind, self.port, self.allow_http, configured)
+            .map_err(|error| anyhow::anyhow!("DIRECT_ACCESS_ORIGIN: {error}"))
     }
     pub fn url(&self) -> String {
         format!("http://{}", SocketAddr::new(self.probe_ip(), self.port))

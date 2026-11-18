@@ -511,6 +511,7 @@ mod tests {
             db: db.clone(),
             vault: vault.clone(),
             origin: "https://webmail.example".into(),
+            direct_origin: None,
             upstream: Stalwart {
                 http: reqwest::Client::new(),
                 base: source_a.clone(),
@@ -539,6 +540,7 @@ mod tests {
         sqlx::query("INSERT INTO platform_users(id,email,recovery_email,stalwart_id,status,service_id,domain_id) VALUES (?,'user@b.example','b@external.example','shared','active','b','b-domain')").bind(b).execute(&db).await.unwrap();
         assert!(sqlx::query("INSERT INTO platform_users(id,email,recovery_email,stalwart_id,status,service_id,domain_id) VALUES (?,'duplicate@b.example','duplicate@external.example','shared','active','b','b-domain')").bind(Uuid::new_v4()).execute(&db).await.is_err());
         let mut headers = HeaderMap::new();
+        headers.insert("host", HeaderValue::from_static("webmail.example"));
         headers.insert(
             "origin",
             HeaderValue::from_static("https://webmail.example"),

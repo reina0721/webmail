@@ -73,6 +73,50 @@ impl Client {
             .error_for_status()
             .context("下载/版本查询失败")
     }
+    pub fn published(
+        &self,
+        repo: &str,
+    ) -> Result<Vec<mailweb_shared::deployment::PublishedVersion>> {
+        config::validate_repo(repo)?;
+        let arch = Architecture::current()?;
+        let mut versions = Vec::new();
+        for page in 1..=100 {
+            let batch: Vec<Release> = self
+                .get(&format!(
+                    "https://api.github.com/repos/{repo}/releases?per_page=100&page={page}"
+                ))?
+                .json()?;
+            let done = batch.len() < 100;
+            versions.extend(batch.into_iter().filter_map(|release| {
+                if release.draft
+                    || !release
+                        .assets
+                        .iter()
+                        .any(|asset| asset.name == arch.app_asset())
+                    || !release
+                        .assets
+                        .iter()
+                        .any(|asset| asset.name == "SHA256SUMS")
+                {
+                    return None;
+                }
+                let version = semver::Version::parse(release.tag_name.strip_prefix('v')?).ok()?;
+                let prerelease = release.prerelease || !version.pre.is_empty();
+                Some((
+                    version,
+                    mailweb_shared::deployment::PublishedVersion {
+                        version: release.tag_name,
+                        prerelease,
+                    },
+                ))
+            }));
+            if done {
+                versions.sort_by(|a, b| b.0.cmp(&a.0));
+                return Ok(versions.into_iter().map(|(_, version)| version).collect());
+            }
+        }
+        bail!("Release 列表超过查询上限")
+    }
     pub fn resolve(&self, repo: &str, version: &str, channel: &str) -> Result<(String, String)> {
         config::validate_repo(repo)?;
         let mut all = Vec::new();
@@ -99,7 +143,12 @@ impl Client {
                 ensure!(page < 100, "Release 列表超过查询上限，需指定版本");
             }
         }
-        select(all, channel, Architecture::current()?)
+        let selected = select(all, channel, Architecture::current()?)?;
+        ensure!(
+            version == "latest" || version == selected.0,
+            "返回的版本与所选标签不匹配"
+        );
+        Ok(selected)
     }
     pub fn download(&self, url: &str, to: &Path) -> Result<()> {
         ensure!(url.starts_with("https://"), "下载必须使用 HTTPS");

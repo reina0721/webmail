@@ -25,8 +25,10 @@
 ## Machine-readable diagnostics
 - "$HOME/apps/mail-web/mailweb" status --json
 - "$HOME/apps/mail-web/mailweb" doctor --json
-- status fields: directory, container, running, healthy, version, revision, bind, port, accessUrl, configured. version/revision may be null before installation or when health information is unavailable.
+- status fields: directory, container, running, healthy, version, revision, bind, port, accessUrl, directAccessUrl, configured. version/revision may be null before installation or when health information is unavailable.
 - Use --yes for unattended operations. The CLI has no generic --output option. Errors return nonzero; do not treat a healthy unconfigured instance as a connected mail service.
+- setup --direct uses the exact configured IP backup entry; directAccessUrl is null when unavailable.
+- version-manager enable activates the host systemd service for the operator version console; import registers a verified local snapshot.
 - setup --show-token explicitly reveals an administrative capability. Never log it or copy it into an issue.
 - backup prints the snapshot path. restore SNAPSHOT --yes restores a matching snapshot; direct database downgrade is unsupported.
 

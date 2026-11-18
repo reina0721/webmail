@@ -403,6 +403,7 @@ mod tests {
             },
             vault: Vault::new(&[9; 32]).unwrap(),
             origin: "https://mail.example".into(),
+            direct_origin: None,
             services: config::Services {
                 domain: "mail.example".into(),
                 ..Default::default()

@@ -12,10 +12,12 @@ import {
 type Settings = components["schemas"]["ConfigurationInput"];
 export function SiteSettings({
   initial,
+  directAccessUrl,
   onSave,
   onApplied,
 }: {
   initial: Settings;
+  directAccessUrl?: string | null;
   onSave: (value: Settings) => Promise<void>;
   onApplied: () => void;
 }) {
@@ -36,7 +38,7 @@ export function SiteSettings({
           {(
             [
               ["brand", "站点名称"],
-              ["publicOrigin", "公开访问来源"],
+              ["publicOrigin", "公开访问来源（主地址）"],
             ] as const
           ).map(([key, label]) => (
             <TextField
@@ -48,6 +50,9 @@ export function SiteSettings({
             />
           ))}
         </div>
+        {directAccessUrl && (
+          <p>IP 备用入口 <a className="console-link" href={directAccessUrl}>{directAccessUrl}</a></p>
+        )}
         <details>
           <summary>高级：手动填写已有 Turnstile 密钥</summary>
           <p>

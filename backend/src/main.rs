@@ -1,3 +1,4 @@
+mod access;
 mod account;
 mod bootstrap;
 mod calendar_feed;
@@ -6,6 +7,7 @@ mod config;
 mod connections;
 mod crypto;
 mod db;
+mod deployment;
 mod gateway;
 mod installation;
 mod logging;
@@ -50,6 +52,7 @@ struct App {
     upstream: Stalwart,
     vault: Vault,
     origin: String,
+    direct_origin: Option<String>,
     services: config::Services,
 }
 impl App {
@@ -58,23 +61,6 @@ impl App {
             format!("{}/internal/mta-hook", self.origin)
         } else {
             format!("{}/internal/mta-hook/{}", self.origin, self.service_id)
-        }
-    }
-    fn cookie_name(&self, kind: &str) -> String {
-        format!(
-            "{}mail_{kind}",
-            if self.origin.starts_with("https://") {
-                "__Host-"
-            } else {
-                ""
-            }
-        )
-    }
-    fn cookie_security(&self) -> &'static str {
-        if self.origin.starts_with("https://") {
-            "; Secure"
-        } else {
-            ""
         }
     }
 }
@@ -156,7 +142,11 @@ fn cookie(headers: &HeaderMap, name: &str) -> Option<String> {
         })
 }
 fn same_origin(app: &App, headers: &HeaderMap) -> Result<()> {
-    if headers.get("origin").and_then(|v| v.to_str().ok()) != Some(app.origin.as_str()) {
+    let access = access::request(app, headers)?;
+    let mut origins = headers.get_all("origin").iter();
+    if origins.next().and_then(|v| v.to_str().ok()) != Some(access.origin)
+        || origins.next().is_some()
+    {
         return Err(Error(StatusCode::FORBIDDEN, "origin_invalid"));
     }
     Ok(())
@@ -180,7 +170,7 @@ fn client_ip(headers: &HeaderMap, peer: std::net::SocketAddr) -> std::net::IpAdd
 fn account_cookie_kind(kind: &str, email: &str) -> String {
     format!("{kind}_{}", hex::encode(email.as_bytes()))
 }
-fn selected_cookie_kind(app: &App, headers: &HeaderMap, kind: &str) -> String {
+fn selected_cookie_kind(access: access::Access<'_>, headers: &HeaderMap, kind: &str) -> String {
     if let Some(email) = headers
         .get("x-mail-account")
         .and_then(|v| v.to_str().ok())
@@ -189,7 +179,7 @@ fn selected_cookie_kind(app: &App, headers: &HeaderMap, kind: &str) -> String {
         let candidate = account_cookie_kind(kind, email);
         if cookie(
             headers,
-            &app.cookie_name(&account_cookie_kind("session", email)),
+            &access.cookie_name(&account_cookie_kind("session", email)),
         )
         .is_some()
         {
@@ -202,12 +192,16 @@ async fn identity(app: &App, headers: &HeaderMap, write: bool) -> Result<Identit
     identify(app, headers, write, true).await
 }
 async fn identify(app: &App, headers: &HeaderMap, write: bool, touch: bool) -> Result<Identity> {
+    if !headers.contains_key("cookie") {
+        return Err(Error(StatusCode::UNAUTHORIZED, "session_required"));
+    }
+    let access = access::request(app, headers)?;
     let sid = cookie(
         headers,
-        &app.cookie_name(&selected_cookie_kind(app, headers, "session")),
+        &access.cookie_name(&selected_cookie_kind(access, headers, "session")),
     )
     .ok_or(Error(StatusCode::UNAUTHORIZED, "session_required"))?;
-    let sid = hash(&sid);
+    let sid = access.session_digest(&sid);
     let row = db::query(db::Statement::MainIdentifySelectSessions)
         .bind(&sid)
         .fetch_optional(&app.db)
@@ -272,6 +266,7 @@ async fn login(
         return Err(Error(StatusCode::SERVICE_UNAVAILABLE, "setup_required"));
     }
     same_origin(&app, &headers)?;
+    let access = access::request(&app, &headers)?;
     let linked = headers.get("x-mail-link").and_then(|v| v.to_str().ok()) == Some("1");
     if linked {
         identity(&app, &headers, true).await?;
@@ -309,8 +304,9 @@ async fn login(
     .await;
     let expires = Utc::now() + Duration::hours(8);
     let id = token();
+    let session_digest = access.session_digest(&id);
     let csrf = token();
-    let result=app.upstream.password_call(&email,&input.password,"x:ApiKey/set",json!({"create":{"session":{"description":format!("mail-web:{}",hash(&id)),"expiresAt":expires.to_rfc3339(),"permissions":{"@type":"Inherit"}}}})).await?;
+    let result=app.upstream.password_call(&email,&input.password,"x:ApiKey/set",json!({"create":{"session":{"description":format!("mail-web:{session_digest}"),"expiresAt":expires.to_rfc3339(),"permissions":{"@type":"Inherit"}}}})).await?;
     let key = result["created"]["session"]["secret"]
         .as_str()
         .ok_or(Error(StatusCode::BAD_GATEWAY, "credential_not_returned"))?;
@@ -319,7 +315,7 @@ async fn login(
         .ok_or(Error(StatusCode::BAD_GATEWAY, "credential_not_returned"))?;
     let secret = app.vault.seal(key.as_bytes()).map_err(internal)?;
     let stored = db::query(db::Statement::MainLoginInsertSessions)
-        .bind(hash(&id))
+        .bind(session_digest)
         .bind(row.get::<Uuid, _>("id"))
         .bind(hash(&csrf))
         .bind(secret)
@@ -346,12 +342,12 @@ async fn login(
         "set-cookie",
         HeaderValue::from_str(&format!(
             "{}={id}; Path=/{}; HttpOnly; SameSite=Strict; Max-Age=28800",
-            app.cookie_name(&if linked {
+            access.cookie_name(&if linked {
                 account_cookie_kind("session", &email)
             } else {
                 "session".into()
             }),
-            app.cookie_security()
+            access.cookie_security()
         ))
         .map_err(|_| internal("cookie"))?,
     );
@@ -359,12 +355,12 @@ async fn login(
         "set-cookie",
         HeaderValue::from_str(&format!(
             "{}={csrf}; Path=/{}; SameSite=Strict; Max-Age=28800",
-            app.cookie_name(&if linked {
+            access.cookie_name(&if linked {
                 account_cookie_kind("csrf", &email)
             } else {
                 "csrf".into()
             }),
-            app.cookie_security()
+            access.cookie_security()
         ))
         .map_err(|_| internal("cookie"))?,
     );
@@ -389,7 +385,8 @@ async fn session(State(app): State<Arc<App>>, headers: HeaderMap) -> Result<Json
 async fn logout(State(app): State<Arc<App>>, headers: HeaderMap) -> Result<Response> {
     let me = identity(&app, &headers, true).await?;
     let app = connections::for_user(&app, me.user).await?;
-    let selected_kind = selected_cookie_kind(&app, &headers, "session");
+    let access = access::request(&app, &headers)?;
+    let selected_kind = selected_cookie_kind(access, &headers, "session");
     let mut sessions = vec![me.session.clone()];
     let mut clear_primary = false;
     if selected_kind != "session" {
@@ -419,7 +416,7 @@ async fn logout(State(app): State<Arc<App>>, headers: HeaderMap) -> Result<Respo
     let mut response = StatusCode::NO_CONTENT.into_response();
     let mut kinds = vec![
         (selected_kind, "; HttpOnly"),
-        (selected_cookie_kind(&app, &headers, "csrf"), ""),
+        (selected_cookie_kind(access, &headers, "csrf"), ""),
     ];
     if clear_primary {
         kinds.extend([("session".into(), "; HttpOnly"), ("csrf".into(), "")]);
@@ -427,8 +424,8 @@ async fn logout(State(app): State<Arc<App>>, headers: HeaderMap) -> Result<Respo
     for (kind, http_only) in kinds {
         let value = format!(
             "{}=; Path=/{}{http_only}; SameSite=Strict; Max-Age=0",
-            app.cookie_name(&kind),
-            app.cookie_security()
+            access.cookie_name(&kind),
+            access.cookie_security()
         );
         response.headers_mut().append(
             "set-cookie",
@@ -700,6 +697,9 @@ async fn health(State(app): State<Arc<App>>) -> Result<Json<Value>> {
         message,
         update_message,
         health,
+        deployment::status,
+        deployment::submit,
+        deployment::job,
         connections::list,
         connections::save,
         connections::prepare,
@@ -1025,6 +1025,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             .map(|settings| settings.services)
             .unwrap_or_else(config::Services::load),
         origin,
+        direct_origin: config::direct_access(),
         upstream: Stalwart {
             http: reqwest::Client::builder()
                 .connect_timeout(std::time::Duration::from_secs(5))
@@ -1057,6 +1058,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     }
     let api = Router::new()
         .merge(connections::routes())
+        .merge(deployment::routes())
         .merge(registration::routes())
         .merge(readiness::routes())
         .merge(account::routes())

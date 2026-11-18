@@ -34,6 +34,8 @@ pub(super) struct PublicRegistrationPolicy {
     domain: String,
     brand: String,
     site_key: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    primary_origin: Option<String>,
     maximum_accounts: i64,
     attachment_bytes: i64,
 }
@@ -41,7 +43,9 @@ pub(super) struct PublicRegistrationPolicy {
 pub(super) async fn public_policy(
     State(app): State<Arc<App>>,
     Query(query): Query<HashMap<String, String>>,
+    headers: HeaderMap,
 ) -> Result<Json<PublicRegistrationPolicy>> {
+    let direct = !app.origin.is_empty() && access::request(&app, &headers)?.direct;
     let app = connections::for_domain(
         &app,
         query
@@ -52,10 +56,15 @@ pub(super) async fn public_policy(
     .await?;
     let p = settings(&app).await?;
     Ok(Json(PublicRegistrationPolicy {
-        enabled: p["enabled"] == true && readiness::ready(&app).await?,
+        enabled: !direct && p["enabled"] == true && readiness::ready(&app).await?,
         domain: app.services.domain.clone(),
         brand: app.services.brand.clone(),
-        site_key: app.services.turnstile_site_key.clone(),
+        site_key: if direct {
+            String::new()
+        } else {
+            app.services.turnstile_site_key.clone()
+        },
+        primary_origin: direct.then(|| app.origin.clone()),
         maximum_accounts: p["maximumAccounts"].as_i64().unwrap_or(100),
         attachment_bytes: p["attachmentBytes"].as_i64().unwrap_or(20971520),
     }))
@@ -209,6 +218,7 @@ pub(super) async fn challenge(
     Json(input): Json<ChallengeInput>,
 ) -> Result<Json<ChallengeView>> {
     same_origin(&app, &headers)?;
+    access::require_primary(&app, &headers)?;
     policy::rate(
         &app,
         &format!(
@@ -290,6 +300,7 @@ pub(super) async fn verify(
     Json(input): Json<VerifyInput>,
 ) -> Result<Json<VerificationView>> {
     same_origin(&app, &headers)?;
+    access::require_primary(&app, &headers)?;
     let row = db::query(db::Statement::RegistrationVerifyUpdateVerificationChallenges)
         .bind(input.challenge_id)
         .bind(db::now())
@@ -327,7 +338,9 @@ pub(super) async fn verify(
 pub(super) async fn availability(
     State(app): State<Arc<App>>,
     Query(q): Query<HashMap<String, String>>,
+    headers: HeaderMap,
 ) -> Result<Json<Value>> {
+    access::require_primary(&app, &headers)?;
     let app = connections::for_domain(
         &app,
         q.get("domainId").map(String::as_str).unwrap_or("default"),
@@ -365,6 +378,7 @@ pub(super) async fn register(
     Json(input): Json<Register>,
 ) -> Result<StatusCode> {
     same_origin(&app, &headers)?;
+    access::require_primary(&app, &headers)?;
     let domain: String = db::scalar(db::Statement::ChallengeDomain)
         .bind(input.challenge_id)
         .fetch_optional(&app.db)
@@ -568,6 +582,7 @@ pub(super) async fn recover(
     Json(input): Json<Recovery>,
 ) -> Result<StatusCode> {
     same_origin(&app, &headers)?;
+    access::require_primary(&app, &headers)?;
     let domain: String = db::scalar(db::Statement::ChallengeDomain)
         .bind(input.challenge_id)
         .fetch_optional(&app.db)
@@ -632,7 +647,11 @@ mod tests {
 }
 
 #[utoipa::path(get,path="/api/v1/registration/domains",responses((status=200,body=Value)))]
-pub(crate) async fn public_domains(State(app): State<Arc<App>>) -> Result<Json<Value>> {
+pub(crate) async fn public_domains(
+    State(app): State<Arc<App>>,
+    headers: HeaderMap,
+) -> Result<Json<Value>> {
+    let direct = !app.origin.is_empty() && access::request(&app, &headers)?.direct;
     let rows = db::query(db::Statement::ConnectionList)
         .fetch_all(&app.db)
         .await?;
@@ -651,7 +670,7 @@ pub(crate) async fn public_domains(State(app): State<Arc<App>>) -> Result<Json<V
             Err(_) => (false, false),
         };
         items.push(
-            json!({"id":id,"domain":name,"enabled":enabled&&ready,"dependenciesReady":ready}),
+            json!({"id":id,"domain":name,"enabled":!direct&&enabled&&ready,"dependenciesReady":!direct&&ready}),
         );
     }
     Ok(Json(json!({"items":items})))

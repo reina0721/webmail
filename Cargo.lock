@@ -1813,6 +1813,7 @@ dependencies = [
  "http-body-util",
  "mail-auth",
  "mail-send",
+ "mailweb-shared",
  "rand 0.8.8",
  "reqwest 0.12.28",
  "rustls-pki-types",
@@ -1838,6 +1839,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "mailweb-shared"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "utoipa",
+]
+
+[[package]]
 name = "mailwebctl"
 version = "0.4.0-alpha.4"
 dependencies = [
@@ -1847,6 +1856,7 @@ dependencies = [
  "fs2",
  "hex",
  "libc",
+ "mailweb-shared",
  "rand 0.8.8",
  "reqwest 0.12.28",
  "semver",

@@ -24,6 +24,8 @@ JMAP = "http://127.0.0.1:19080/jmap/"
 def request(url, method="GET", body=None, headers=None):
     data = None if body is None else (body if isinstance(body, bytes) else json.dumps(body).encode())
     hdr = dict(headers or {})
+    if url.startswith(BASE + "/"):
+        hdr.setdefault("Host", "mail-web:8080")
     if data is not None:
         hdr.setdefault("Content-Type", "application/json")
     req = urllib.request.Request(url, data, hdr, method=method)

@@ -522,6 +522,7 @@ pub(super) async fn run(
         vault: app.vault.clone(),
         origin: job.spec.public_origin.clone(),
         services: services.clone(),
+        direct_origin: app.direct_origin.clone(),
     };
     checkpoint(app, job, cancel, "operator").await?;
     operator(app, job, access, &runtime).await?;

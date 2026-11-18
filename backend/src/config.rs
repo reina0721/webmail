@@ -98,6 +98,18 @@ pub fn validate_origin(value: &str) -> Result<String, Box<dyn std::error::Error>
     }
     Ok(url.origin().ascii_serialization())
 }
+pub fn direct_access() -> Option<String> {
+    let bind = std::env::var("LISTEN_ADDRESS").ok()?;
+    let bind = bind.trim_matches(['[', ']']).parse().ok()?;
+    let port = std::env::var("PORT").ok()?.parse().ok()?;
+    let allow_http = std::env::var("ALLOW_HTTP").as_deref() == Ok("true");
+    let configured = std::env::var("DIRECT_ACCESS_ORIGIN").unwrap_or_default();
+    mailweb_shared::direct_origin(bind, port, allow_http, &configured).unwrap_or_else(|error| {
+        tracing::warn!(error, "DIRECT_ACCESS_ORIGIN ignored");
+        None
+    })
+}
+
 pub fn upstream(origin: &str) -> Result<String, Box<dyn std::error::Error>> {
     let value = std::env::var("STALWART_URL")?;
     let url = reqwest::Url::parse(&value)?;

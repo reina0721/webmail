@@ -150,6 +150,8 @@ docker compose --project-directory "$INSTALL_DIR" -f "$INSTALL_DIR/compose.yaml"
 
 ## 6. CLI 更新、备份和恢复
 
+HTTPS 反代保留原始 `Host`。启用了 HTTP 且绑定具体 IP 的实例可从原 IP 和端口进入邮箱与管理后台。通配监听时按 [IP 备用入口](cli.md#ip-备用入口) 指定备用地址。控制台的 [版本管理](cli.md#在控制台切换版本) 通过宿主机服务执行升级与快照回退。
+
 **正在使用 v0.4.0-alpha.2：请直接按 [逐步升级教程](cli.md#从-v040-alpha2-升级逐步操作) 操作，包含找目录、备份、更新 CLI、更新应用和失败恢复。** 不需要重新安装或重新配置 Stalwart。
 
 以下为日常维护命令参考，可从任意工作目录调用，始终识别自身安装目录：

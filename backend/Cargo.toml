@@ -4,6 +4,7 @@ version = "0.4.0-alpha.4"
 edition = "2024"
 
 [dependencies]
+mailweb-shared = { path = "../crates/mailweb-shared", features = ["openapi"] }
 axum = { version = "0.8", features = ["multipart"] }
 tokio-util = { version = "0.7", features = ["io"] }
 tokio = { version = "1", features = ["full"] }

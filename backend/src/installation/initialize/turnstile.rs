@@ -153,6 +153,7 @@ mod tests {
             },
             vault: Vault::new(&[9; 32]).unwrap(),
             origin: "https://webmail.example.com".into(),
+            direct_origin: None,
             services: config::Services {
                 domain: "example.com".into(),
                 brand: "Mail".into(),
@@ -281,6 +282,7 @@ mod tests {
                 let mut request = Request::builder()
                     .method("POST")
                     .uri(path)
+                    .header("host", "webmail.example.com")
                     .header("origin", origin)
                     .header("content-type", "application/json")
                     .header("x-csrf-token", "csrf");
@@ -337,7 +339,7 @@ mod tests {
             ("valid-site", "https://example.com"),
         ] {
             let response = crate::installation::routes().with_state(app.clone()).oneshot(Request::builder().method("PUT")
-                .uri("/installation/config").header("origin", &app.origin)
+                .uri("/installation/config").header("host", "webmail.example.com").header("origin", &app.origin)
                 .header("content-type", "application/json").header("x-csrf-token", "csrf")
                 .header("cookie", "__Host-mail_session=session")
                 .body(Body::from(json!({"brand":"Mail","domain":"example.com","publicOrigin":app.origin,"stalwartUrl":app.upstream.base,"turnstileSiteKey":site,"turnstileSecret":secret}).to_string())).unwrap()).await.unwrap();

@@ -7,6 +7,7 @@ use crate::{
     release::{self, Manifest},
 };
 use anyhow::{Context, Result, bail, ensure};
+use mailweb_shared::deployment::Phase;
 use serde_json::{Value, json};
 use std::{
     fs::{self, File},
@@ -22,7 +23,7 @@ fn now() -> u128 {
         .unwrap()
         .as_millis()
 }
-fn installed(s: &Settings) -> Result<Option<Manifest>> {
+pub(crate) fn installed(s: &Settings) -> Result<Option<Manifest>> {
     let p = s.root.join("config/installed-release.json");
     if !p.exists() {
         return Ok(None);
@@ -56,6 +57,9 @@ fn local_root(cli: &Cli) -> Result<PathBuf> {
 pub fn run(cli: Cli) -> Result<()> {
     let mut s = Settings::load(&local_root(&cli)?)?;
     s.apply(&cli)?;
+    if let Command::VersionManager { action } = &cli.command {
+        return crate::manager::run(&s, action);
+    }
     let writing = !matches!(
         cli.command,
         Command::Status
@@ -81,9 +85,14 @@ pub fn run(cli: Cli) -> Result<()> {
     s.apply(&cli)?;
     let _lock = if writing { Some(s.lock()?) } else { None };
     match &cli.command {
-        Command::Install { version, bundle } | Command::Update { version, bundle } => {
-            install(&mut s, &old, &cli, version, bundle.as_deref())
-        }
+        Command::Install { version, bundle } | Command::Update { version, bundle } => install(
+            &mut s,
+            &old,
+            &cli,
+            version,
+            bundle.as_deref(),
+            &mut |_, _| Ok(()),
+        ),
         Command::Configure => configure(&mut s, &old, &cli),
         Command::Start => docker::start(&s),
         Command::Stop => docker::stop(&s),
@@ -114,11 +123,11 @@ pub fn run(cli: Cli) -> Result<()> {
             ensure!(cli.yes, "恢复会替换本实例数据，请备份后使用 --yes");
             restore(&old, snapshot, &cli)
         }
-        Command::Setup { show_token } => setup(&s, *show_token),
+        Command::Setup { show_token, direct } => setup(&s, *show_token, *direct),
         Command::RotateSetupToken => {
             write_key(&s, "setup", true)?;
             s.permissions()?;
-            setup(&s, false)
+            setup(&s, false, false)
         }
         Command::CheckUpdate { version } => {
             let (tag, _) = release::Client::new(cli.download_mirror.as_deref())?.resolve(
@@ -130,6 +139,7 @@ pub fn run(cli: Cli) -> Result<()> {
             Ok(())
         }
         Command::SelfUpdate { version } => self_update(&s, &cli, version),
+        Command::VersionManager { .. } => unreachable!(),
         Command::PolicyVerified { value } => {
             docker::stop(&s)?;
             let r = docker::maintenance(&s, &["--set-policy-verified", value]);
@@ -247,18 +257,20 @@ fn ensure_not_downgrade(s: &Settings, version: &str) -> Result<()> {
     }
     Ok(())
 }
-fn install(
+pub(crate) fn install(
     s: &mut Settings,
     old: &Settings,
     cli: &Cli,
     version: &str,
     bundle: Option<&Path>,
+    progress: &mut dyn FnMut(Phase, Option<&Path>) -> Result<()>,
 ) -> Result<()> {
     if !matches!(cli.command, Command::Update { .. }) {
         config::wizard(s, cli)?;
     }
     let origin = desired_origin(s, old, cli)?;
     preflight(old, s, cli)?;
+    progress(Phase::Download, None)?;
     let (package, mut manifest) = release::prepare(
         s,
         version,
@@ -266,6 +278,7 @@ fn install(
         cli.download_mirror.as_deref(),
         bundle,
     )?;
+    progress(Phase::Verify, None)?;
     manifest.image_id = crate::image::declared_config_id(
         &package.join("image.tar"),
         &manifest.image,
@@ -318,11 +331,13 @@ fn install(
     }
     let existed = old.root.join(".env").exists();
     let snapshot = if existed {
+        progress(Phase::Backup, None)?;
         Some(backup(old, false)?)
     } else {
         None
     };
     let apply = (|| -> Result<()> {
+        progress(Phase::Switch, snapshot.as_deref())?;
         if !existed {
             s.values = config::env_read(&package.join(".env.example"))?;
             s.values.remove("PUBLIC_ORIGIN");
@@ -342,6 +357,7 @@ fn install(
             s.values.insert("PUBLIC_ORIGIN".into(), o.clone());
             s.save()?;
         }
+        progress(Phase::Health, None)?;
         docker::start(s)?;
         config::atomic(
             &s.root.join("config/installed-release.json"),
@@ -455,7 +471,7 @@ fn status(s: &Settings, json_output: bool) -> Result<()> {
         .send()
         .ok()
         .and_then(|r| r.json::<Value>().ok());
-    let report = json!({"directory":s.root,"container":s.name,"running":running,"healthy":running&&health.is_some(),"version":installed(s)?.map(|m|m.version),"revision":health.as_ref().and_then(|h|h["revision"].as_str()),"bind":s.bind,"port":s.port,"accessUrl":s.url(),"configured":install.as_ref().is_some_and(|i|i["configured"]==true)});
+    let report = json!({"directory":s.root,"container":s.name,"running":running,"healthy":running&&health.is_some(),"version":installed(s)?.map(|m|m.version),"revision":health.as_ref().and_then(|h|h["revision"].as_str()),"bind":s.bind,"port":s.port,"accessUrl":s.url(),"directAccessUrl":s.direct_access_url()?,"configured":install.as_ref().is_some_and(|i|i["configured"]==true)});
     if json_output {
         println!("{}", serde_json::to_string_pretty(&report)?)
     } else {
@@ -554,20 +570,20 @@ fn doctor(
     ensure!(good, "诊断存在失败项");
     Ok(())
 }
-fn setup(s: &Settings, show: bool) -> Result<()> {
-    let origin = s
-        .values
-        .get("PUBLIC_ORIGIN")
-        .cloned()
-        .or_else(|| {
-            s.root
-                .join("config/runtime.enc")
-                .exists()
-                .then(|| read_origin(s).ok())
-                .flatten()
-        })
-        .filter(|o| config::validate_origin(o, s.allow_http).is_ok())
-        .unwrap_or_else(|| s.url());
+fn setup(s: &Settings, show: bool, direct: bool) -> Result<()> {
+    let origin = if direct {
+        s.direct_access_url()?
+            .context("未启用 HTTP IP 备用入口，请检查监听地址和 DIRECT_ACCESS_ORIGIN")?
+    } else {
+        s.root
+            .join("config/runtime.enc")
+            .exists()
+            .then(|| read_origin(s).ok())
+            .flatten()
+            .or_else(|| s.values.get("PUBLIC_ORIGIN").cloned())
+            .filter(|o| config::validate_origin(o, s.allow_http).is_ok())
+            .unwrap_or_else(|| s.url())
+    };
     let url = format!("{}/console/setup/", origin.trim_end_matches('/'));
     println!("配置入口：{url}");
     if show || std::io::stdout().is_terminal() {
@@ -592,7 +608,7 @@ fn summary(s: &Settings, m: &Manifest) -> Result<()> {
             s.port
         )
     };
-    setup(s, false)?;
+    setup(s, false, false)?;
     println!(
         "应用已安装；Stalwart 配置在网页向导完成。\n管理命令：./mailweb status / doctor / logs / update / backup"
     );
@@ -629,7 +645,7 @@ fn archive_config(s: &Settings, destination: &Path) -> Result<()> {
     b.into_inner()?.finish()?;
     Ok(())
 }
-fn backup(s: &Settings, restart: bool) -> Result<PathBuf> {
+pub(crate) fn backup(s: &Settings, restart: bool) -> Result<PathBuf> {
     docker::owned(s)?;
     let running = docker::running(s);
     if running {
@@ -714,7 +730,7 @@ fn install_docs(package: &Path, root: &Path) -> Result<()> {
     }
     Ok(())
 }
-fn apply_snapshot(s: &Settings, path: &Path) -> Result<()> {
+fn apply_snapshot(s: &Settings, path: &Path, restore_host_config: bool) -> Result<()> {
     let stage = tempfile::tempdir_in(&s.root)?;
     release::unpack(&path.join("config-secrets.tar.gz"), stage.path())?;
     for d in ["config", "secrets"] {
@@ -733,8 +749,10 @@ fn apply_snapshot(s: &Settings, path: &Path) -> Result<()> {
             copy_tree(&stage.path().join(d), &s.root.join(d))?
         }
     }
-    for n in [".env", "compose.yaml"] {
-        config::atomic(&s.root.join(n), &fs::read(path.join(n))?, 0o600)?
+    if restore_host_config {
+        for n in [".env", "compose.yaml"] {
+            config::atomic(&s.root.join(n), &fs::read(path.join(n))?, 0o600)?
+        }
     }
     for suffix in ["", "-wal", "-shm"] {
         let file = s.root.join(format!("data/db/mail-web.sqlite{suffix}"));
@@ -752,6 +770,52 @@ fn apply_snapshot(s: &Settings, path: &Path) -> Result<()> {
     )?;
     Ok(())
 }
+/// The version manager passes its own verified snapshot. Its host configuration
+/// comes only from the live installation, never from a historical archive.
+pub(crate) fn apply_managed_snapshot(
+    s: &Settings,
+    snapshot: &Path,
+    manifest: &Manifest,
+    revoke_sessions: bool,
+    starting: impl FnOnce() -> Result<()>,
+) -> Result<()> {
+    docker::stop(s)?;
+    apply_snapshot(s, snapshot, false)?;
+    let mut restored = s.clone();
+    restored.values.insert(
+        "MAIL_WEB_VERSION".into(),
+        manifest.version.trim_start_matches('v').into(),
+    );
+    restored.save()?;
+    config::atomic(&s.root.join("compose.yaml"), COMPOSE.as_bytes(), 0o600)?;
+    config::atomic(
+        &s.root.join("config/installed-release.json"),
+        &serde_json::to_vec_pretty(manifest)?,
+        0o600,
+    )?;
+    restored.permissions()?;
+    if revoke_sessions {
+        docker::maintenance(&restored, &["--revoke-all-sessions"])?;
+    }
+    starting()?;
+    docker::start(&restored)
+}
+pub(crate) fn install_manager_mount(s: &Settings) -> Result<()> {
+    let file = s.root.join("compose.yaml");
+    // The automatic host helper supports the official generated Compose file.
+    // Preserve any custom setup rather than replacing it during enable.
+    let existing = fs::read_to_string(&file)?;
+    let prior = COMPOSE.replace(
+        "      - ./version-manager-socket:/run/mailweb-manager:ro\n",
+        "",
+    );
+    ensure!(
+        existing == COMPOSE || existing == prior,
+        "检测到自定义 Compose，请使用官方部署配置启用网页版本管理"
+    );
+    config::atomic(&file, COMPOSE.as_bytes(), 0o600)
+}
+
 fn restore(s: &Settings, snapshot: &Path, cli: &Cli) -> Result<()> {
     let path = if snapshot.is_absolute() {
         snapshot.into()
@@ -820,7 +884,7 @@ fn restore(s: &Settings, snapshot: &Path, cli: &Cli) -> Result<()> {
         None
     };
     let apply = (|| -> Result<()> {
-        apply_snapshot(s, &path)?;
+        apply_snapshot(s, &path, true)?;
         let mut new = Settings::load(&s.root)?;
         new.project = s.project.clone();
         new.apply(cli)?;
@@ -845,7 +909,7 @@ fn restore(s: &Settings, snapshot: &Path, cli: &Cli) -> Result<()> {
             let _ = docker::stop(&failed);
         }
         if let Some(safety) = safety {
-            apply_snapshot(s, &safety)?;
+            apply_snapshot(s, &safety, true)?;
             s.permissions()?;
             if was_running {
                 let _ = docker::start(s);

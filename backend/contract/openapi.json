@@ -385,6 +385,107 @@
         }
       }
     },
+    "/api/v1/admin/deployment": {
+      "get": {
+        "tags": [
+          "deployment"
+        ],
+        "operationId": "deployment_status",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentView"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Operator required"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/deployment/jobs": {
+      "post": {
+        "tags": [
+          "deployment"
+        ],
+        "operationId": "submit_deployment_job",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Submit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Operator required"
+          },
+          "409": {
+            "description": "Host rejected the operation"
+          },
+          "503": {
+            "description": "Version manager unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/deployment/jobs/{id}": {
+      "get": {
+        "tags": [
+          "deployment"
+        ],
+        "operationId": "read_deployment_job",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Operator required"
+          },
+          "404": {
+            "description": "Job not found"
+          },
+          "503": {
+            "description": "Version manager unavailable"
+          }
+        }
+      }
+    },
     "/api/v1/admin/directory": {
       "get": {
         "tags": [
@@ -2907,6 +3008,12 @@
           "documentationUrl"
         ],
         "properties": {
+          "directAccessUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "documentationUrl": {
             "type": "string"
           },
@@ -2943,6 +3050,33 @@
         ],
         "properties": {
           "description": {
+            "type": "string"
+          }
+        }
+      },
+      "DeploymentView": {
+        "type": "object",
+        "required": [
+          "version",
+          "revision",
+          "architecture",
+          "managerOnline",
+          "inventory"
+        ],
+        "properties": {
+          "architecture": {
+            "type": "string"
+          },
+          "inventory": {
+            "$ref": "#/components/schemas/Inventory"
+          },
+          "managerOnline": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "version": {
             "type": "string"
           }
         }
@@ -3140,6 +3274,80 @@
           }
         }
       },
+      "Inventory": {
+        "type": "object",
+        "required": [
+          "releases",
+          "releasesStatus",
+          "snapshots"
+        ],
+        "properties": {
+          "job": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Job"
+              }
+            ]
+          },
+          "releases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublishedVersion"
+            }
+          },
+          "releasesStatus": {
+            "type": "string"
+          },
+          "snapshots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Snapshot"
+            }
+          }
+        }
+      },
+      "Job": {
+        "type": "object",
+        "required": [
+          "id",
+          "operation",
+          "targetVersion",
+          "phase",
+          "message"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/Operation"
+          },
+          "phase": {
+            "$ref": "#/components/schemas/Phase"
+          },
+          "recoveryCommand": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "runningVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "targetVersion": {
+            "type": "string"
+          }
+        }
+      },
       "Login": {
         "type": "object",
         "required": [
@@ -3189,6 +3397,13 @@
           }
         }
       },
+      "Operation": {
+        "type": "string",
+        "enum": [
+          "update",
+          "rollback"
+        ]
+      },
       "OperatorInput": {
         "type": "object",
         "required": [
@@ -3222,6 +3437,21 @@
             "type": "string"
           }
         }
+      },
+      "Phase": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "download",
+          "verify",
+          "backup",
+          "switch",
+          "health",
+          "recovering",
+          "succeeded",
+          "recovered",
+          "failed"
+        ]
       },
       "ProfileInput": {
         "type": "object",
@@ -3274,7 +3504,28 @@
             "type": "integer",
             "format": "int64"
           },
+          "primaryOrigin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "siteKey": {
+            "type": "string"
+          }
+        }
+      },
+      "PublishedVersion": {
+        "type": "object",
+        "required": [
+          "version",
+          "prerelease"
+        ],
+        "properties": {
+          "prerelease": {
+            "type": "boolean"
+          },
+          "version": {
             "type": "string"
           }
         }
@@ -3397,6 +3648,55 @@
             "type": "boolean"
           }
         }
+      },
+      "Snapshot": {
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "createdAt"
+        ],
+        "properties": {
+          "createdAt": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "Submit": {
+        "type": "object",
+        "required": [
+          "id",
+          "expectedVersion",
+          "operation",
+          "target"
+        ],
+        "properties": {
+          "confirmDataRestore": {
+            "type": "boolean"
+          },
+          "expectedVersion": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/Operation"
+          },
+          "target": {
+            "type": "string",
+            "description": "Exact release tag for an update, registered snapshot ID for a rollback."
+          }
+        },
+        "additionalProperties": false
       },
       "UploadView": {
         "type": "object",

@@ -48,6 +48,7 @@ fn current_default(app: &App) -> bool {
                     base: saved.stalwart_url,
                 },
                 origin: saved.origin,
+                direct_origin: None,
                 vault: app.vault.clone(),
                 services: saved.services,
             };
@@ -473,6 +474,7 @@ mod tests {
             },
             vault: Vault::new(&[3; 32]).unwrap(),
             origin: "https://webmail.example.com".into(),
+            direct_origin: None,
             services,
         };
         assert!(!ready(&app).await.unwrap());
@@ -540,6 +542,7 @@ mod tests {
             },
             vault: Vault::new(&[4; 32]).unwrap(),
             origin: "https://webmail.example.com".into(),
+            direct_origin: None,
             services: config::Services {
                 turnstile_secret: "private-pepper".into(),
                 ..Default::default()
@@ -555,6 +558,7 @@ mod tests {
             .await
             .unwrap();
         let mut headers = HeaderMap::new();
+        headers.insert("host", HeaderValue::from_static("webmail.example.com"));
         headers.insert(
             "origin",
             HeaderValue::from_static("https://webmail.example.com"),
@@ -715,6 +719,7 @@ pub(crate) async fn interaction(
     Json(input): Json<Input>,
 ) -> Result<Json<Value>> {
     same_origin(&app, &headers)?;
+    access::require_primary(&app, &headers)?;
     let app = ticket_context(&app, &input).await?;
     let session = session(&app, &input).await?;
     Ok(Json(
@@ -728,6 +733,7 @@ pub(crate) async fn readiness_send(
     Json(input): Json<Input>,
 ) -> Result<Json<Value>> {
     same_origin(&app, &headers)?;
+    access::require_primary(&app, &headers)?;
     let app = ticket_context(&app, &input).await?;
     let _ = session(&app, &input).await?;
     let email = input.email.trim().to_lowercase();
@@ -784,6 +790,7 @@ pub(crate) async fn readiness_verify(
     Json(input): Json<Input>,
 ) -> Result<Json<Value>> {
     same_origin(&app, &headers)?;
+    access::require_primary(&app, &headers)?;
     let app = ticket_context(&app, &input).await?;
     let row = session(&app, &input).await?;
     let revision = fingerprint(&app);

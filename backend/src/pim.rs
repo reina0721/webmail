@@ -1155,6 +1155,7 @@ mod tests {
             },
             vault,
             origin: "https://mail.example".into(),
+            direct_origin: None,
             services: config::Services {
                 domain: "mail.example".into(),
                 hook_id: "dedicated-hook".into(),
@@ -1169,6 +1170,7 @@ mod tests {
                 .method(method)
                 .uri(path)
                 .header("cookie", "__Host-mail_session=session")
+                .header("host", "mail.example")
                 .header("origin", "https://mail.example")
                 .header("x-csrf-token", "csrf")
                 .header("idempotency-key", "native-loss-1234567890")

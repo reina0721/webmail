@@ -55,6 +55,9 @@ HTTP 直连额外传 `--allow-http`，公开来源填实际服务器 IP；IPv6 U
 | `backup` | 保存一致性 SQLite、加密配置、密钥、基础设施配置和校验和 |
 | `restore /absolute/install/backups/SNAPSHOT --yes` | 校验后恢复匹配版本和数据，撤销旧会话 |
 | `setup --show-token` | 显示本安装配置链接及令牌 |
+| `setup --direct --show-token` | 生成 IP 备用入口的修复链接 |
+| `version-manager enable` | 启用宿主机 systemd 版本管理服务 |
+| `version-manager import /实际快照目录` | 校验并登记旧版快照 |
 | `rotate-setup-token` | 轮换本安装管理令牌 |
 | `self-update --version latest` | 仅更新管理 CLI，校验版本及 SHA-256 |
 
@@ -77,6 +80,39 @@ HTTP 直连改端口时，需同步设置新 Origin：
 ```
 
 已配置站点非交互更改 IP/端口却未传 `--public-origin` 会拒绝。应用维护命令 `--set-public-origin URL` 仅更新加密配置的网站来源；不会执行 Stalwart 自动配置或改写管理员注册开放策略。控制台会提示检查来源变化后的验证要求。
+
+## IP 备用入口
+
+Webmail 可通过一个公开主地址和一个 IP 备用地址访问。HTTPS 反代须保留原始 `Host`（包括非默认端口）。浏览器在两个地址分别登录。域名或反代故障时，可用 IP 打开邮箱与后台；注册、找回密码、人机验证与收信验证在主地址完成。
+
+安装的 `ALLOW_HTTP=true` 且 `LISTEN_ADDRESS` 为具体 IP 时，备用地址自动使用该 IP 和宿主机 `PORT`。监听 `0.0.0.0` 或 `::` 时，在安装目录的 `.env` 指定 `DIRECT_ACCESS_ORIGIN=http://实际IP:端口`，IPv6 地址加方括号。设置后执行 `./mailweb start` 使 Compose 应用新的环境配置。
+
+```bash
+./mailweb status --json
+./mailweb setup --direct --show-token
+```
+
+`directAccessUrl` 为备用地址，未启用时为 `null`。HTTP 明文连接适合受信网络内的应急访问。
+
+## 在控制台切换版本
+
+在已安装支持此功能的应用和管理 CLI 后，在原安装目录执行：
+
+```bash
+sudo ./mailweb version-manager enable
+```
+
+适用于由宿主机 root 管理的标准 Compose 安装和 systemd。启用时会重建本实例容器以挂载版本管理套接字。回到控制台「版本管理」可查看运行版本、发布清单和快照。升级会校验精确版本的附件，备份后切换，再检查实际运行版本。切换失败会用保存的快照尝试恢复；宿主机日志保留故障细节。
+
+从终端升级前留下的旧版快照可在本机登记，例如：
+
+```bash
+sudo ./mailweb version-manager import '/安装目录/backups/实际快照目录'
+```
+
+登记会校验 SQLite、配置归档及发布镜像，并复制到仅宿主机 root 可读写的管理目录。控制台回退会还原快照内的 Webmail 数据库和运行配置，保留当前绑定和端口。快照之后的本地数据变更随之回退，应用会话需要重新登录；Stalwart 服务独立运行。
+
+回到没有版本管理页的旧版后，按确认页给出的版本号从原安装目录运行 `sudo ./bin/mailweb-version-manager update --version v目标版本 --yes`。若旧版缺少 IP 备用机制，以旧版保存的主来源为准；管理员可从服务器终端使用 CLI 恢复。管理服务的名称在启用时输出，可用 `journalctl -u 服务名` 查看日志。
 
 ## 旧版迁移
 

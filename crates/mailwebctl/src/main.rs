@@ -3,6 +3,7 @@
 mod config;
 mod docker;
 mod image;
+mod manager;
 mod operations;
 mod platform;
 mod release;
@@ -80,6 +81,13 @@ enum Command {
     Setup {
         #[arg(long)]
         show_token: bool,
+        /// 使用 IP 备用入口。
+        #[arg(long)]
+        direct: bool,
+    },
+    VersionManager {
+        #[command(subcommand)]
+        action: manager::Action,
     },
     RotateSetupToken,
     CheckUpdate {

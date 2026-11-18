@@ -24,6 +24,7 @@ async fn session_isolation_csrf_revocation_and_operator_boundary() {
         },
         vault,
         origin: "https://mail.example.com".into(),
+        direct_origin: None,
         services: config::Services {
             domain: "mail.example".into(),
             ..config::Services::default()
@@ -31,6 +32,7 @@ async fn session_isolation_csrf_revocation_and_operator_boundary() {
     });
     let routes = Router::new()
         .merge(account::routes())
+        .merge(deployment::routes())
         .route("/auth/session", get(session))
         .with_state(app.clone());
     let request = |method: &str, path: &str, origin: &str, csrf: &str| {
@@ -38,11 +40,31 @@ async fn session_isolation_csrf_revocation_and_operator_boundary() {
             .method(method)
             .uri(path)
             .header("cookie", "__Host-mail_session=session-a")
+            .header("host", "mail.example.com")
             .header("origin", origin)
             .header("x-csrf-token", csrf)
             .body(Body::empty())
             .unwrap()
     };
+    let version_request = Request::builder()
+        .method("POST")
+        .uri("/admin/deployment/jobs")
+        .header("host", "mail.example.com")
+        .header("origin", "https://mail.example.com")
+        .header("cookie", "__Host-mail_session=session-a")
+        .header("x-csrf-token", "csrf")
+        .header("content-type", "application/json")
+        .body(Body::from(json!({"id":"a".repeat(32),"expectedVersion":"v0.4.0-alpha.4","operation":"update","target":"v0.5.0"}).to_string()))
+        .unwrap();
+    assert_eq!(
+        routes
+            .clone()
+            .oneshot(version_request)
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
     assert_eq!(
         routes
             .clone()
@@ -248,4 +270,98 @@ fn contract_covers_every_business_group() {
             "missing {path}"
         );
     }
+}
+
+#[tokio::test]
+async fn backup_entry_checks_host_origin_and_session_independently() {
+    let dir = std::env::temp_dir().join(Uuid::new_v4().to_string());
+    let pool = db::connect(&dir.join("test.sqlite")).await.unwrap();
+    let vault = Vault::new(&[7; 32]).unwrap();
+    let user = Uuid::new_v4();
+    sqlx::query("INSERT INTO platform_users(id,email,recovery_email,stalwart_id,status,operator) VALUES (?,'operator@example.com','test@example.net','local','active',1)")
+        .bind(user).execute(&pool).await.unwrap();
+    let app = App {
+        root: None,
+        revision: 0,
+        service_id: "default".into(),
+        domain_id: "default".into(),
+        db: pool,
+        upstream: Stalwart {
+            http: reqwest::Client::new(),
+            base: "https://unused.invalid".into(),
+        },
+        vault,
+        origin: "https://mail.example.com".into(),
+        direct_origin: Some("http://[2001:db8::2]:8088".into()),
+        services: config::Services::default(),
+    };
+    let origin = app.direct_origin.as_deref().unwrap();
+    let h = |host: &str, origin: &str, cookie: &str| {
+        let mut h = HeaderMap::new();
+        for (key, value) in [
+            ("host", host),
+            ("origin", origin),
+            ("cookie", cookie),
+            ("x-csrf-token", "csrf"),
+        ] {
+            h.insert(key, HeaderValue::from_str(value).unwrap());
+        }
+        h
+    };
+    let ip = h("[2001:db8::2]:8088", origin, "mail_session=direct");
+    let domain = h("mail.example.com", &app.origin, "__Host-mail_session=web");
+    for (headers, token) in [(&ip, "direct"), (&domain, "web")] {
+        let access = access::request(&app, headers).unwrap();
+        sqlx::query("INSERT INTO sessions(id_hash,user_id,csrf_hash,upstream_key,upstream_key_id,expires_at) VALUES (?,?,?,?,?,?)")
+            .bind(access.session_digest(token)).bind(user).bind(hash("csrf"))
+            .bind(app.vault.seal(b"test-key").unwrap()).bind(token).bind(db::now()+60000)
+            .execute(&app.db).await.unwrap();
+        assert_eq!(
+            access.cookie_security(),
+            if token == "web" { "; Secure" } else { "" }
+        );
+        assert!(identity(&app, headers, true).await.unwrap().operator);
+    }
+    let cross = h("[2001:db8::2]:8088", &app.origin, "mail_session=direct");
+    assert!(matches!(
+        identity(&app, &cross, true).await,
+        Err(Error(_, "origin_invalid"))
+    ));
+    let replay = h("[2001:db8::2]:8088", origin, "mail_session=web");
+    assert!(matches!(
+        identify(&app, &replay, false, false).await,
+        Err(Error(_, "session_expired"))
+    ));
+    let replay = h(
+        "mail.example.com",
+        &app.origin,
+        "__Host-mail_session=direct",
+    );
+    assert!(matches!(
+        identify(&app, &replay, false, false).await,
+        Err(Error(_, "session_expired"))
+    ));
+    let mut foreign = h("foreign.example", origin, "mail_session=direct");
+    foreign.insert(
+        "x-forwarded-host",
+        HeaderValue::from_static("[2001:db8::2]:8088"),
+    );
+    foreign.insert("x-forwarded-proto", HeaderValue::from_static("http"));
+    assert!(matches!(
+        identity(&app, &foreign, true).await,
+        Err(Error(_, "origin_invalid"))
+    ));
+    assert!(matches!(
+        access::require_primary(&app, &ip),
+        Err(Error(_, "primary_origin_required"))
+    ));
+    let mut conflicting = ip.clone();
+    conflicting.append(
+        "origin",
+        HeaderValue::from_static("https://foreign.example"),
+    );
+    assert!(same_origin(&app, &conflicting).is_err());
+    assert_eq!(app.hook_url(), "https://mail.example.com/internal/mta-hook");
+    app.db.close().await;
+    std::fs::remove_dir_all(dir).unwrap();
 }

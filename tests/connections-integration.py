@@ -38,6 +38,8 @@ def docker(*args):
 def request(url, method="GET", body=None, headers=None):
     data = None if body is None else body if isinstance(body, bytes) else json.dumps(body).encode()
     hdr = dict(headers or {})
+    if url.startswith(BASE + "/"):
+        hdr.setdefault("Host", "mail-web-connections-test:8080")
     if data is not None:
         hdr.setdefault("Content-Type", "application/json")
     try:

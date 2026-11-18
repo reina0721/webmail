@@ -283,6 +283,7 @@ mod tests {
             db: db.clone(),
             vault: Vault::new(&[1; 32]).unwrap(),
             origin: "https://webmail.example".into(),
+            direct_origin: None,
             upstream: Stalwart {
                 http: reqwest::Client::new(),
                 base: "https://upstream.example".into(),
@@ -341,6 +342,7 @@ mod tests {
             },
             vault: Vault::new(&[1; 32]).unwrap(),
             origin: "https://localhost".into(),
+            direct_origin: None,
             services: crate::config::Services {
                 domain: "mail.example".into(),
                 ..crate::config::Services::default()

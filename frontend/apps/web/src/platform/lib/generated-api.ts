@@ -164,6 +164,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/deployment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["deployment_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/deployment/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["submit_deployment_job"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/deployment/jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["read_deployment_job"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/directory": {
         parameters: {
             query?: never;
@@ -1264,6 +1312,7 @@ export interface components {
             turnstileSiteKey?: string;
         };
         ConfigurationView: {
+            directAccessUrl?: string | null;
             documentationUrl: string;
             hookSecretSet: boolean;
             missingRequirements: string[];
@@ -1275,6 +1324,13 @@ export interface components {
         };
         CredentialInput: {
             description: string;
+        };
+        DeploymentView: {
+            architecture: string;
+            inventory: components["schemas"]["Inventory"];
+            managerOnline: boolean;
+            revision: string;
+            version: string;
         };
         DirectoryPolicyInput: {
             enabled: boolean;
@@ -1318,6 +1374,21 @@ export interface components {
             needsOperator: boolean;
             version: string;
         };
+        Inventory: {
+            job?: null | components["schemas"]["Job"];
+            releases: components["schemas"]["PublishedVersion"][];
+            releasesStatus: string;
+            snapshots: components["schemas"]["Snapshot"][];
+        };
+        Job: {
+            id: string;
+            message: string;
+            operation: components["schemas"]["Operation"];
+            phase: components["schemas"]["Phase"];
+            recoveryCommand?: string | null;
+            runningVersion?: string | null;
+            targetVersion: string;
+        };
         Login: {
             email: string;
             password: string;
@@ -1330,6 +1401,8 @@ export interface components {
             read?: boolean | null;
             starred?: boolean | null;
         };
+        /** @enum {string} */
+        Operation: "update" | "rollback";
         OperatorInput: {
             email: string;
             password: string;
@@ -1339,6 +1412,8 @@ export interface components {
             current_password: string;
             new_password: string;
         };
+        /** @enum {string} */
+        Phase: "queued" | "download" | "verify" | "backup" | "switch" | "health" | "recovering" | "succeeded" | "recovered" | "failed";
         ProfileInput: {
             display_name?: string | null;
             language?: string | null;
@@ -1352,7 +1427,12 @@ export interface components {
             enabled: boolean;
             /** Format: int64 */
             maximumAccounts: number;
+            primaryOrigin?: string | null;
             siteKey: string;
+        };
+        PublishedVersion: {
+            prerelease: boolean;
+            version: string;
         };
         Recovery: {
             /** Format: uuid */
@@ -1390,6 +1470,20 @@ export interface components {
             /** Format: uuid */
             id: string;
             operator: boolean;
+        };
+        Snapshot: {
+            /** Format: int64 */
+            createdAt: number;
+            id: string;
+            version: string;
+        };
+        Submit: {
+            confirmDataRestore?: boolean;
+            expectedVersion: string;
+            id: string;
+            operation: components["schemas"]["Operation"];
+            /** @description Exact release tag for an update, registered snapshot ID for a rollback. */
+            target: string;
         };
         UploadView: {
             blobId: string;
@@ -1816,6 +1910,118 @@ export interface operations {
         };
         responses: {
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    deployment_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeploymentView"];
+                };
+            };
+            /** @description Operator required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    submit_deployment_job: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Submit"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description Operator required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Host rejected the operation */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Version manager unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    read_deployment_job: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description Operator required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Job not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Version manager unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

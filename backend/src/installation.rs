@@ -249,6 +249,7 @@ pub(super) struct ConfigurationView {
     policy_verified: bool,
     missing_requirements: Vec<String>,
     documentation_url: String,
+    direct_access_url: Option<String>,
 }
 #[utoipa::path(get,path="/api/v1/installation/config",responses((status=200,body=ConfigurationView),(status=401,description="Maintenance token or operator session required")))]
 pub(super) async fn read_config(
@@ -280,6 +281,7 @@ pub(super) async fn read_config(
         policy_verified: s.policy_verified,
         missing_requirements: discovery::missing(s),
         documentation_url: discovery::documentation_url(),
+        direct_access_url: access::backup_url(&app).map(str::to_owned),
     }))
 }
 pub(crate) fn domain_valid(domain: &str) -> bool {
@@ -678,6 +680,7 @@ mod tests {
             },
             vault: Vault::new(&[9; 32]).unwrap(),
             origin: String::new(),
+            direct_origin: None,
             services: config::Services {
                 brand: "Mail Web".into(),
                 ..config::Services::default()

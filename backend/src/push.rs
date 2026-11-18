@@ -43,7 +43,10 @@ async fn contexts(app: &App, headers: &HeaderMap) -> Vec<Identity> {
         seen.insert(me.user);
         output.push(me);
     }
-    let prefix = app.cookie_name("session_");
+    let Ok(access) = access::request(app, headers) else {
+        return output;
+    };
+    let prefix = access.cookie_name("session_");
     let names = headers
         .get("cookie")
         .and_then(|v| v.to_str().ok())

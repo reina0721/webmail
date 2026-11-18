@@ -1,0 +1,15 @@
+[package]
+name = "mailweb-shared"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+openapi = ["dep:utoipa"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+utoipa = { version = "5", optional = true }

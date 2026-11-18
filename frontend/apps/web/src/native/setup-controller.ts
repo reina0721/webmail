@@ -124,7 +124,22 @@ export function useAutomaticInstallation({
     setCfToken("");
     setOperatorPassword("");
     setTicket("");
+    setPreview(null);
   };
+  function changeStalwartAddress(value: string) {
+    setBase(value);
+    if (normalizeStalwart(value) === normalizeStalwart(base)) return;
+    if (!ticket) {
+      setPassword("");
+      setApiKey("");
+      return;
+    }
+    clearSecrets();
+    setDomains([]);
+    setAccounts([]);
+    setCloudflareRequested(false);
+    setSpec((current) => ({ ...current, domain: "", cloudflareAccount: "" }));
+  }
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -335,7 +350,6 @@ export function useAutomaticInstallation({
         headers: auth(),
       });
       clearSecrets();
-      setPreview(null);
       if (job?.status !== "running") {
         setApplied(false);
         setJob(null);
@@ -356,7 +370,7 @@ export function useAutomaticInstallation({
     pending,
     error,
     base,
-    setBase,
+    setBase: changeStalwartAddress,
     mode,
     setMode,
     username,

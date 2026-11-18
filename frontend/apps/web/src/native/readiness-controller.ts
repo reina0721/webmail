@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { api, errorMessage } from "@platform/lib/api";
+import { api, errorMessage, isTransientConnectionError } from "@platform/lib/api";
 
 type Check = { id: string; label: string; status: string; reason?: string };
 type Report = {
@@ -67,8 +67,7 @@ export function useReadiness({
     onChange?.(report.ready);
   }
 
-  async function load() {
-    const request = generation.current;
+  async function load(request = ++generation.current, retries = 4) {
     try {
       const report = await api<Report>("/installation/readiness" + query, {
         headers,
@@ -76,6 +75,11 @@ export function useReadiness({
       if (request === generation.current) accept(report);
     } catch (e) {
       if (request !== generation.current) return;
+      if (retries && isTransientConnectionError(e)) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 800));
+        if (request === generation.current) await load(request, retries - 1);
+        return;
+      }
       setValue(null);
       setError(errorMessage(e));
       onChange?.(false);
@@ -110,7 +114,7 @@ export function useReadiness({
         );
         if (request !== generation.current) return;
         setUrl(result.url);
-        await load();
+        await load(request);
         return;
       }
       const path =

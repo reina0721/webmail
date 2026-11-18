@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { errorCodeMessage } from "@platform/lib/api";
 import {
   Action,
   TextField,
@@ -17,6 +18,7 @@ const jobStates: Record<string, string> = {
   completed: "邮件服务配置已完成",
   failed: "配置未完成，可继续重试",
   cancelled: "配置已暂停",
+  interrupted: "配置中断，可继续重试",
 };
 
 export function ConsoleSetup() {
@@ -109,10 +111,15 @@ export function ConsoleSetup() {
             <h2>{jobStates[c.job.status] ?? "邮件服务配置状态"}</h2>
             {running && (
               <p role="status">
-                当前步骤：{setupSteps[c.job.step] ?? c.job.step}
+                {c.job.step
+                  ? `当前步骤：${setupSteps[c.job.step] ?? c.job.step}`
+                  : "正在准备配置…"}
               </p>
             )}
-            {c.job.error && <p role="alert">{c.job.error}</p>}
+            {c.job.error && <p role="alert">{errorCodeMessage(c.job.error)}</p>}
+            {showForm && !authorized && c.job.status !== "completed" && (
+              <p>修复后请重新验证 Stalwart 权限，再检查并应用原来的配置。</p>
+            )}
             {notes.length > 0 && (
               <details>
                 <summary>已完成的操作</summary>
@@ -128,7 +135,7 @@ export function ConsoleSetup() {
                 进入控制台 →
               </Link>
             ) : (
-              c.job.status !== "completed" && (
+              c.job.status === "running" && (
                 <Action
                   variant="secondary"
                   disabled={c.pending}
@@ -349,7 +356,7 @@ export function ConsoleSetup() {
               </Action>
             </section>
           )}
-          {c.preview && (
+          {authorized && c.preview && (
             <section className="console-panel">
               <h2>确认配置</h2>
               <ul>

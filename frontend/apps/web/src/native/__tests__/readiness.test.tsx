@@ -32,6 +32,13 @@ const report = {
 beforeEach(() => {
   request.mockReset();
 });
+it("rereads registration conditions when the service briefly restarts", async () => {
+  request.mockRejectedValueOnce(new TypeError("Failed to fetch")).mockResolvedValue(report);
+  render(<RegistrationReadiness />);
+  expect(await screen.findByText("Turnstile 配置", {}, { timeout: 3000 })).toBeInTheDocument();
+  expect(request).toHaveBeenCalledTimes(2);
+  expect(screen.queryByText(/连接失败，请稍后重试/)).not.toBeInTheDocument();
+});
 it("explains why verification is disabled and provides the actual repair entry", async () => {
   request.mockResolvedValue(report);
   render(<RegistrationReadiness />);

@@ -4,6 +4,14 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+## [0.4.0-alpha.13] - 2026-11-18
+
+### Fixed
+
+- Explain SMTP connectivity failures and clear old setup confirmation before authorization is renewed.
+- Clear prior credentials and confirmation when the Stalwart source changes.
+- Retry console and registration readiness reads during brief configuration restarts.
+
 ## [0.4.0-alpha.12] - 2026-11-18
 
 ### Fixed

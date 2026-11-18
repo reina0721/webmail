@@ -5,6 +5,7 @@ const request=vi.hoisted(()=>vi.fn());
 vi.mock('@platform/lib/api', async original=>({...await original<object>(),api:request}));
 vi.mock('../readiness',()=>({RegistrationReadiness:({domainId}:{domainId:string})=><div>Health: {domainId}</div>}));
 vi.mock('../directory-policy',()=>({ConsoleDirectory:({domainId,onDirtyChange}:{domainId:string;onDirtyChange:(dirty:boolean)=>void})=><button onClick={()=>onDirtyChange(true)}>Edit directory: {domainId}</button>}));
+import {ApiError} from '@platform/lib/api';
 import {Console} from '../console';
 const connections={services:[{id:'default',name:'A',origin:'https://a.example',configured:true},{id:'second',name:'B',origin:'https://b.example',configured:true}],domains:[{id:'default',name:'a.example',serviceId:'default',serviceName:'A'},{id:'domain-b',name:'b.example',serviceId:'second',serviceName:'B'}]};
 beforeEach(()=>{
@@ -79,4 +80,17 @@ it('keeps deployment controls hidden from ordinary mailbox users', async()=>{
  render(<Console section="versions"/>);
  expect(await screen.findByRole('heading',{name:'需要控制台权限'})).toBeInTheDocument();
  expect(request.mock.calls.some(([path])=>path.startsWith('/admin/'))).toBe(false);
+});
+
+it('opens registration after a temporary proxy failure while site settings apply', async()=>{
+ const previous=request.getMockImplementation()!;
+ let failed=false;
+ request.mockImplementation(async(path:string, options?:RequestInit)=>{
+  if(path==='/auth/session'&&!failed){failed=true;throw new ApiError(502,'unavailable');}
+  return previous(path,options);
+ });
+ render(<Console section="registration"/>);
+ expect(await screen.findByRole('heading',{name:'公开注册策略'},{timeout:3000})).toBeInTheDocument();
+ expect(request.mock.calls.filter(([path])=>path==='/auth/session')).toHaveLength(2);
+ expect(screen.queryByRole('button',{name:'重新连接'})).not.toBeInTheDocument();
 });

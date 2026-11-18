@@ -2,7 +2,7 @@
 import {useEffect,useState,useRef,type ReactNode} from 'react';
 import Link from 'next/link';
 import {Action,TextField,SelectField,CheckboxField,ConfirmDialog,Dialog,DialogTitle,DialogContent,DialogActions} from '@mail-web/ui';
-import {api,ApiError,errorMessage} from '@platform/lib/api';
+import {api,ApiError,errorMessage,isTransientConnectionError} from '@platform/lib/api';
 import {Auth,type Session} from './auth';
 import {useInstallationLeave} from '@platform/host/use-installation-leave';
 type User={id:string;email:string;status:string;operator:boolean;quotaBytes:number;hourlyRecipients:number;dailyRecipients:number};
@@ -36,7 +36,7 @@ export function Console({section='overview'}:{section?:Section}){
  const dirty=editorDirty||connectionDirty||!!policy&&saved!==JSON.stringify(policy);const leave=useInstallationLeave(dirty);
  const q='?domainId='+encodeURIComponent(domain);
  function changeDomain(id:string){const url=new URL(location.href);url.searchParams.delete('connection');history.replaceState(history.state,'',url);setDomain(id);}
- async function load(){
+ async function load(retries=4){
   const request=++generation.current;
   setLoading(true);
   setError('');
@@ -65,13 +65,18 @@ export function Console({section='overview'}:{section?:Section}){
    if(config){setSettings(config.settings);setDirectAccessUrl(config.directAccessUrl??null);}
   } catch(e) {
    if(request!==generation.current)return;
+   if(retries&&isTransientConnectionError(e)){
+    await new Promise<void>(resolve=>setTimeout(resolve,800));
+    if(request===generation.current)void load(retries-1);
+    return;
+   }
    if(e instanceof ApiError&&e.status===401)setSession(null);
    else setError(errorMessage(e));
   } finally {
    if(request===generation.current)setLoading(false);
   }
  }
- useEffect(()=>{setRegistrationReady(false);if(section!=='setup')void load();},[domain,section]);
+ useEffect(()=>{setRegistrationReady(false);if(section!=='setup')void load();return()=>{generation.current++;};},[domain,section]);
  useEffect(()=>{let active=true;void api<{version:string;revision:string}>('/health/ready').then(value=>{if(active)setHealth(value);}).catch(()=>{});return()=>{active=false;};},[]);
  async function run(operation:()=>Promise<void>){setBusy(true);setNotice('');try{await operation();setNotice('已保存');}catch(e){setNotice(errorMessage(e));}finally{setBusy(false);}}
  const title=nav.find(n=>n[0]===section)?.[1];

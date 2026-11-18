@@ -1,5 +1,6 @@
 import importlib.util
 import pathlib
+import json
 import unittest
 from unittest.mock import patch
 spec=importlib.util.spec_from_file_location('release_status',pathlib.Path(__file__).resolve().parents[1]/'tooling/release_status.py')
@@ -37,5 +38,30 @@ class ReleaseStatus(unittest.TestCase):
             status.verify_owner('owner/repo','v1.0.0',SHA,{'draft':True,'target_commitish':'main'})
         with patch.object(status,'gh_json',return_value={'object':{'type':'commit','sha':'b'*40}}),self.assertRaises(ValueError):
             status.verify_owner('owner/repo','v1.0.0',SHA,{'draft':False})
+
+    def test_untagged_draft_is_published_by_its_verified_release_id(self):
+        draft={'id':42,'tag_name':'v1.0.0','draft':True,'target_commitish':SHA,'body':'Notes'}
+        calls=[]
+        def api(path,*flags):
+            calls.append(path)
+            if path.endswith('?per_page=100'):
+                self.assertEqual(flags,('--paginate','--slurp'))
+                return [[{'tag_name':'v0.9.0'}],[draft]]
+            self.assertEqual(path,'repos/owner/repo/releases/42')
+            self.assertEqual(flags[:3],('--method','PATCH','--input'))
+            update=json.loads(pathlib.Path(flags[3]).read_text())
+            self.assertFalse(update['draft'])
+            self.assertIn('Fast checks: ✅ passed',update['body'])
+            return {**draft,'draft':False}
+        with patch.object(status,'gh_json',side_effect=api):
+            status.save_status('owner/repo','v1.0.0',SHA,'fast','success',URL,publish=True)
+        self.assertEqual(len(calls),2)
+    def test_lookup_never_selects_an_ambiguous_tag(self):
+        draft={'tag_name':'v1.0.0','draft':True}
+        with patch.object(status,'gh_json',return_value=[[draft],[draft]]),self.assertRaises(ValueError):
+            status.find_release('owner/repo','v1.0.0')
+    def test_published_release_is_never_published_again(self):
+        with patch.object(status,'find_release',return_value={'draft':False}),self.assertRaises(ValueError):
+            status.save_status('owner/repo','v1.0.0',SHA,'fast','success',URL,publish=True)
 
 if __name__=='__main__':unittest.main()

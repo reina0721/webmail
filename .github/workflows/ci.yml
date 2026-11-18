@@ -161,6 +161,5 @@ jobs:
           VERSION: ${{ needs.metadata.outputs.version }}
         run: |
           set -eu
-          sh tooling/release-guard.sh "$VERSION"
-          python3 tooling/release_status.py --repository "$GITHUB_REPOSITORY" --version "$VERSION" --commit "$GITHUB_SHA" --phase fast --status success --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-          gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false
+          test "$(sh tooling/release-guard.sh "$VERSION")" = existing
+          python3 tooling/release_status.py --publish --repository "$GITHUB_REPOSITORY" --version "$VERSION" --commit "$GITHUB_SHA" --phase fast --status success --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

@@ -1,4 +1,4 @@
-"""Update only the validation section of an immutable release's notes."""
+"""Find release drafts and record validation for immutable assets."""
 import argparse
 import json
 import pathlib
@@ -39,8 +39,17 @@ def render(body, commit, phase, status, run_url):
     return before + START + '\n' + '\n'.join([f'- Source commit: `{commit}`', fast, full]) + '\n' + END + after
 
 
-def gh_json(path):
-    return json.loads(subprocess.check_output(['gh', 'api', path], text=True))
+def gh_json(path, *flags):
+    return json.loads(subprocess.check_output(['gh', 'api', *flags, path], text=True))
+
+
+def find_release(repository, version):
+    # The exact-tag endpoint can return 404 while the draft has no git tag.
+    pages = gh_json(f'repos/{repository}/releases?per_page=100', '--paginate', '--slurp')
+    matches = [release for page in pages for release in page if release['tag_name'] == version]
+    if len(matches) > 1:
+        raise ValueError('More than one release has the requested tag')
+    return matches[0] if matches else None
 
 
 def verify_owner(repository, version, commit, release):
@@ -63,21 +72,51 @@ def verify_owner(repository, version, commit, release):
     raise ValueError('Cannot resolve the published tag')
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    for name in ('repository', 'version', 'commit', 'phase', 'status', 'run-url'):
-        parser.add_argument('--' + name, required=True)
-    args = parser.parse_args()
-    if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', args.repository) or not re.fullmatch(r'v\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?', args.version):
-        raise ValueError('Invalid repository or version')
-    release = gh_json(f'repos/{args.repository}/releases/tags/{args.version}')
-    verify_owner(args.repository, args.version, args.commit, release)
-    body = render(release.get('body') or '', args.commit, args.phase, args.status, args.run_url)
+def save_status(repository, version, commit, phase, status, run_url, publish=False):
+    if publish:
+        if phase != 'fast' or status != 'success':
+            raise ValueError('Publishing requires successful fast checks')
+        release = find_release(repository, version)
+        if release is None or not release['draft']:
+            raise ValueError('Publication requires an existing draft')
+    else:
+        release = gh_json(f'repos/{repository}/releases/tags/{version}')
+        if release['draft']:
+            raise ValueError('Validation status requires a published release')
+    verify_owner(repository, version, commit, release)
+    body = render(release.get('body') or '', commit, phase, status, run_url)
+    update = {'body': body}
+    if publish:
+        update['draft'] = False
     with tempfile.TemporaryDirectory() as folder:
         payload = pathlib.Path(folder) / 'notes.json'
-        payload.write_text(json.dumps({'body': body}), encoding='utf-8')
-        subprocess.run(['gh', 'api', '--method', 'PATCH', f'repos/{args.repository}/releases/{release["id"]}', '--input', str(payload)], check=True, stdout=subprocess.DEVNULL)
-    print(f'{args.version}: {args.phase} validation {args.status}; assets unchanged')
+        payload.write_text(json.dumps(update), encoding='utf-8')
+        result = gh_json(
+            f'repos/{repository}/releases/{release["id"]}', '--method', 'PATCH', '--input', str(payload)
+        )
+    if publish and (result['draft'] or result['tag_name'] != version):
+        raise ValueError('GitHub did not publish the requested draft')
+    print(f'{version}: {phase} validation {status}; assets unchanged')
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--repository', required=True)
+    parser.add_argument('--version', required=True)
+    actions = parser.add_mutually_exclusive_group()
+    actions.add_argument('--lookup', action='store_true')
+    actions.add_argument('--publish', action='store_true')
+    for name in ('commit', 'phase', 'status', 'run-url'):
+        parser.add_argument('--' + name)
+    args = parser.parse_args()
+    if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', args.repository) or not re.fullmatch(r'v\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?', args.version):
+        parser.error('Invalid repository or version')
+    if args.lookup:
+        print(json.dumps(find_release(args.repository, args.version)))
+        return
+    if not all((args.commit, args.phase, args.status, args.run_url)):
+        parser.error('Status updates require --commit, --phase, --status and --run-url')
+    save_status(args.repository, args.version, args.commit, args.phase, args.status, args.run_url, args.publish)
 
 
 if __name__ == '__main__':

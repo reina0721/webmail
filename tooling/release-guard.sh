@@ -18,7 +18,8 @@ tag_commit=$(awk 'NR == 1 {sha=$1} /\^\{\}$/ {sha=$1} END {print sha}' "$stage/t
 if [ -n "$tag_commit" ]; then
  test "$tag_commit" = "$commit" || { echo 'Version tag belongs to another commit; choose a new version' >&2; exit 1; }
 fi
-if gh api "repos/$repository/releases/tags/$version" > "$stage/release" 2> "$stage/error"; then
+python3 tooling/release_status.py --lookup --repository "$repository" --version "$version" > "$stage/release"
+if jq -e 'type == "object"' "$stage/release" >/dev/null; then
  # GitHub ignores target_commitish when the tag already exists. A symbolic
  # target is acceptable only with a tag already verified against this commit.
  jq -e --arg commit "$commit" --arg tag "$tag_commit" '.draft == true and
@@ -28,6 +29,5 @@ if gh api "repos/$repository/releases/tags/$version" > "$stage/release" 2> "$sta
  }
  echo existing
 else
- grep -q 'HTTP 404' "$stage/error" || { cat "$stage/error" >&2; exit 1; }
  echo new
 fi

@@ -20,7 +20,7 @@ test('publication depends on native builds and checksums; installation runs afte
 test('published record exists before public release and triggers pinned full validation',()=>{
  const steps=quick.jobs.publish.steps;
  const record=steps.findIndex(step=>step.with?.name==='published-release');
- const publish=steps.findIndex(step=>step.run?.includes('--draft=false'));
+ const publish=steps.findIndex(step=>step.run?.includes('release_status.py --publish'));
  assert.ok(record>=0&&record<publish);
  assert.deepEqual(full.on.workflow_run.workflows,[quick.name]);
  assert.match(full.jobs.metadata.if,/head_repository.full_name == github.repository/);
@@ -51,5 +51,5 @@ test('ordinary checks stay read-only and full results update notes only after bo
  assert.match(runs(full.jobs.report),/INSTALLATION_RESULT/);
  assert.match(full.jobs.report.if,/outputs.release == 'true'/);
  assert.match(runs(full.jobs.report),/--phase full --status/);
- assert.doesNotMatch(runs(full.jobs.report),/release upload|--draft=false/);
+ assert.doesNotMatch(runs(full.jobs.report),/release upload|--draft=false|--publish/);
 });

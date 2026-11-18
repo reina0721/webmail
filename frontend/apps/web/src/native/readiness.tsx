@@ -30,9 +30,7 @@ export function RegistrationReadiness({
   const format = (time?: number) =>
     time ? new Date(time).toLocaleString() : "尚无记录";
   const failed = v?.items.filter((item) => item.status !== "passed") ?? [];
-  const missingTurnstile = failed.some(
-    (item) => item.reason === "turnstile_missing",
-  );
+  const missingTurnstile = failed.some((item) => item.id === "turnstile");
   const canVerify = !!v?.items.length && !failed.length;
   const registrationStatus = v?.effectiveEnabled
     ? "公开注册已开启。"
@@ -63,7 +61,8 @@ export function RegistrationReadiness({
       await navigator.clipboard.writeText(url);
       message = "验证链接已复制，可以在普通浏览器打开。";
     } catch {
-      message = "浏览器无法写入剪贴板。请右键打开验证页的链接，选择复制链接地址。";
+      message =
+        "浏览器无法写入剪贴板。请右键打开验证页的链接，选择复制链接地址。";
     }
     setCopyResult({ url: c.url, message });
   }
@@ -146,7 +145,7 @@ export function RegistrationReadiness({
       )}
       {missingTurnstile && (
         <a className="console-link" href="/console/site/#turnstile-setup">
-          使用 Cloudflare API Token 自动配置 Turnstile →
+          配置或修复 Turnstile →
         </a>
       )}
       <div className="console-checklist">
@@ -167,7 +166,7 @@ export function RegistrationReadiness({
                     item.reason ??
                     "请检查连接与权限。"}
                 </p>
-                {item.reason === "turnstile_missing" ? (
+                {item.id === "turnstile" ? (
                   <a
                     className="console-link"
                     href="/console/site/#turnstile-setup"

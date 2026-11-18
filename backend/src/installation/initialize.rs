@@ -335,6 +335,29 @@ pub(crate) struct Request {
     spec: Spec,
     #[serde(default, rename = "operatorPassword")]
     operator_password: Option<String>,
+    #[serde(default, rename = "cloudflareToken")]
+    cloudflare_token: Option<String>,
+}
+fn apply_cloudflare_input(input: &mut Request, access: &mut Grant) -> Result<()> {
+    if let Some(token) = input.cloudflare_token.take() {
+        let token = zeroize::Zeroizing::new(token);
+        if token.len() > 4096 {
+            return Err(Error(StatusCode::BAD_REQUEST, "credential_too_long"));
+        }
+        access.cloudflare_token.zeroize();
+        access.cloudflare_token = token.trim().into();
+    }
+    input.spec.cloudflare_account = input.spec.cloudflare_account.trim().into();
+    if !input.spec.cloudflare_account.is_empty() {
+        cloudflare::hostname(&input.spec.public_origin)?;
+    }
+    if !access.cloudflare_token.is_empty() && input.spec.cloudflare_account.is_empty() {
+        return Err(Error(
+            StatusCode::BAD_REQUEST,
+            "cloudflare_account_required",
+        ));
+    }
+    Ok(())
 }
 fn normalize_spec(spec: &mut Spec) -> Result<()> {
     spec.brand = spec.brand.trim().into();
@@ -356,15 +379,7 @@ pub(crate) async fn preflight(
     normalize_spec(&mut input.spec)?;
     let who = owner(&app, &headers, true).await?;
     let mut access = grant(&input.ticket, &who).await?;
-    if !input.spec.cloudflare_account.is_empty() {
-        cloudflare::hostname(&input.spec.public_origin)?;
-    }
-    if !access.cloudflare_token.is_empty() && input.spec.cloudflare_account.is_empty() {
-        return Err(Error(
-            StatusCode::BAD_REQUEST,
-            "cloudflare_account_required",
-        ));
-    }
+    apply_cloudflare_input(&mut input, &mut access)?;
     if let Some(password) = input.operator_password.take() {
         access.operator_password = password;
         if let Some(stored) = GRANTS.lock().await.get_mut(&input.ticket) {
@@ -412,15 +427,7 @@ pub(crate) async fn start(
     normalize_spec(&mut input.spec)?;
     let who = owner(&app, &headers, true).await?;
     let mut access = grant(&input.ticket, &who).await?;
-    if !input.spec.cloudflare_account.is_empty() {
-        cloudflare::hostname(&input.spec.public_origin)?;
-    }
-    if !access.cloudflare_token.is_empty() && input.spec.cloudflare_account.is_empty() {
-        return Err(Error(
-            StatusCode::BAD_REQUEST,
-            "cloudflare_account_required",
-        ));
-    }
+    apply_cloudflare_input(&mut input, &mut access)?;
     if let Some(password) = input.operator_password.take() {
         access.operator_password = password;
         if let Some(stored) = GRANTS.lock().await.get_mut(&input.ticket) {

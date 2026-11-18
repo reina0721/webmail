@@ -28,6 +28,7 @@ fn fingerprint(app: &App) -> String {
     let mut services = app.services.clone();
     services.brand.clear();
     services.policy_verified = false;
+    services.turnstile_binding = None;
     hash(&format!(
         "readiness-v1:{}:{}:{}",
         app.upstream.base,
@@ -505,11 +506,29 @@ pub async fn check(app: &App) -> Result<()> {
     );
     item!(
         "turnstile",
-        "Turnstile 配置（真实验证在下一步）",
-        if s.turnstile_ready() {
-            Ok(())
-        } else {
+        "Turnstile 密钥（组件实测与收信在下一步）",
+        if !s.turnstile_ready() {
             Err(Error(StatusCode::BAD_REQUEST, "turnstile_missing"))
+        } else if app
+            .root
+            .as_deref()
+            .unwrap_or(app)
+            .services
+            .turnstile_binding
+            .as_ref()
+            .is_some_and(|binding| {
+                reqwest::Url::parse(&app.origin)
+                    .ok()
+                    .and_then(|url| url.host_str().map(|host| !binding.permits(host)))
+                    .unwrap_or(false)
+            })
+        {
+            Err(Error(
+                StatusCode::BAD_REQUEST,
+                "turnstile_hostname_mismatch",
+            ))
+        } else {
+            Ok(())
         }
     );
     let ok = items.iter().all(|i| i["status"] == "passed");
@@ -752,6 +771,7 @@ mod tests {
             hook_secret: "hook".into(),
             turnstile_site_key: "site".into(),
             turnstile_secret: "secret".into(),
+            turnstile_binding: None,
             policy_verified: true,
         };
         let app = App {

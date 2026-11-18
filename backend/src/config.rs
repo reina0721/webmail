@@ -10,9 +10,31 @@ pub struct Services {
     pub domain_id: String,
     pub turnstile_secret: String,
     pub turnstile_site_key: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub turnstile_binding: Option<TurnstileBinding>,
     pub hook_secret: String,
     pub hook_id: String,
     pub policy_verified: bool,
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TurnstileBinding {
+    pub account_id: String,
+    pub widget_name: String,
+    pub hostnames: Vec<String>,
+    pub checked_at: i64,
+}
+impl TurnstileBinding {
+    pub fn permits(&self, host: &str) -> bool {
+        self.hostnames.iter().any(|allowed| {
+            let allowed = allowed.to_ascii_lowercase();
+            host == allowed
+                || host
+                    .strip_suffix(&allowed)
+                    .is_some_and(|prefix| prefix.ends_with('.'))
+        })
+    }
 }
 fn secret(name: &str) -> String {
     std::env::var(name)
@@ -37,6 +59,7 @@ impl Services {
             domain_id: std::env::var("STALWART_DOMAIN_ID").unwrap_or_default(),
             turnstile_secret: secret("TURNSTILE_SECRET_FILE"),
             turnstile_site_key: std::env::var("TURNSTILE_SITE_KEY").unwrap_or_default(),
+            turnstile_binding: None,
             hook_secret: secret("MTA_HOOK_SECRET_FILE"),
             hook_id: std::env::var("STALWART_HOOK_ID").unwrap_or_default(),
             policy_verified: std::env::var("MTA_POLICY_VERIFIED").as_deref() == Ok("true"),

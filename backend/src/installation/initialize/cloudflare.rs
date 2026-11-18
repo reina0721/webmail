@@ -1,4 +1,5 @@
 use super::*;
+use subtle::ConstantTimeEq;
 pub(super) const API: &str = "https://api.cloudflare.com/client/v4";
 pub(super) fn hostname(origin: &str) -> Result<String> {
     let url = reqwest::Url::parse(origin)
@@ -125,6 +126,111 @@ pub(super) async fn validate_at(app: &App, key: &str, id: &str, base: &str) -> R
     .await?;
     Ok(())
 }
+
+fn binding(account: &str, widget: &Value) -> Result<config::TurnstileBinding> {
+    let invalid = || Error(StatusCode::BAD_GATEWAY, "cloudflare_response_invalid");
+    let name = widget["name"]
+        .as_str()
+        .filter(|name| !name.is_empty())
+        .ok_or_else(invalid)?;
+    let hostnames = serde_json::from_value(widget["domains"].clone()).map_err(|_| invalid())?;
+    Ok(config::TurnstileBinding {
+        account_id: account.into(),
+        widget_name: name.into(),
+        hostnames,
+        checked_at: db::now(),
+    })
+}
+
+pub(super) async fn repair_at(
+    app: &App,
+    saved: &RuntimeConfig,
+    key: &str,
+    account: &str,
+    host: &str,
+    base: &str,
+) -> Result<(config::TurnstileBinding, bool)> {
+    let site = &saved.services.turnstile_site_key;
+    let secret_matches = |widget: &Value| {
+        widget["secret"].as_str().is_some_and(|secret| {
+            bool::from(
+                secret
+                    .as_bytes()
+                    .ct_eq(saved.services.turnstile_secret.as_bytes()),
+            )
+        })
+    };
+    let endpoint = format!("/accounts/{account}/challenges/widgets");
+    let items = widgets(app, key, &endpoint, base).await?;
+    if !items.iter().any(|widget| widget["sitekey"] == *site) {
+        return Err(Error(StatusCode::CONFLICT, "turnstile_widget_missing"));
+    }
+    let path = format!("{endpoint}/{site}");
+    let client = &app.upstream.http;
+    let widget = request_at(client, base, key, reqwest::Method::GET, &path, None).await?;
+    if widget["sitekey"] != *site {
+        return Err(Error(
+            StatusCode::BAD_GATEWAY,
+            "cloudflare_response_invalid",
+        ));
+    }
+    if !secret_matches(&widget) {
+        return Err(Error(
+            StatusCode::CONFLICT,
+            "turnstile_widget_secret_mismatch",
+        ));
+    }
+    let current = binding(account, &widget)?;
+    if current.permits(host) {
+        return Ok((current, false));
+    }
+    if current.hostnames.is_empty() {
+        return Err(Error(StatusCode::CONFLICT, "turnstile_widget_unrestricted"));
+    }
+    let mode = widget["mode"]
+        .as_str()
+        .filter(|mode| matches!(*mode, "non-interactive" | "invisible" | "managed"))
+        .ok_or(Error(
+            StatusCode::BAD_GATEWAY,
+            "cloudflare_response_invalid",
+        ))?;
+    let mut domains = current.hostnames;
+    domains.push(host.into());
+    let mut payload = json!({"domains":domains,"mode":mode,"name":current.widget_name});
+    for field in [
+        "bot_fight_mode",
+        "clearance_level",
+        "ephemeral_id",
+        "offlabel",
+        "region",
+    ] {
+        if let Some(value) = widget.get(field).filter(|value| !value.is_null()) {
+            payload[field] = value.clone();
+        }
+    }
+    let updated = request_at(
+        client,
+        base,
+        key,
+        reqwest::Method::PUT,
+        &path,
+        Some(payload),
+    )
+    .await?;
+    let confirmed = binding(account, &updated)?;
+    if updated["sitekey"] != *site
+        || !secret_matches(&updated)
+        || !domains
+            .iter()
+            .all(|domain| confirmed.hostnames.contains(domain))
+    {
+        return Err(Error(
+            StatusCode::BAD_GATEWAY,
+            "cloudflare_response_invalid",
+        ));
+    }
+    Ok((confirmed, true))
+}
 pub(super) async fn create(app: &App, job: &mut Job, key: &str) -> Result<()> {
     create_at(app, job, key, API, &|job| journal::write(app, job)).await
 }
@@ -163,6 +269,7 @@ pub(super) async fn create_at(
     {
         let site = candidates[0]["sitekey"]
             .as_str()
+            .filter(|site| config::turnstile_key_valid(site))
             .ok_or_else(|| internal("turnstile_result_missing"))?;
         request_at(
             &app.upstream.http,
@@ -178,11 +285,20 @@ pub(super) async fn create_at(
     };
     let site = widget["sitekey"]
         .as_str()
+        .filter(|site| config::turnstile_key_valid(site))
         .ok_or_else(|| internal("turnstile_result_missing"))?;
     let secret = widget["secret"]
         .as_str()
-        .filter(|v| !v.is_empty())
+        .filter(|v| config::turnstile_key_valid(v))
         .ok_or(Error(StatusCode::CONFLICT, "turnstile_secret_unavailable"))?;
+    let binding = binding(account, &widget)?;
+    if binding.widget_name != name || binding.hostnames != [host] {
+        return Err(Error(
+            StatusCode::BAD_GATEWAY,
+            "cloudflare_response_invalid",
+        ));
+    }
+    job.turnstile_binding = Some(binding);
     job.resources.insert("turnstile".into(), site.into());
     job.secrets.insert("turnstile".into(), secret.into());
     save(job)

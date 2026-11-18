@@ -4,6 +4,18 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+## [0.4.0-alpha.14] - 2026-11-18
+
+### Added
+
+- Repair a saved Turnstile widget after an origin change and explicitly replace a missing widget.
+- Show the Cloudflare account, widget name, public Site Key, confirmed hostnames and credential status.
+
+### Fixed
+
+- Keep the Cloudflare Account ID field visible during setup and repair, including when a Token is pasted after Stalwart authorization.
+- Report what configuration was reloaded and preserve the current form draft.
+
 ## [0.4.0-alpha.13] - 2026-11-18
 
 ### Fixed

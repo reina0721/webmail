@@ -43,7 +43,7 @@ type Status = {
   needsOperator: boolean;
   instanceId: string;
 };
-const resourceNames: Record<string, string> = {
+export const setupResourceNames: Record<string, string> = {
   domain: "邮箱域名 ID",
   directory: "目录服务身份",
   directoryKey: "目录服务密钥 ID",
@@ -75,6 +75,7 @@ export function useAutomaticInstallation({
   const { token, setToken, origin } = useSetupAccess();
   const [connectionsDirty, setConnectionsDirty] = useState(false);
   const [site, setSite] = useState({ brand: "", origin: "" });
+  const [reloadNotice, setReloadNotice] = useState("");
   const [repairPrimary, setRepairPrimary] = useState(false);
   const [advanced, setAdvanced] = useState(false),
     [status, setStatus] = useState<Status | null>(initialStatus ?? null),
@@ -118,6 +119,12 @@ export function useAutomaticInstallation({
     setDirty(true);
     setPreview(null);
   };
+  function updateCloudflareToken(value: string) {
+    setCfToken(value);
+    setAccounts([]);
+    setPreview(null);
+    setDirty(true);
+  }
   const clearSecrets = () => {
     setPassword("");
     setApiKey("");
@@ -147,11 +154,12 @@ export function useAutomaticInstallation({
       generation.current++;
     };
   }, []);
-  async function load() {
+  async function load(manual = false) {
     const at = ++generation.current,
       active = () => alive.current && at === generation.current;
     setPending(true);
     setError("");
+    setReloadNotice("");
     try {
       const current = initialStatus ?? (await api<Status>("/installation"));
       if (!active()) return;
@@ -176,7 +184,8 @@ export function useAutomaticInstallation({
       if (!active()) return;
       setStatus(current);
       setJob(prior.job);
-      if (prior.job) {
+      const keepDraft = manual && loaded;
+      if (!keepDraft && prior.job && prior.job.status !== "completed") {
         setSpec({
           ...prior.job.spec,
           directoryQueries: prior.job.spec.directoryQueries ?? false,
@@ -184,19 +193,41 @@ export function useAutomaticInstallation({
         setBase(prior.job.base);
       }
       if (value) {
-        setBase(value.settings.stalwartUrl);
         setSite({
           brand: value.settings.brand,
           origin: value.settings.publicOrigin,
         });
-        if (!prior.job)
+        if (!keepDraft && (!prior.job || prior.job.status === "completed")) {
+          setBase(value.settings.stalwartUrl);
           setSpec((s) => ({
             ...s,
             brand: value.settings.brand,
             domain: value.settings.domain,
             publicOrigin: value.settings.publicOrigin,
+            operatorEmail: prior.job?.spec?.operatorEmail ?? s.operatorEmail,
+            recoveryEmail: prior.job?.spec?.recoveryEmail ?? s.recoveryEmail,
           }));
+        }
       } else setSpec((s) => ({ ...s, publicOrigin: s.publicOrigin || origin }));
+      if (manual) {
+        const state = prior.job && setupSteps[prior.job.step];
+        setReloadNotice(
+          value
+            ? `已读取已保存的配置。当前主地址为 ${value.settings.publicOrigin}。`
+            : "已读取安装状态。邮件服务配置尚未完成。",
+        );
+        if (state && prior.job?.status !== "completed")
+          setReloadNotice((notice) => notice + ` 上次进行到「${state}」。`);
+        if (
+          (cfToken.trim() || cloudflareRequested) &&
+          !spec.cloudflareAccount.trim()
+        )
+          setReloadNotice(
+            (notice) =>
+              notice +
+              " 如需继续验证配置，请在下方「Turnstile 人机验证」补齐 Cloudflare 账号。",
+          );
+      }
       setError("");
       setLoaded(true);
     } catch (e) {
@@ -264,6 +295,7 @@ export function useAutomaticInstallation({
     const at = ++generation.current;
     setPending(true);
     setError("");
+    setReloadNotice("");
     setPreview(null);
     setTicket("");
     try {
@@ -295,7 +327,11 @@ export function useAutomaticInstallation({
         setSpec((s) => ({ ...s, domain: s.domain || value.domains[0].name }));
       setAccounts(value.cloudflareAccounts);
       if (value.cloudflareAccounts.length === 1)
-        change("cloudflareAccount", value.cloudflareAccounts[0].id);
+        setSpec((current) => ({
+          ...current,
+          cloudflareAccount:
+            current.cloudflareAccount || value.cloudflareAccounts[0].id,
+        }));
       setPassword("");
       setApiKey("");
       setCfToken("");
@@ -308,16 +344,57 @@ export function useAutomaticInstallation({
   async function preflight() {
     setPending(true);
     setError("");
+    setReloadNotice("");
     try {
-      const value = await api<{ resources: string[] }>(
+      const target = {
+        ...spec,
+        cloudflareAccount: spec.cloudflareAccount.trim(),
+      };
+      if (cfToken.trim() && !target.cloudflareAccount) {
+        const result = await api<{ accounts: { id: string; name: string }[] }>(
+          "/installation/turnstile/accounts",
+          {
+            method: "POST",
+            headers: auth(),
+            body: JSON.stringify({ cloudflareToken: cfToken.trim() }),
+          },
+        );
+        setAccounts(result.accounts);
+        if (result.accounts.length === 1) {
+          target.cloudflareAccount = result.accounts[0].id;
+          change("cloudflareAccount", target.cloudflareAccount);
+        }
+      }
+      if (
+        (cfToken.trim() || cloudflareRequested) &&
+        !target.cloudflareAccount
+      ) {
+        setError(
+          "请在「Turnstile 人机验证」中选择 Cloudflare 账号或填写 Account ID。",
+        );
+        return;
+      }
+      const value = await api<{ resources: string[]; turnstile?: boolean }>(
         "/installation/initialize/preflight",
         {
           method: "POST",
           headers: auth(),
-          body: JSON.stringify({ ticket, spec, operatorPassword }),
+          body: JSON.stringify({
+            ticket,
+            spec: target,
+            operatorPassword,
+            ...(cfToken.trim() && { cloudflareToken: cfToken.trim() }),
+          }),
         },
       );
-      setPreview(value.resources);
+      setPreview(
+        value.turnstile
+          ? [
+              ...value.resources,
+              "Cloudflare Turnstile 组件与一对密钥（Site Key 和 Secret）",
+            ]
+          : value.resources,
+      );
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -331,11 +408,17 @@ export function useAutomaticInstallation({
       const result = await api<{ job: Job }>("/installation/initialize/job", {
         method: "POST",
         headers: auth(),
-        body: JSON.stringify({ ticket, spec, operatorPassword }),
+        body: JSON.stringify({
+          ticket,
+          spec,
+          operatorPassword,
+          ...(cfToken.trim() && { cloudflareToken: cfToken.trim() }),
+        }),
       });
       setJob(result.job);
       setDirty(false);
       setOperatorPassword("");
+      setCfToken("");
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -369,6 +452,7 @@ export function useAutomaticInstallation({
     loaded,
     pending,
     error,
+    reloadNotice,
     base,
     setBase: changeStalwartAddress,
     mode,
@@ -380,7 +464,7 @@ export function useAutomaticInstallation({
     apiKey,
     setApiKey,
     cfToken,
-    setCfToken,
+    setCfToken: updateCloudflareToken,
     operatorPassword,
     setOperatorPassword,
     spec,

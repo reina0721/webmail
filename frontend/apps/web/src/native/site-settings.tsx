@@ -14,12 +14,10 @@ export function SiteSettings({
   initial,
   directAccessUrl,
   onSave,
-  onApplied,
 }: {
   initial: Settings;
   directAccessUrl?: string | null;
   onSave: (value: SiteUpdate) => Promise<void>;
-  onApplied: () => void;
 }) {
   const [value, setValue] = useState({
     brand: initial.brand,
@@ -64,7 +62,9 @@ export function SiteSettings({
       await onSave(update);
       setValue(update);
       setNotice(
-        "站点地址已保存。请打开主地址确认邮箱能正常访问，再配置注册验证。",
+        update.publicOrigin !== initial.publicOrigin
+          ? "主地址已保存。请打开主地址确认邮箱能正常访问，再到下方核对 Turnstile 组件是否允许新域名。"
+          : "站点名称已保存。",
       );
     } catch (e) {
       setError(errorMessage(e));
@@ -160,60 +160,59 @@ export function SiteSettings({
         publicOrigin={initial.publicOrigin}
         disabled={dirty || busy || editingKeys}
         onBusyChange={setAutomaticBusy}
-        onApplied={onApplied}
       />
       <section className="console-panel">
-        <details>
-          <summary>手动配置已有的 Turnstile 组件</summary>
+        <header>
+          <h2>手动配置已有的 Turnstile 组件（可选）</h2>
           <p>
-            如果你已在 Cloudflare 创建组件，请填写同一个组件的 Site Key 和
-            Secret。组件必须允许 Webmail 主地址的域名。
+            使用上方自动配置后可跳过。若已有 Cloudflare 组件，可手动保存该组件的
+            Site Key 和 Secret。
           </p>
-          {legacyKey && (
-            <p>
-              原来保存的 Site Key
-              格式无效。可在上方自动创建组件，或在这里填入正确的两把密钥。
-            </p>
-          )}
-          <div className="console-form-grid">
-            <TextField
-              label="Turnstile Site Key"
-              disabled={locked}
-              value={siteKey}
-              onChange={(e) => setSiteKey(e.target.value)}
-            />
-            <PasswordField
-              label="Turnstile Secret"
-              purpose="new"
-              disabled={locked}
-              value={secret}
-              onChange={(e) => setSecret(e.target.value)}
-            />
-          </div>
-          <div className="console-actions">
+        </header>
+        {legacyKey && (
+          <p>
+            原来保存的 Site Key
+            格式无效。可在上方自动创建组件，或在这里填入正确的两把密钥。
+          </p>
+        )}
+        <div className="console-form-grid">
+          <TextField
+            label="Turnstile Site Key"
+            disabled={locked}
+            value={siteKey}
+            onChange={(e) => setSiteKey(e.target.value)}
+          />
+          <PasswordField
+            label="Turnstile Secret"
+            purpose="new"
+            disabled={locked}
+            value={secret}
+            onChange={(e) => setSecret(e.target.value)}
+          />
+        </div>
+        <div className="console-actions">
+          <Action
+            disabled={!editingKeys || dirty || automaticBusy}
+            loading={busy && editingKeys}
+            onPress={() => void saveKeys()}
+          >
+            保存 Turnstile 密钥
+          </Action>
+          {editingKeys && (
             <Action
-              disabled={!editingKeys || dirty || automaticBusy}
-              loading={busy && editingKeys}
-              onPress={() => void saveKeys()}
+              variant="quiet"
+              disabled={locked}
+              onPress={() => {
+                setSiteKey("");
+                setSecret("");
+                setManualMessage("");
+              }}
             >
-              保存 Turnstile 密钥
+              清除输入
             </Action>
-            {editingKeys && (
-              <Action
-                variant="quiet"
-                disabled={locked}
-                onPress={() => {
-                  setSiteKey("");
-                  setSecret("");
-                  setManualMessage("");
-                }}
-              >
-                清除输入
-              </Action>
-            )}
-          </div>
-          {manualMessage && <p role="status">{manualMessage}</p>}
-        </details>
+          )}
+        </div>
+        {manualMessage && <p role="status">{manualMessage}</p>}
       </section>
       <ConfirmDialog
         triggerLabel="离开"

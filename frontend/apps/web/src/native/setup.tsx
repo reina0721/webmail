@@ -10,7 +10,11 @@ import {
   CheckboxField,
   ConfirmDialog,
 } from "@mail-web/ui";
-import { setupSteps, useAutomaticInstallation } from "./setup-controller";
+import {
+  setupResourceNames,
+  setupSteps,
+  useAutomaticInstallation,
+} from "./setup-controller";
 
 const jobStates: Record<string, string> = {
   running: "正在配置邮件服务",
@@ -38,6 +42,13 @@ export function ConsoleSetup() {
   }));
   const locked = c.pending || running;
   const notes = c.job?.completed.map((step) => setupSteps[step] ?? step) ?? [];
+  const resources = Object.entries(c.job?.resources ?? {}).filter(
+    ([key]) => key in setupResourceNames,
+  );
+  const cloudflareAccounts = c.accounts.map((account) => ({
+    value: account.id,
+    label: account.name,
+  }));
 
   return (
     <div className="console-setup">
@@ -52,7 +63,10 @@ export function ConsoleSetup() {
             </p>
           </header>
           <div className="console-actions">
-            <Link className="console-link" href="/console/site/">
+            <Link
+              className="console-link"
+              href="/console/site/#turnstile-setup"
+            >
               设置主地址与 Turnstile →
             </Link>
             <Link className="console-link" href="/console/registration/">
@@ -64,7 +78,9 @@ export function ConsoleSetup() {
           </div>
           <details>
             <summary>修复 Stalwart 连接或权限</summary>
-            <p>用于重新授权 Stalwart，补齐此安装所需的权限与邮件服务资源。</p>
+            <p>
+              需要修复 Stalwart 连接或权限时，用它重新授权并检查邮件服务资源。
+            </p>
             <Action
               variant="secondary"
               disabled={locked || !c.loaded}
@@ -93,16 +109,22 @@ export function ConsoleSetup() {
           {c.pending && <p role="status">正在处理，请稍候…</p>}
         </section>
       )}
-      {c.error && (
-        <div className="console-alert" role="alert">
-          {c.error}
+      {(!installed || repair || c.error) && (
+        <div className="console-actions">
           <Action
             variant="quiet"
             disabled={locked}
-            onPress={() => void c.load()}
+            loading={c.pending}
+            onPress={() => void c.load(true)}
           >
             重新读取配置
           </Action>
+        </div>
+      )}
+      {c.reloadNotice && <p role="status">{c.reloadNotice}</p>}
+      {c.error && (
+        <div className="console-alert" role="alert">
+          {c.error}
         </div>
       )}
       {c.job &&
@@ -121,14 +143,14 @@ export function ConsoleSetup() {
               <p>修复后请重新验证 Stalwart 权限，再检查并应用原来的配置。</p>
             )}
             {notes.length > 0 && (
-              <details>
-                <summary>已完成的操作</summary>
+              <div>
+                <h3>已完成的操作</h3>
                 <ul>
                   {notes.map((step) => (
                     <li key={step}>{step}</li>
                   ))}
                 </ul>
-              </details>
+              </div>
             )}
             {c.applied ? (
               <Link className="console-link" href="/console/">
@@ -201,20 +223,6 @@ export function ConsoleSetup() {
                 />
               )}
             </div>
-            <details>
-              <summary>同时配置公开注册的人机验证（可选）</summary>
-              <p>
-                只使用邮箱时可以跳过。以后可在「站点与默认设置」添加 Turnstile。
-              </p>
-              <PasswordField
-                purpose="current"
-                label="Cloudflare API Token"
-                hint="需要目标 Cloudflare 账号的 Turnstile 编辑权限。"
-                value={c.cfToken}
-                disabled={locked}
-                onChange={(e) => c.setCfToken(e.target.value)}
-              />
-            </details>
             <Action
               loading={c.pending && !authorized}
               disabled={
@@ -233,6 +241,63 @@ export function ConsoleSetup() {
                 Stalwart 授权已取得。请继续填写站点与运营邮箱。
               </p>
             )}
+          </section>
+          <section className="console-panel" id="installation-turnstile">
+            <header>
+              <h2>Turnstile 人机验证（可选）</h2>
+              <p>
+                开启公开注册时使用。配置成功后，Cloudflare 会生成验证组件、Site
+                Key 和 Secret。
+              </p>
+              {installed && (
+                <Link
+                  className="console-link"
+                  href="/console/site/#turnstile-setup"
+                >
+                  只修复现有 Turnstile 组件 →
+                </Link>
+              )}
+            </header>
+            <div className="console-form-grid">
+              <PasswordField
+                purpose="current"
+                label="Cloudflare API Token"
+                hint={
+                  c.cloudflareRequested
+                    ? "本次 Stalwart 授权中已提供 Token。也可在这里输入新的 Token。"
+                    : "需要目标 Cloudflare 账号的 Turnstile 编辑权限。"
+                }
+                value={c.cfToken}
+                disabled={locked}
+                onChange={(e) => c.setCfToken(e.target.value)}
+              />
+              <TextField
+                label="Cloudflare Account ID"
+                hint="32 位账号 ID。Token 能读取账号时，可以留空并自动选择。"
+                value={c.spec.cloudflareAccount}
+                onChange={(e) => c.change("cloudflareAccount", e.target.value)}
+                disabled={locked}
+              />
+              {cloudflareAccounts.length > 1 && (
+                <SelectField
+                  label="从读取到的 Cloudflare 账号中选择"
+                  value={c.spec.cloudflareAccount}
+                  options={cloudflareAccounts}
+                  onValueChange={(value) =>
+                    c.change("cloudflareAccount", value)
+                  }
+                  disabled={locked}
+                />
+              )}
+            </div>
+            <a
+              className="console-link"
+              href="https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              在 Cloudflare 找到 Account ID ↗
+            </a>
           </section>
           {authorized && (
             <section className="console-panel">
@@ -304,31 +369,6 @@ export function ConsoleSetup() {
                   onChange={(e) => c.setOperatorPassword(e.target.value)}
                   disabled={locked}
                 />
-                {c.cloudflareRequested &&
-                  (c.accounts.length ? (
-                    <SelectField
-                      label="Cloudflare 账号"
-                      value={c.spec.cloudflareAccount}
-                      options={c.accounts.map((account) => ({
-                        value: account.id,
-                        label: account.name,
-                      }))}
-                      onValueChange={(value) =>
-                        c.change("cloudflareAccount", value)
-                      }
-                      disabled={locked}
-                    />
-                  ) : (
-                    <TextField
-                      label="Cloudflare Account ID"
-                      hint="Token 未能列出账号。请从 Cloudflare 后台查找「Copy account ID」，填入 32 位账号 ID。"
-                      value={c.spec.cloudflareAccount}
-                      onChange={(e) =>
-                        c.change("cloudflareAccount", e.target.value)
-                      }
-                      disabled={locked}
-                    />
-                  ))}
               </div>
               <details>
                 <summary>域名与用户目录选项</summary>
@@ -359,6 +399,15 @@ export function ConsoleSetup() {
           {authorized && c.preview && (
             <section className="console-panel">
               <h2>确认配置</h2>
+              <p>
+                Webmail 主地址 <code>{c.spec.publicOrigin}</code>
+              </p>
+              {c.spec.cloudflareAccount && (
+                <p>
+                  目标 Cloudflare Account ID{" "}
+                  <code>{c.spec.cloudflareAccount}</code>
+                </p>
+              )}
               <ul>
                 {c.preview.map((item) => (
                   <li key={item}>{item}</li>
@@ -374,6 +423,31 @@ export function ConsoleSetup() {
             </section>
           )}
         </>
+      )}
+      {resources.length > 0 && (
+        <section className="console-panel">
+          <header>
+            <h2>安装任务生成的资源</h2>
+            <p>
+              以下标识来自本次或上次安装任务。站点设置显示当前使用的组件与绑定域名。
+            </p>
+          </header>
+          <dl className="console-form-grid">
+            {resources.map(([kind, value]) => (
+              <div key={kind}>
+                <dt className="console-hint">{setupResourceNames[kind]}</dt>
+                <dd>
+                  <code>{value}</code>
+                </dd>
+              </div>
+            ))}
+          </dl>
+          {c.job?.spec?.cloudflareAccount && (
+            <p>
+              Cloudflare Account ID <code>{c.job.spec.cloudflareAccount}</code>
+            </p>
+          )}
+        </section>
       )}
       <ConfirmDialog
         triggerLabel="离开"

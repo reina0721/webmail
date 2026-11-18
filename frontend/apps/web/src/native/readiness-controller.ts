@@ -1,6 +1,10 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { api, errorMessage, isTransientConnectionError } from "@platform/lib/api";
+import {
+  api,
+  errorMessage,
+  isTransientConnectionError,
+} from "@platform/lib/api";
 
 type Check = { id: string; label: string; status: string; reason?: string };
 type Report = {
@@ -37,6 +41,8 @@ const reasons: Record<string, string> = {
     "主地址已响应。请检查反代是否将回调路径及认证请求头转发到此 Webmail。",
   turnstile_missing:
     "尚未配置 Turnstile。请使用 Cloudflare API Token 自动创建并保存验证组件。",
+  turnstile_hostname_mismatch:
+    "当前域名不在 Cloudflare 上次确认的绑定范围内。请在站点设置核对并修复组件，再检查注册条件。",
 };
 
 export function useReadiness({

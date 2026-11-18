@@ -33,6 +33,8 @@ pub(super) struct Job {
     pub secrets: HashMap<String, String>,
     pub completed: Vec<String>,
     pub pending: HashMap<String, Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turnstile_binding: Option<config::TurnstileBinding>,
 }
 impl Job {
     pub fn new(owner: String, base: String, spec: Spec) -> Self {
@@ -48,6 +50,7 @@ impl Job {
             secrets: HashMap::new(),
             completed: Vec::new(),
             pending: HashMap::new(),
+            turnstile_binding: None,
         }
     }
     pub fn public(&self) -> Value {

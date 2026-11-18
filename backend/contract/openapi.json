@@ -6,7 +6,7 @@
     "license": {
       "name": ""
     },
-    "version": "0.4.0-alpha.13"
+    "version": "0.4.0-alpha.14"
   },
   "paths": {
     "/api/push/action": {
@@ -2076,7 +2076,9 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {}
+              "schema": {
+                "$ref": "#/components/schemas/TurnstileInput"
+              }
             }
           },
           "required": true
@@ -2086,9 +2088,14 @@
             "description": "",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/TurnstileResult"
+                }
               }
             }
+          },
+          "409": {
+            "description": "The current widget or website needs attention"
           }
         }
       }
@@ -2102,7 +2109,9 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {}
+              "schema": {
+                "$ref": "#/components/schemas/TurnstileInput"
+              }
             }
           },
           "required": true
@@ -3108,6 +3117,16 @@
           "settings": {
             "$ref": "#/components/schemas/ConfigurationInput"
           },
+          "turnstileBinding": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TurnstileBinding"
+              }
+            ]
+          },
           "turnstileSecretSet": {
             "type": "boolean"
           }
@@ -3796,6 +3815,66 @@
         },
         "additionalProperties": false
       },
+      "TurnstileBinding": {
+        "type": "object",
+        "required": [
+          "accountId",
+          "widgetName",
+          "hostnames",
+          "checkedAt"
+        ],
+        "properties": {
+          "accountId": {
+            "type": "string"
+          },
+          "checkedAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "hostnames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "widgetName": {
+            "type": "string"
+          }
+        }
+      },
+      "TurnstileInput": {
+        "type": "object",
+        "required": [
+          "cloudflareToken"
+        ],
+        "properties": {
+          "cloudflareAccount": {
+            "type": "string"
+          },
+          "cloudflareToken": {
+            "type": "string",
+            "writeOnly": true
+          },
+          "publicOrigin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "repair": {
+            "type": "boolean"
+          },
+          "replaceMissing": {
+            "type": "boolean"
+          },
+          "siteKey": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "TurnstileKeys": {
         "type": "object",
         "required": [
@@ -3811,6 +3890,39 @@
           }
         },
         "additionalProperties": false
+      },
+      "TurnstileResult": {
+        "type": "object",
+        "required": [
+          "configured",
+          "restartRequired",
+          "action",
+          "siteKey"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "restartRequired": {
+            "type": "boolean"
+          },
+          "siteKey": {
+            "type": "string"
+          },
+          "turnstileBinding": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TurnstileBinding"
+              }
+            ]
+          }
+        }
       },
       "UploadView": {
         "type": "object",

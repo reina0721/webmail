@@ -51,6 +51,15 @@ export function errorCodeMessage(code:string,status?:number):string {
  });
  Object.assign(messages,{turnstile_hostname_required:'自动配置 Turnstile 需要 Webmail 使用域名访问，IP 地址不可作为组件主机名。请先配置域名并保存公开访问来源。',turnstile_configuration_invalid:'Turnstile 密钥格式错误：Site Key 不能填写网址，请使用 Cloudflare API Token 自动配置。',
  cloudflare_token_required:'请填写 Cloudflare API Token',cloudflare_account_required:'已提供 Cloudflare Token，请选择账号或填写 Account ID，不能跳过 Turnstile 配置',turnstile_configuration_conflict:'请使用原 Cloudflare 账号和网站来源继续未完成的验证配置',turnstile_already_configured:'已有 Turnstile 配置，未创建或覆盖其他组件，请刷新配置状态'});
+ Object.assign(messages,{
+  turnstile_widget_missing:'此 Cloudflare 账号中找不到 Webmail 当前使用的组件。请核对账号。确认要在此账号重新建立验证时，可创建替代组件。',
+  turnstile_widget_secret_mismatch:'当前组件的 Secret 与 Webmail 保存的值不一致。请在下方手动配置区保存该组件当前的 Secret，再核对组件。',
+  turnstile_widget_unrestricted:'此组件没有明确的域名绑定。请在 Cloudflare 组件设置中为它指定 Webmail 域名，再重新核对。',
+  turnstile_origin_changed:'Webmail 主地址已变更。请重新读取配置，确认当前主地址后再核对组件。',
+  turnstile_keys_changed:'Webmail 保存的 Site Key 已变更。请重新读取配置，再核对组件。',
+  cloudflare_request_failed:'Cloudflare 拒绝了请求。请检查目标账号、Token 权限和组件可用的域名配额，再重试。',
+  cloudflare_response_invalid:'Cloudflare 返回的组件资料不完整，暂时无法确认配置。请重新核对组件。',
+ });
  return messages[code]??(status===429?'请求较频繁，请稍后重试':status===401?'登录已过期，请重新登录':status===403?'当前账号没有执行此操作的权限':'操作暂未完成，请稍后重试');
 }
 export async function api<T>(path:string,options:ApiOptions={}):Promise<T> {

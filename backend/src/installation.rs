@@ -249,6 +249,7 @@ pub(super) struct ConfigurationView {
     notification_key_set: bool,
     hook_secret_set: bool,
     turnstile_secret_set: bool,
+    turnstile_binding: Option<config::TurnstileBinding>,
     policy_verified: bool,
     missing_requirements: Vec<String>,
     documentation_url: String,
@@ -281,6 +282,7 @@ pub(super) async fn read_config(
         notification_key_set: !s.notification_key.is_empty(),
         hook_secret_set: !s.hook_secret.is_empty(),
         turnstile_secret_set: !s.turnstile_secret.is_empty(),
+        turnstile_binding: s.turnstile_binding.clone(),
         policy_verified: s.policy_verified,
         missing_requirements: discovery::missing(s),
         documentation_url: discovery::documentation_url(),
@@ -393,6 +395,11 @@ fn apply_site_update(saved: &mut RuntimeConfig, input: SiteUpdate) -> Result<()>
             ));
         }
         validate_turnstile(site_key, Some(secret))?;
+        if saved.services.turnstile_site_key != site_key
+            || saved.services.turnstile_secret != secret
+        {
+            saved.services.turnstile_binding = None;
+        }
         saved.services.turnstile_site_key = site_key.to_owned();
         saved.services.turnstile_secret = secret.to_owned();
     }
@@ -523,9 +530,15 @@ pub(super) async fn save_config(
         hook_id: input.hook_id,
         turnstile_secret: retain_secret(input.turnstile_secret, &app.services.turnstile_secret),
         turnstile_site_key: input.turnstile_site_key,
+        turnstile_binding: None,
         // Connection changes cannot silently certify protocol enforcement.
         policy_verified: false,
     };
+    if services.turnstile_site_key == app.services.turnstile_site_key
+        && services.turnstile_secret == app.services.turnstile_secret
+    {
+        services.turnstile_binding = app.services.turnstile_binding.clone();
+    }
     services.policy_verified = app.services.policy_verified
         && services.domain == app.services.domain
         && upstream.base == app.upstream.base

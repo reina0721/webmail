@@ -17,6 +17,16 @@ vi.mock("@platform/host/use-installation-leave", () => ({
 import { ApiError } from "@platform/lib/api";
 import { TurnstileSetup } from "../turnstile-setup";
 const account = "a".repeat(32);
+const binding = {
+  accountId: account,
+  widgetName: "mail-verification",
+  hostnames: ["webmail.example.net"],
+  checkedAt: 42,
+};
+const inputs = {
+  token: "isolated-token",
+  accountLabel: /Cloudflare Account ID/,
+};
 let applied = false;
 beforeEach(() => {
   applied = false;
@@ -25,11 +35,17 @@ beforeEach(() => {
       return {
         settings: { turnstileSiteKey: applied ? "owned-site" : "" },
         turnstileSecretSet: applied,
+        turnstileBinding: applied ? binding : null,
       };
     if (path === "/installation/turnstile/accounts") return { accounts: [] };
     if (path === "/installation/turnstile") {
       applied = true;
-      return { configured: true };
+      return {
+        configured: true,
+        action: "created",
+        siteKey: "owned-site",
+        turnstileBinding: binding,
+      };
     }
     throw new Error("Unexpected request: " + path);
   });
@@ -56,7 +72,7 @@ it("repairs a missing account listing with an Account ID and only a Cloudflare t
   expect(screen.getByLabelText("Cloudflare API Token")).toHaveValue(
     "isolated-token",
   );
-  fireEvent.change(screen.getByLabelText("Cloudflare Account ID"), {
+  fireEvent.change(screen.getByLabelText(inputs.accountLabel), {
     target: { value: account },
   });
   fireEvent.click(
@@ -73,11 +89,11 @@ it("repairs a missing account listing with an Account ID and only a Cloudflare t
       }),
     ),
   );
-  await screen.findByText("Turnstile 已配置。", {}, { timeout: 3000 });
+  await screen.findByText(/已创建 Turnstile 组件/, {}, { timeout: 3000 });
   expect(onApplied).toHaveBeenCalledTimes(1);
-  expect(
-    screen.queryByLabelText("Cloudflare API Token"),
-  ).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Cloudflare API Token")).toHaveValue("");
+  expect(screen.getByText(binding.widgetName)).toBeInTheDocument();
+  expect(screen.getByText("owned-site")).toBeInTheDocument();
   expect(
     screen.getByRole("link", { name: /进入注册与收信验证/ }),
   ).toHaveAttribute("href", "/console/registration/");
@@ -97,11 +113,11 @@ it("requires an account and displays an explicit provider error without discardi
   });
   const button = screen.getByRole("button", { name: "自动创建并保存验证配置" });
   expect(button).toBeEnabled();
-  fireEvent.change(screen.getByLabelText("Cloudflare Account ID"), {
+  fireEvent.change(screen.getByLabelText(inputs.accountLabel), {
     target: { value: "not-an-account" },
   });
   expect(button).toBeDisabled();
-  fireEvent.change(screen.getByLabelText("Cloudflare Account ID"), {
+  fireEvent.change(screen.getByLabelText(inputs.accountLabel), {
     target: { value: account },
   });
   fireEvent.click(button);
@@ -124,7 +140,7 @@ it("discovers the single account and automatically configures Turnstile with one
   fireEvent.click(
     screen.getByRole("button", { name: "自动创建并保存验证配置" }),
   );
-  await screen.findByText("Turnstile 已配置。", {}, { timeout: 3000 });
+  await screen.findByText(/已创建 Turnstile 组件/, {}, { timeout: 3000 });
   expect(request).toHaveBeenCalledWith(
     "/installation/turnstile",
     expect.objectContaining({
@@ -194,5 +210,66 @@ it("allows automatic repair when a URL was previously stored as the Site Key", a
   render(<TurnstileSetup />);
   await waitFor(() => expect(request).toHaveBeenCalled());
   expect(screen.getByLabelText("Cloudflare API Token")).toBeInTheDocument();
-  expect(screen.queryByText("Turnstile 已配置。")).not.toBeInTheDocument();
+  expect(await screen.findByText("保存的值格式无效")).toBeInTheDocument();
+});
+
+it("shows the old confirmed hostname and keeps the active Site Key visible until a replacement is applied", async () => {
+  const origin = "https://webmail.example.net";
+  const oldBinding = {
+    ...binding,
+    hostnames: ["old.example.net"],
+    checkedAt: 20,
+  };
+  let sent = 0;
+  request.mockImplementation(async (path: string, options?: RequestInit) => {
+    if (path === "/installation/config") {
+      return {
+        settings: {
+          turnstileSiteKey: applied ? "new-site-key" : "old-site-key",
+        },
+        turnstileSecretSet: true,
+        turnstileBinding: applied ? binding : oldBinding,
+      };
+    }
+    if (path === "/installation/turnstile") {
+      const payload = JSON.parse(String(options?.body));
+      expect(payload).toMatchObject({
+        repair: true,
+        publicOrigin: origin,
+        siteKey: "old-site-key",
+      });
+      sent += 1;
+      if (!payload.replaceMissing)
+        throw new ApiError(409, "turnstile_widget_missing");
+      return {
+        configured: true,
+        action: "replaced",
+        siteKey: "new-site-key",
+        turnstileBinding: binding,
+      };
+    }
+    throw new Error("Unexpected request: " + path);
+  });
+  render(<TurnstileSetup publicOrigin={origin} />);
+  expect(await screen.findByText("old.example.net")).toBeInTheDocument();
+  expect(
+    screen.getByText(/当前域名不在上次确认的绑定范围内/),
+  ).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Cloudflare API Token"), {
+    target: { value: "isolated-token" },
+  });
+  fireEvent.change(screen.getByLabelText(inputs.accountLabel), {
+    target: { value: account },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "核对并修复现有组件" }));
+  fireEvent.click(
+    await screen.findByRole("button", { name: "在此账号创建替代组件" }),
+  );
+  await screen.findByText(/正在等待服务应用配置/);
+  expect(screen.getByText("old-site-key")).toBeInTheDocument();
+  applied = true;
+  expect(
+    await screen.findByText("new-site-key", {}, { timeout: 3000 }),
+  ).toBeInTheDocument();
+  expect(sent).toBe(2);
 });

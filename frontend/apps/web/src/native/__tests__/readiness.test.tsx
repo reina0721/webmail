@@ -47,7 +47,7 @@ it("explains why verification is disabled and provides the actual repair entry",
     screen.getByRole("button", { name: "生成收信验证链接" }),
   ).toBeDisabled();
   expect(
-    screen.getByRole("link", { name: /使用 Cloudflare API Token/ }),
+    screen.getByRole("link", { name: /配置或修复 Turnstile/ }),
   ).toHaveAttribute("href", "/console/site/#turnstile-setup");
   expect(
     screen.getByText(/收信验证入口将在所有自动检查通过后启用/),

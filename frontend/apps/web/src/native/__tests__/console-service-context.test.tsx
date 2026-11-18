@@ -64,7 +64,7 @@ it('lets an installed operator save a new address even when domain administratio
  const origin=await screen.findByRole('textbox',{name:/公开访问来源/});
  fireEvent.change(origin,{target:{value:'https://webmail.example.net/'}});
  fireEvent.click(screen.getByRole('button',{name:'保存站点配置'}));
- await screen.findByText(/站点地址已保存/);
+ await screen.findByText(/主地址已保存/);
  expect(request).toHaveBeenCalledWith('/installation/config',expect.objectContaining({
   method:'PATCH',body:JSON.stringify({brand:'Mail',publicOrigin:'https://webmail.example.net'}),
  }));

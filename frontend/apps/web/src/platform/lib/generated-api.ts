@@ -1336,6 +1336,7 @@ export interface components {
             policyVerified: boolean;
             provisioningKeySet: boolean;
             settings: components["schemas"]["ConfigurationInput"];
+            turnstileBinding?: null | components["schemas"]["TurnstileBinding"];
             turnstileSecretSet: boolean;
         };
         CredentialInput: {
@@ -1506,9 +1507,31 @@ export interface components {
             /** @description Exact release tag for an update, registered snapshot ID for a rollback. */
             target: string;
         };
+        TurnstileBinding: {
+            accountId: string;
+            /** Format: int64 */
+            checkedAt: number;
+            hostnames: string[];
+            widgetName: string;
+        };
+        TurnstileInput: {
+            cloudflareAccount?: string;
+            cloudflareToken: string;
+            publicOrigin?: string | null;
+            repair?: boolean;
+            replaceMissing?: boolean;
+            siteKey?: string | null;
+        };
         TurnstileKeys: {
             secret: string;
             siteKey: string;
+        };
+        TurnstileResult: {
+            action: string;
+            configured: boolean;
+            restartRequired: boolean;
+            siteKey: string;
+            turnstileBinding?: null | components["schemas"]["TurnstileBinding"];
         };
         UploadView: {
             blobId: string;
@@ -3681,7 +3704,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": unknown;
+                "application/json": components["schemas"]["TurnstileInput"];
             };
         };
         responses: {
@@ -3690,8 +3713,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TurnstileResult"];
                 };
+            };
+            /** @description The current widget or website needs attention */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -3704,7 +3734,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": unknown;
+                "application/json": components["schemas"]["TurnstileInput"];
             };
         };
         responses: {

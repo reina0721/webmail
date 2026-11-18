@@ -1,19 +1,27 @@
 //! Repair Turnstile independently of mail-server administrative authorization.
 use super::*;
+use sha2::{Digest, Sha256};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct Input {
+pub(crate) struct TurnstileInput {
+    #[schema(write_only)]
     cloudflare_token: String,
     #[serde(default)]
     cloudflare_account: String,
+    #[serde(default)]
+    repair: bool,
+    #[serde(default)]
+    replace_missing: bool,
+    public_origin: Option<String>,
+    site_key: Option<String>,
 }
-impl Drop for Input {
+impl Drop for TurnstileInput {
     fn drop(&mut self) {
         self.cloudflare_token.zeroize();
     }
 }
-impl Input {
+impl TurnstileInput {
     fn validate(&mut self) -> Result<()> {
         if self.cloudflare_token.trim().is_empty() || self.cloudflare_token.len() > 4096 {
             return Err(Error(StatusCode::BAD_REQUEST, "cloudflare_token_required"));
@@ -22,21 +30,30 @@ impl Input {
         Ok(())
     }
 }
-async fn permitted(app: &App, headers: &HeaderMap) -> Result<String> {
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TurnstileResult {
+    configured: bool,
+    restart_required: bool,
+    action: &'static str,
+    site_key: String,
+    turnstile_binding: Option<config::TurnstileBinding>,
+}
+async fn permitted(app: &App, headers: &HeaderMap, require_configured: bool) -> Result<String> {
     let who = owner(app, headers, true).await?;
-    if !configured(app) {
+    if require_configured && !configured(app) {
         return Err(Error(StatusCode::BAD_REQUEST, "setup_required"));
     }
     policy::rate(app, &format!("turnstile:{who}"), 20, 60_000).await?;
     Ok(who)
 }
-#[utoipa::path(post,tag="installation",path="/api/v1/installation/turnstile/accounts",request_body=Value,responses((status=200,body=Value)))]
+#[utoipa::path(post,tag="installation",path="/api/v1/installation/turnstile/accounts",request_body=TurnstileInput,responses((status=200,body=Value)))]
 pub(crate) async fn accounts(
     State(app): State<Arc<App>>,
     headers: HeaderMap,
-    Json(mut input): Json<Input>,
+    Json(mut input): Json<TurnstileInput>,
 ) -> Result<Json<Value>> {
-    permitted(&app, &headers).await?;
+    permitted(&app, &headers, false).await?;
     input.validate()?;
     let accounts = cloudflare::accounts(&app, input.cloudflare_token.trim()).await?;
     Ok(Json(
@@ -44,24 +61,69 @@ pub(crate) async fn accounts(
     ))
 }
 
-/// Only the two Turnstile fields can change. The encrypted repair journal keeps
-/// resource ownership across lost API replies without retaining the API token.
+/// The encrypted journal preserves ownership across lost replies without storing the API token.
 async fn complete(
     app: &App,
     saved: &mut RuntimeConfig,
-    input: &Input,
+    input: &TurnstileInput,
     who: String,
     path: &std::path::Path,
     api: &str,
-) -> Result<()> {
-    cloudflare::hostname(&saved.origin)?;
-    cloudflare::validate_at(
-        app,
-        input.cloudflare_token.trim(),
-        &input.cloudflare_account,
-        api,
-    )
-    .await?;
+) -> Result<&'static str> {
+    if input
+        .public_origin
+        .as_ref()
+        .is_some_and(|origin| origin != &saved.origin)
+    {
+        return Err(Error(StatusCode::CONFLICT, "turnstile_origin_changed"));
+    }
+    if input
+        .site_key
+        .as_ref()
+        .is_some_and(|site| site != &saved.services.turnstile_site_key)
+    {
+        return Err(Error(StatusCode::CONFLICT, "turnstile_keys_changed"));
+    }
+    let host = cloudflare::hostname(&saved.origin)?;
+    let token = input.cloudflare_token.trim();
+    if !cloudflare::account_id(&input.cloudflare_account) || token.is_empty() {
+        return Err(Error(
+            StatusCode::BAD_REQUEST,
+            "cloudflare_account_and_token_required",
+        ));
+    }
+    let replacing = input.repair && saved.services.turnstile_ready();
+    if replacing {
+        match cloudflare::repair_at(app, saved, token, &input.cloudflare_account, &host, api).await
+        {
+            Ok((binding, changed)) => {
+                saved.services.turnstile_binding = Some(binding);
+                return Ok(if changed { "repaired" } else { "verified" });
+            }
+            Err(Error(_, "turnstile_widget_missing")) if input.replace_missing => {}
+            Err(error) => return Err(error),
+        }
+    }
+    let contextual_path;
+    let path = if replacing
+        || journal::read_at(app, path)?.is_some_and(|job| {
+            !saved.services.turnstile_ready()
+                && (job.spec.cloudflare_account != input.cloudflare_account
+                    || job.spec.public_origin != saved.origin)
+        }) {
+        let scope = (
+            &input.cloudflare_account,
+            &saved.origin,
+            &saved.services.turnstile_site_key,
+        );
+        let hash = Sha256::digest(
+            serde_json::to_vec(&scope).map_err(|_| internal("turnstile_configuration_invalid"))?,
+        );
+        contextual_path = path.with_file_name(format!("turnstile-setup-{hash:x}.enc"));
+        contextual_path.as_path()
+    } else {
+        path
+    };
     let mut job = match journal::read_at(app, path)? {
         Some(job) => {
             if job.spec.cloudflare_account != input.cloudflare_account
@@ -75,7 +137,7 @@ async fn complete(
             job
         }
         None => {
-            if saved.services.turnstile_ready() {
+            if saved.services.turnstile_ready() && !replacing {
                 return Err(Error(StatusCode::CONFLICT, "turnstile_already_configured"));
             }
             let spec: Spec = serde_json::from_value(json!({"brand":saved.services.brand,"domain":saved.services.domain,"publicOrigin":saved.origin,"cloudflareAccount":input.cloudflare_account}))
@@ -83,13 +145,31 @@ async fn complete(
             Job::new(who, saved.stalwart_url.clone(), spec)
         }
     };
-    if saved.services.turnstile_ready()
+    if !replacing
+        && saved.services.turnstile_ready()
         && (saved.services.turnstile_site_key != job.resource("turnstile")
             || saved.services.turnstile_secret != job.secret("turnstile"))
     {
         return Err(Error(StatusCode::CONFLICT, "turnstile_already_configured"));
     }
-    cloudflare::create_at(app, &mut job, input.cloudflare_token.trim(), api, &|job| {
+    if !job.resource("turnstile").is_empty() {
+        // A restored snapshot can reference a replacement that was later deleted.
+        let mut staged = saved.clone();
+        staged.services.turnstile_site_key = job.resource("turnstile");
+        staged.services.turnstile_secret = job.secret("turnstile");
+        match cloudflare::repair_at(app, &staged, token, &input.cloudflare_account, &host, api)
+            .await
+        {
+            Ok((binding, _)) => job.turnstile_binding = Some(binding),
+            Err(Error(_, "turnstile_widget_missing"))
+                if replacing || !saved.services.turnstile_ready() =>
+            {
+                job = Job::new(job.owner, job.base, job.spec);
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    cloudflare::create_at(app, &mut job, token, api, &|job| {
         journal::write_at(app, job, path)
     })
     .await?;
@@ -101,17 +181,19 @@ async fn complete(
             "turnstile_secret_unavailable",
         ));
     }
+    validate_turnstile(&site, Some(&secret))?;
     saved.services.turnstile_site_key = site;
     saved.services.turnstile_secret = secret;
-    Ok(())
+    saved.services.turnstile_binding = job.turnstile_binding;
+    Ok(if replacing { "replaced" } else { "created" })
 }
-#[utoipa::path(post,tag="installation",path="/api/v1/installation/turnstile",request_body=Value,responses((status=200,body=Value)))]
+#[utoipa::path(post,tag="installation",path="/api/v1/installation/turnstile",request_body=TurnstileInput,responses((status=200,body=TurnstileResult),(status=409,description="The current widget or website needs attention")))]
 pub(crate) async fn configure(
     State(app): State<Arc<App>>,
     headers: HeaderMap,
-    Json(mut input): Json<Input>,
-) -> Result<Json<Value>> {
-    let who = permitted(&app, &headers).await?;
+    Json(mut input): Json<TurnstileInput>,
+) -> Result<Json<TurnstileResult>> {
+    let who = permitted(&app, &headers, true).await?;
     input.validate()?;
     let _lock = CONFIG_LOCK.lock().await;
     if super::active(&app).await? {
@@ -119,15 +201,29 @@ pub(crate) async fn configure(
     }
     let mut saved = load(&app.vault)
         .map_err(|_| internal("configuration_read"))?
+        .or_else(|| {
+            configured(&app).then(|| RuntimeConfig {
+                version: 1,
+                origin: app.origin.clone(),
+                stalwart_url: app.upstream.base.clone(),
+                services: app.services.clone(),
+            })
+        })
         .ok_or(Error(StatusCode::BAD_REQUEST, "setup_required"))?;
     let path = config_path().with_file_name("turnstile-setup.enc");
-    complete(&app, &mut saved, &input, who, &path, cloudflare::API).await?;
+    let action = complete(&app, &mut saved, &input, who, &path, cloudflare::API).await?;
     persist(&app.vault, &saved)?;
     tokio::spawn(async {
         tokio::time::sleep(std::time::Duration::from_millis(700)).await;
         RELOAD.notify_one();
     });
-    Ok(Json(json!({"configured":true,"restartRequired":true})))
+    Ok(Json(TurnstileResult {
+        configured: true,
+        restart_required: true,
+        action,
+        site_key: saved.services.turnstile_site_key,
+        turnstile_binding: saved.services.turnstile_binding,
+    }))
 }
 
 #[cfg(test)]
@@ -221,9 +317,13 @@ mod tests {
         saved.services.turnstile_secret = "wrong-but-nonempty".into();
         let before = serde_json::to_value(&saved).unwrap();
         let path = root.join("turnstile-setup.enc");
-        let input = Input {
+        let input = TurnstileInput {
             cloudflare_token: "isolated-turnstile-token".into(),
             cloudflare_account: "a".repeat(32),
+            repair: false,
+            replace_missing: false,
+            public_origin: None,
+            site_key: None,
         };
         assert!(
             complete(&app, &mut saved, &input, "operator".into(), &path, &base)
@@ -242,6 +342,10 @@ mod tests {
         let mut after = serde_json::to_value(&saved).unwrap();
         after["services"]["turnstile_site_key"] = before["services"]["turnstile_site_key"].clone();
         after["services"]["turnstile_secret"] = before["services"]["turnstile_secret"].clone();
+        after["services"]
+            .as_object_mut()
+            .unwrap()
+            .remove("turnstile_binding");
         assert_eq!(after, before);
         let bytes = app.vault.open(&std::fs::read(&path).unwrap()).unwrap();
         assert!(
@@ -249,9 +353,13 @@ mod tests {
                 .unwrap()
                 .contains("isolated-turnstile-token")
         );
-        let other = Input {
+        let other = TurnstileInput {
             cloudflare_token: "isolated-turnstile-token".into(),
             cloudflare_account: "a".repeat(32),
+            repair: false,
+            replace_missing: false,
+            public_origin: None,
+            site_key: None,
         };
         saved.services.turnstile_site_key = "manually-configured-site".into();
         assert_eq!(
@@ -261,6 +369,161 @@ mod tests {
                 .1,
             "turnstile_already_configured"
         );
+        server.abort();
+        app.db.close().await;
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[tokio::test]
+    async fn migrated_site_checks_ownership_repairs_binding_and_replaces_only_on_request() {
+        let root = std::env::temp_dir().join(format!("turnstile-migration-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let app = fixture(&root).await;
+        let old = json!({
+            "sitekey":"old-site-key","secret":"original-secret","name":"original-widget",
+            "domains":["old.example.com","other.example.org"],"mode":"invisible",
+            "clearance_level":"no_clearance","region":"world"
+        });
+        let widget = Arc::new(tokio::sync::Mutex::new(Some(old.clone())));
+        let (updates, creates) = (Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0)));
+        let (provider, put, post) = (widget.clone(), updates.clone(), creates.clone());
+        let router = Router::new().fallback(
+            move |method: reqwest::Method, uri: axum::http::Uri, body: axum::body::Bytes| {
+                let (provider, put, post) = (provider.clone(), put.clone(), post.clone());
+                async move {
+                    let mut widget = provider.lock().await;
+                    let result = if method == reqwest::Method::PUT {
+                        assert!(uri.path().ends_with("/old-site-key"));
+                        put.fetch_add(1, Ordering::SeqCst);
+                        let payload: Value = serde_json::from_slice(&body).unwrap();
+                        assert_eq!(payload["mode"], "invisible");
+                        assert_eq!(payload["clearance_level"], "no_clearance");
+                        assert_eq!(payload["region"], "world");
+                        assert_eq!(payload["name"], "original-widget");
+                        assert!(payload.get("secret").is_none());
+                        let value = widget.as_mut().unwrap();
+                        value["domains"] = payload["domains"].clone();
+                        value.clone()
+                    } else if method == reqwest::Method::POST {
+                        let number = post.fetch_add(1, Ordering::SeqCst) + 1;
+                        let payload: Value = serde_json::from_slice(&body).unwrap();
+                        assert_eq!(payload["domains"], json!(["webmail.example.com"]));
+                        let mut created = payload;
+                        created["sitekey"] = json!(format!("replacement-key-{number}"));
+                        created["secret"] = json!("replacement-secret");
+                        *widget = Some(created.clone());
+                        created
+                    } else if uri.path().ends_with("/challenges/widgets") {
+                        json!(widget.iter().collect::<Vec<_>>())
+                    } else {
+                        widget.clone().unwrap()
+                    };
+                    Json(json!({"success":true,"result":result}))
+                }
+            },
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
+        let mut saved = RuntimeConfig {
+            version: 1,
+            origin: app.origin.clone(),
+            stalwart_url: app.upstream.base.clone(),
+            services: app.services.clone(),
+        };
+        saved.services.turnstile_site_key = "old-site-key".into();
+        saved.services.turnstile_secret = "wrong-secret".into();
+        let path = root.join("turnstile-setup.enc");
+        let mut input = TurnstileInput {
+            cloudflare_token: "isolated-token".into(),
+            cloudflare_account: "a".repeat(32),
+            repair: true,
+            replace_missing: false,
+            public_origin: Some("https://previous.example.com".into()),
+            site_key: Some("old-site-key".into()),
+        };
+        assert_eq!(
+            complete(&app, &mut saved, &input, "operator".into(), &path, &base)
+                .await
+                .unwrap_err()
+                .1,
+            "turnstile_origin_changed"
+        );
+        input.public_origin = Some(saved.origin.clone());
+        assert_eq!(
+            complete(&app, &mut saved, &input, "operator".into(), &path, &base)
+                .await
+                .unwrap_err()
+                .1,
+            "turnstile_widget_secret_mismatch"
+        );
+        assert_eq!(updates.load(Ordering::SeqCst), 0);
+        saved.services.turnstile_secret = "original-secret".into();
+        assert_eq!(
+            complete(&app, &mut saved, &input, "operator".into(), &path, &base)
+                .await
+                .unwrap(),
+            "repaired"
+        );
+        assert_eq!(saved.services.turnstile_site_key, "old-site-key");
+        assert_eq!(saved.services.turnstile_secret, "original-secret");
+        assert_eq!(
+            saved.services.turnstile_binding.as_ref().unwrap().hostnames,
+            [
+                "old.example.com",
+                "other.example.org",
+                "webmail.example.com"
+            ]
+        );
+        assert_eq!(
+            complete(&app, &mut saved, &input, "operator".into(), &path, &base)
+                .await
+                .unwrap(),
+            "verified"
+        );
+        assert_eq!(updates.load(Ordering::SeqCst), 1);
+
+        *widget.lock().await = None;
+        assert_eq!(
+            complete(&app, &mut saved, &input, "operator".into(), &path, &base)
+                .await
+                .unwrap_err()
+                .1,
+            "turnstile_widget_missing"
+        );
+        assert_eq!(creates.load(Ordering::SeqCst), 0);
+        input.replace_missing = true;
+        let snapshot = saved.clone();
+        assert_eq!(
+            complete(&app, &mut saved, &input, "operator".into(), &path, &base)
+                .await
+                .unwrap(),
+            "replaced"
+        );
+        assert_eq!(saved.services.turnstile_site_key, "replacement-key-1");
+        assert_eq!(
+            saved.services.turnstile_binding.as_ref().unwrap().hostnames,
+            ["webmail.example.com"]
+        );
+        input.site_key = Some(saved.services.turnstile_site_key.clone());
+        assert_eq!(
+            complete(&app, &mut saved, &input, "operator".into(), &path, &base)
+                .await
+                .unwrap(),
+            "verified"
+        );
+        assert_eq!(creates.load(Ordering::SeqCst), 1);
+        // Both widgets can be deleted while the old key is restored from a snapshot.
+        *widget.lock().await = None;
+        saved = snapshot;
+        input.site_key = Some(saved.services.turnstile_site_key.clone());
+        assert_eq!(
+            complete(&app, &mut saved, &input, "operator".into(), &path, &base)
+                .await
+                .unwrap(),
+            "replaced"
+        );
+        assert_eq!(saved.services.turnstile_site_key, "replacement-key-2");
+        assert_eq!(creates.load(Ordering::SeqCst), 2);
         server.abort();
         app.db.close().await;
         std::fs::remove_dir_all(root).unwrap();

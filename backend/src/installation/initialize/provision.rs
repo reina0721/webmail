@@ -500,6 +500,11 @@ pub(super) async fn run(
         } else {
             job.resource("turnstile")
         },
+        turnstile_binding: if job.spec.cloudflare_account.is_empty() {
+            app.services.turnstile_binding.clone()
+        } else {
+            job.turnstile_binding.clone()
+        },
         policy_verified: false,
     };
     let runtime = App {

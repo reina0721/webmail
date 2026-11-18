@@ -31,4 +31,19 @@ describe('useTimeoutWhileMounted', () => {
     expect(callback).not.toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  it('ignores a timer scheduled by an action that finishes after unmount', async () => {
+    vi.useFakeTimers();
+    const callback = vi.fn();
+    const { result, unmount } = renderHook(() => useTimeoutWhileMounted());
+    const schedule = result.current;
+    const completion = Promise.resolve().then(() => schedule(callback, 400));
+
+    unmount();
+    await completion;
+
+    expect(vi.getTimerCount()).toBe(0);
+    vi.advanceTimersByTime(400);
+    expect(callback).not.toHaveBeenCalled();
+  });
 });

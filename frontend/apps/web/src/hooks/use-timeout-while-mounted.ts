@@ -10,16 +10,20 @@ import { useCallback, useEffect, useRef } from "react";
  */
 export function useTimeoutWhileMounted(): (callback: () => void, ms: number) => void {
   const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
+  const mounted = useRef(false);
 
   useEffect(() => {
+    mounted.current = true;
     const pending = timers.current;
     return () => {
+      mounted.current = false;
       pending.forEach(clearTimeout);
       pending.clear();
     };
   }, []);
 
   return useCallback((callback: () => void, ms: number) => {
+    if (!mounted.current) return;
     const id = setTimeout(() => {
       timers.current.delete(id);
       callback();

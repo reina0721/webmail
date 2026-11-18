@@ -32,7 +32,7 @@ class ReleasePackaging(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = pathlib.Path(self.temp.name)
-        for name in ("release-version.txt", "backend/Cargo.toml", "crates/mailwebctl/Cargo.toml", "install.sh", ".env.example", "tooling/release_metadata.py", "tooling/release-guard.sh"):
+        for name in ("release-version.txt", "backend/Cargo.toml", "crates/mailwebctl/Cargo.toml", "install.sh", ".env.example", "tooling/release_metadata.py", "tooling/release-guard.sh", "tooling/release_status.py"):
             target = self.root / name
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / name, target)
@@ -176,11 +176,14 @@ class ReleasePackaging(unittest.TestCase):
         gh.chmod(0o755)
         release = self.root / "release.json"
         env = {**os.environ, "PATH": str(fakebin) + os.pathsep + os.environ["PATH"], "TEST_COMMIT": COMMIT, "TEST_TAG": COMMIT, "TEST_RELEASE": str(release), "GITHUB_REF": "refs/tags/test"}
+        def set_release(draft, commit):
+            release.write_text(json.dumps([[{"tag_name": VERSION, "draft": draft, "target_commitish": commit}]]))
+
         for draft, commit, success in ((True, COMMIT, True), (False, COMMIT, False), (True, "2" * 40, False), (True, "main", True)):
-            release.write_text(json.dumps({"draft": draft, "target_commitish": commit}))
+            set_release(draft, commit)
             result = subprocess.run(["sh", self.root / "tooling/release-guard.sh", VERSION], env=env, capture_output=True)
             self.assertEqual(result.returncode == 0, success, result.stderr.decode())
-        release.write_text(json.dumps({"draft": True, "target_commitish": COMMIT}))
+        set_release(True, COMMIT)
         env["TEST_TAG"] = "3" * 40
         result = subprocess.run(["sh", self.root / "tooling/release-guard.sh", VERSION], env=env, capture_output=True)
         self.assertNotEqual(result.returncode, 0)
@@ -190,13 +193,14 @@ class ReleasePackaging(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr.decode())
         env["TEST_TAG"] = ""
         env.pop("TEST_PEELED")
-        env["TEST_STATUS"] = "404"
+        release.write_text("[[]]")
         result = subprocess.run(["sh", self.root / "tooling/release-guard.sh", VERSION], env=env, capture_output=True)
         self.assertEqual(result.stdout.strip(), b"new")
         self.assertEqual(result.returncode, 0, result.stderr.decode())
-        env["TEST_STATUS"] = "403"
-        result = subprocess.run(["sh", self.root / "tooling/release-guard.sh", VERSION], env=env, capture_output=True)
-        self.assertNotEqual(result.returncode, 0)
+        for status in ("403", "404"):
+            env["TEST_STATUS"] = status
+            result = subprocess.run(["sh", self.root / "tooling/release-guard.sh", VERSION], env=env, capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
 
 
 if __name__ == "__main__":

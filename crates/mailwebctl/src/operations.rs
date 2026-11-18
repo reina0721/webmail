@@ -222,7 +222,11 @@ fn desired_origin(s: &Settings, old: &Settings, cli: &Cli) -> Result<Option<Stri
     }
     Ok(None)
 }
-fn read_origin(s: &Settings) -> Result<String> {
+pub(crate) fn read_origin(s: &Settings) -> Result<String> {
+    let settings = read_site_settings(s)?;
+    Ok(settings["publicOrigin"].as_str().unwrap_or_default().into())
+}
+fn read_site_settings(s: &Settings) -> Result<Value> {
     let token = fs::read_to_string(s.root.join("secrets/setup.key"))?;
     let response = reqwest::blocking::Client::builder()
         .no_proxy()
@@ -233,10 +237,7 @@ fn read_origin(s: &Settings) -> Result<String> {
         .send()?
         .error_for_status()?
         .json::<Value>()?;
-    Ok(response["settings"]["publicOrigin"]
-        .as_str()
-        .unwrap_or_default()
-        .into())
+    Ok(response["settings"].clone())
 }
 fn ensure_not_downgrade(s: &Settings, version: &str) -> Result<()> {
     let target = semver::Version::parse(version.trim_start_matches('v'))?;
@@ -279,46 +280,8 @@ pub(crate) fn install(
         bundle,
     )?;
     progress(Phase::Verify, None)?;
-    manifest.image_id = crate::image::declared_config_id(
-        &package.join("image.tar"),
-        &manifest.image,
-        &manifest.image_id,
-    )?;
     ensure_not_downgrade(s, &manifest.version)?;
-    eprintln!(
-        "校验完成：{} · {}",
-        manifest.version, manifest.source_commit
-    );
-    docker::stream(&[
-        "load",
-        "-i",
-        package.join("image.tar").to_str().context("包路径无效")?,
-    ])?;
-    ensure!(
-        crate::image::matches(&manifest.image, &manifest.image_id)?,
-        "导入镜像 ID 与清单不符"
-    );
-    let runtime: Value = serde_json::from_str(&docker::capture(&[
-        "run",
-        "--rm",
-        "--pull",
-        "never",
-        &manifest.image,
-        "--runtime-info",
-    ])?)?;
-    ensure!(
-        runtime["version"].as_str() == Some(manifest.version.trim_start_matches('v'))
-            && (manifest.cli_version.is_none()
-                || runtime["revision"].as_str() == Some(&manifest.source_commit)),
-        "镜像版本/提交与发布清单不一致"
-    );
-    if let Some(version) = &manifest.cli_version {
-        ensure!(
-            version == manifest.version.trim_start_matches('v'),
-            "应用与 CLI 清单版本不一致"
-        );
-        verify_cli_version(&package.join("bin/mailwebctl"), version)?;
-    }
+    verify_release_image(&package, &mut manifest)?;
     if !s.root.join("bin/mailwebctl").exists() {
         install_cli(
             s,
@@ -359,11 +322,7 @@ pub(crate) fn install(
         }
         progress(Phase::Health, None)?;
         docker::start(s)?;
-        config::atomic(
-            &s.root.join("config/installed-release.json"),
-            &serde_json::to_vec_pretty(&manifest)?,
-            0o600,
-        )?;
+        save_installed(s, &manifest)?;
         install_cli(
             s,
             package
@@ -387,6 +346,59 @@ pub(crate) fn install(
     }
     summary(s, &manifest)?;
     Ok(())
+}
+
+pub(crate) fn verify_release_image(package: &Path, manifest: &mut Manifest) -> Result<()> {
+    manifest.image_id = crate::image::declared_config_id(
+        &package.join("image.tar"),
+        &manifest.image,
+        &manifest.image_id,
+    )?;
+    eprintln!(
+        "校验完成：{} · {}",
+        manifest.version, manifest.source_commit
+    );
+    docker::stream(&[
+        "load",
+        "-i",
+        package.join("image.tar").to_str().context("包路径无效")?,
+    ])?;
+    ensure!(
+        crate::image::matches(&manifest.image, &manifest.image_id)?,
+        "导入镜像 ID 与清单不符"
+    );
+    let runtime: Value = serde_json::from_str(&docker::capture(&[
+        "run",
+        "--rm",
+        "--pull",
+        "never",
+        &manifest.image,
+        "--runtime-info",
+    ])?)?;
+    ensure!(
+        runtime["version"]
+            .as_str()
+            .is_some_and(|running| manifest.matches_runtime_version(running))
+            && (manifest.cli_version.is_none()
+                || runtime["revision"].as_str() == Some(&manifest.source_commit)),
+        "镜像版本/提交与发布清单不一致"
+    );
+    if let Some(version) = &manifest.cli_version {
+        ensure!(
+            version == manifest.version.trim_start_matches('v'),
+            "应用与 CLI 清单版本不一致"
+        );
+        verify_cli_version(&package.join("bin/mailwebctl"), version)?;
+    }
+    Ok(())
+}
+
+fn save_installed(s: &Settings, manifest: &Manifest) -> Result<()> {
+    config::atomic(
+        &s.root.join("config/installed-release.json"),
+        &serde_json::to_vec_pretty(manifest)?,
+        0o600,
+    )
 }
 fn verify_cli_version(source: &Path, version: &str) -> Result<()> {
     let output = Process::new(source).arg("--version").output()?;
@@ -730,9 +742,7 @@ fn install_docs(package: &Path, root: &Path) -> Result<()> {
     }
     Ok(())
 }
-fn apply_snapshot(s: &Settings, path: &Path, restore_host_config: bool) -> Result<()> {
-    let stage = tempfile::tempdir_in(&s.root)?;
-    release::unpack(&path.join("config-secrets.tar.gz"), stage.path())?;
+fn clear_local_configuration(s: &Settings) -> Result<()> {
     for d in ["config", "secrets"] {
         for entry in fs::read_dir(s.root.join(d))? {
             let entry = entry?;
@@ -745,15 +755,10 @@ fn apply_snapshot(s: &Settings, path: &Path, restore_host_config: bool) -> Resul
                 fs::remove_file(entry.path())?
             }
         }
-        if stage.path().join(d).is_dir() {
-            copy_tree(&stage.path().join(d), &s.root.join(d))?
-        }
     }
-    if restore_host_config {
-        for n in [".env", "compose.yaml"] {
-            config::atomic(&s.root.join(n), &fs::read(path.join(n))?, 0o600)?
-        }
-    }
+    Ok(())
+}
+fn preserve_local_database(s: &Settings) -> Result<()> {
     for suffix in ["", "-wal", "-shm"] {
         let file = s.root.join(format!("data/db/mail-web.sqlite{suffix}"));
         if file.exists() {
@@ -764,11 +769,94 @@ fn apply_snapshot(s: &Settings, path: &Path, restore_host_config: bool) -> Resul
             fs::rename(file, preserved)?
         }
     }
+    Ok(())
+}
+fn apply_snapshot(s: &Settings, path: &Path, restore_host_config: bool) -> Result<()> {
+    let stage = tempfile::tempdir_in(&s.root)?;
+    release::unpack(&path.join("config-secrets.tar.gz"), stage.path())?;
+    clear_local_configuration(s)?;
+    for d in ["config", "secrets"] {
+        if stage.path().join(d).is_dir() {
+            copy_tree(&stage.path().join(d), &s.root.join(d))?
+        }
+    }
+    if restore_host_config {
+        for n in [".env", "compose.yaml"] {
+            config::atomic(&s.root.join(n), &fs::read(path.join(n))?, 0o600)?
+        }
+    }
+    preserve_local_database(s)?;
     fs::copy(
         path.join("mail-web.sqlite"),
         s.root.join("data/db/mail-web.sqlite"),
     )?;
     Ok(())
+}
+
+const APP_ENV: &[&str] = &[
+    "PUBLIC_ORIGIN",
+    "SITE_NAME",
+    "STALWART_URL",
+    "MAIL_DOMAIN",
+    "STALWART_DOMAIN_ID",
+    "STALWART_HOOK_ID",
+    "NOTIFICATION_ACCOUNT_ID",
+    "NOTIFICATION_EMAIL",
+    "TURNSTILE_SITE_KEY",
+    "MTA_POLICY_VERIFIED",
+];
+
+pub(crate) fn historical_settings(s: &Settings, manifest: &Manifest) -> Result<Settings> {
+    let mut target = s.clone();
+    let saved = read_site_settings(s).unwrap_or_default();
+    let current_origin = saved["publicOrigin"]
+        .as_str()
+        .filter(|url| !url.is_empty())
+        .or_else(|| s.values.get("PUBLIC_ORIGIN").map(String::as_str))
+        .filter(|url| config::validate_origin(url, s.allow_http).is_ok());
+    for key in APP_ENV {
+        target.values.remove(*key);
+    }
+    let tag = semver::Version::parse(manifest.version.trim_start_matches('v'))?;
+    if tag.major == 0 && tag.minor < 2 {
+        // These releases predate browser setup and require both origins at startup.
+        let origin = current_origin
+            .filter(|url| config::validate_origin(url, false).is_ok())
+            .map(str::to_owned)
+            .unwrap_or_else(|| format!("http://127.0.0.1:{}", s.port));
+        let upstream = saved["stalwartUrl"]
+            .as_str()
+            .or_else(|| s.values.get("STALWART_URL").map(String::as_str))
+            .filter(|url| {
+                url.starts_with("https://") && config::validate_origin(url, false).is_ok()
+            })
+            .unwrap_or("https://unconfigured.invalid");
+        target.values.insert("PUBLIC_ORIGIN".into(), origin);
+        target.values.insert("STALWART_URL".into(), upstream.into());
+    } else if let Some(origin) = current_origin {
+        target.values.insert("PUBLIC_ORIGIN".into(), origin.into());
+    }
+    target
+        .values
+        .insert("MAIL_WEB_VERSION".into(), tag.to_string());
+    Ok(target)
+}
+
+pub(crate) fn apply_historical(
+    mut target: Settings,
+    manifest: &Manifest,
+    starting: impl FnOnce() -> Result<()>,
+) -> Result<()> {
+    clear_local_configuration(&target)?;
+    preserve_local_database(&target)?;
+    for key in ["session", "setup", "mta-hook"] {
+        write_key(&target, key, true)?;
+    }
+    target.save()?;
+    save_installed(&target, manifest)?;
+    target.permissions()?;
+    starting()?;
+    docker::start(&target)
 }
 /// The version manager passes its own verified snapshot. Its host configuration
 /// comes only from the live installation, never from a historical archive.
@@ -782,17 +870,20 @@ pub(crate) fn apply_managed_snapshot(
     docker::stop(s)?;
     apply_snapshot(s, snapshot, false)?;
     let mut restored = s.clone();
+    let saved_env = config::env_read(&snapshot.join(".env"))?;
+    for key in APP_ENV {
+        restored.values.remove(*key);
+        if let Some(value) = saved_env.get(*key) {
+            restored.values.insert((*key).into(), value.clone());
+        }
+    }
     restored.values.insert(
         "MAIL_WEB_VERSION".into(),
         manifest.version.trim_start_matches('v').into(),
     );
     restored.save()?;
     config::atomic(&s.root.join("compose.yaml"), COMPOSE.as_bytes(), 0o600)?;
-    config::atomic(
-        &s.root.join("config/installed-release.json"),
-        &serde_json::to_vec_pretty(manifest)?,
-        0o600,
-    )?;
+    save_installed(s, manifest)?;
     restored.permissions()?;
     if revoke_sessions {
         docker::maintenance(&restored, &["--revoke-all-sessions"])?;

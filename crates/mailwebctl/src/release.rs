@@ -3,6 +3,7 @@
 use crate::config::{self, Settings};
 use crate::platform::Architecture;
 use anyhow::{Context, Result, bail, ensure};
+use mailweb_shared::deployment::{GithubRelease as Release, PublishedVersion, release_catalog};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -22,17 +23,16 @@ pub struct Manifest {
     #[serde(default)]
     pub cli_version: Option<String>,
 }
-#[derive(Deserialize)]
-struct Asset {
-    name: String,
-    browser_download_url: String,
-}
-#[derive(Deserialize)]
-struct Release {
-    tag_name: String,
-    draft: bool,
-    prerelease: bool,
-    assets: Vec<Asset>,
+impl Manifest {
+    pub fn matches_runtime_version(&self, runtime: &str) -> bool {
+        let tag = self.version.trim_start_matches('v');
+        if runtime == tag {
+            return true;
+        }
+        // The first published 0.1.0 alpha images used a shared Cargo version.
+        // Their release identity is verified separately by the archive and image hashes.
+        self.cli_version.is_none() && tag.starts_with("0.1.0-alpha.") && runtime == "0.1.0"
+    }
 }
 pub struct Client {
     http: reqwest::blocking::Client,
@@ -73,10 +73,7 @@ impl Client {
             .error_for_status()
             .context("下载/版本查询失败")
     }
-    pub fn published(
-        &self,
-        repo: &str,
-    ) -> Result<Vec<mailweb_shared::deployment::PublishedVersion>> {
+    pub fn published(&self, repo: &str) -> Result<Vec<PublishedVersion>> {
         config::validate_repo(repo)?;
         let arch = Architecture::current()?;
         let mut versions = Vec::new();
@@ -87,32 +84,9 @@ impl Client {
                 ))?
                 .json()?;
             let done = batch.len() < 100;
-            versions.extend(batch.into_iter().filter_map(|release| {
-                if release.draft
-                    || !release
-                        .assets
-                        .iter()
-                        .any(|asset| asset.name == arch.app_asset())
-                    || !release
-                        .assets
-                        .iter()
-                        .any(|asset| asset.name == "SHA256SUMS")
-                {
-                    return None;
-                }
-                let version = semver::Version::parse(release.tag_name.strip_prefix('v')?).ok()?;
-                let prerelease = release.prerelease || !version.pre.is_empty();
-                Some((
-                    version,
-                    mailweb_shared::deployment::PublishedVersion {
-                        version: release.tag_name,
-                        prerelease,
-                    },
-                ))
-            }));
+            versions.extend(batch);
             if done {
-                versions.sort_by(|a, b| b.0.cmp(&a.0));
-                return Ok(versions.into_iter().map(|(_, version)| version).collect());
+                return Ok(release_catalog(versions, arch.app_asset()));
             }
         }
         bail!("Release 列表超过查询上限")
@@ -410,6 +384,7 @@ mod tests {
 #[cfg(test)]
 mod selection_tests {
     use super::*;
+    use mailweb_shared::deployment::GithubAsset as Asset;
     fn release(tag: &str, draft: bool, prerelease: bool, assets: bool) -> Release {
         Release {
             tag_name: tag.into(),

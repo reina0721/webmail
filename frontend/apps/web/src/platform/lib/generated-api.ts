@@ -1392,6 +1392,7 @@ export interface components {
             version: string;
         };
         Inventory: {
+            historicalSwitch?: boolean;
             job?: null | components["schemas"]["Job"];
             releases: components["schemas"]["PublishedVersion"][];
             releasesStatus: string;
@@ -1419,7 +1420,7 @@ export interface components {
             starred?: boolean | null;
         };
         /** @enum {string} */
-        Operation: "update" | "rollback";
+        Operation: "update" | "rollback" | "install_historical";
         OperatorInput: {
             email: string;
             password: string;
@@ -1448,7 +1449,9 @@ export interface components {
             siteKey: string;
         };
         PublishedVersion: {
+            historical?: boolean;
             prerelease: boolean;
+            unavailableReason?: string | null;
             version: string;
         };
         Recovery: {
@@ -1504,7 +1507,7 @@ export interface components {
             expectedVersion: string;
             id: string;
             operation: components["schemas"]["Operation"];
-            /** @description Exact release tag for an update, registered snapshot ID for a rollback. */
+            /** @description Exact GitHub release tag, or the registered snapshot ID for a rollback. */
             target: string;
         };
         TurnstileBinding: {

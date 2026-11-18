@@ -54,14 +54,8 @@ pub fn atomic(path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
     Ok(())
 }
 pub fn validate_repo(value: &str) -> Result<()> {
-    let p: Vec<_> = value.split('/').collect();
     ensure!(
-        p.len() == 2
-            && p.iter().all(|s| !s.is_empty()
-                && *s != "."
-                && *s != ".."
-                && s.bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || b"_.-".contains(&b))),
+        mailweb_shared::deployment::valid_repository(value),
         "仓库必须是 OWNER/REPO"
     );
     Ok(())

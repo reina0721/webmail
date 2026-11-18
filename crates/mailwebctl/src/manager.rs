@@ -11,6 +11,7 @@ use anyhow::{Context, Result, ensure};
 use clap::Parser;
 use mailweb_shared::deployment::{
     Inventory, Job, MAX_REQUEST, Operation, Phase, PublishedVersion, Request, Snapshot, Submit,
+    exact_version,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -41,6 +42,10 @@ const SNAPSHOT_FILES: [&str; 4] = [
 #[derive(clap::Subcommand, Debug)]
 pub enum Action {
     Enable,
+    Snapshots,
+    Job {
+        id: String,
+    },
     Import {
         snapshot: PathBuf,
     },
@@ -85,13 +90,7 @@ fn snapshot_id() -> String {
     format!("{:032x}", rand::random::<u128>())
 }
 fn version(tag: &str) -> Result<semver::Version> {
-    ensure!(tag.len() <= 100, "版本号过长");
-    let v = semver::Version::parse(tag.strip_prefix('v').context("版本需要 v 前缀")?)?;
-    ensure!(
-        v.build.is_empty() && tag == format!("v{v}"),
-        "需要精确发布版本"
-    );
-    Ok(v)
+    exact_version(tag).context("需要带 v 前缀的精确发布版本")
 }
 fn current(s: &Settings) -> Result<String> {
     let installed = format!(
@@ -121,9 +120,24 @@ fn running_version(s: &Settings) -> Option<String> {
         .ok()?
         .json()
         .ok()?;
-    let tag = format!("v{}", response["version"].as_str()?);
-    version(&tag).ok()?;
-    Some(tag)
+    let manifest = operations::installed(s).ok().flatten();
+    if let Some(runtime) = response["version"].as_str() {
+        let tag = format!("v{runtime}");
+        version(&tag).ok()?;
+        if !manifest.as_ref().is_some_and(|expected| {
+            expected.version != tag && expected.matches_runtime_version(runtime)
+        }) {
+            return Some(tag);
+        }
+    }
+    // Older images expose only health status or omit the release's alpha suffix.
+    let manifest = manifest?;
+    let active_image = docker::capture(&["inspect", "--format", "{{.Image}}", &s.name]).ok()?;
+    let tagged_image =
+        docker::capture(&["image", "inspect", "--format", "{{.Id}}", &manifest.image]).ok()?;
+    (active_image.trim() == tagged_image.trim()
+        && image::matches(&manifest.image, &manifest.image_id).ok()?)
+    .then_some(manifest.version)
 }
 fn owned_path(path: &Path, directory: bool) -> Result<()> {
     let m = fs::symlink_metadata(path)?;
@@ -270,6 +284,21 @@ pub fn run(s: &Settings, action: &Action) -> Result<()> {
     private_dir(&state(&s.root).join("snapshots"))?;
     match action {
         Action::Enable => enable(&s),
+        Action::Snapshots => {
+            for snapshot in registered_snapshots(&s)? {
+                println!(
+                    "{}\t{}\t{}",
+                    snapshot.version, snapshot.id, snapshot.created_at
+                );
+            }
+            Ok(())
+        }
+        Action::Job { id } => {
+            ensure!(id_valid(id), "任务 ID 无效");
+            let record: Record = load(&record_path(&s, id)).context("任务不存在")?;
+            println!("{}", serde_json::to_string_pretty(&record.job)?);
+            Ok(())
+        }
         Action::Import { snapshot } => {
             let _lock = s.lock()?;
             let source = snapshot.canonicalize()?;
@@ -508,11 +537,15 @@ fn submit(s: &Settings, job: Submit, actor: String) -> Result<(Record, bool)> {
         Operation::Rollback => {
             ensure!(job.confirm_data_restore, "需要确认恢复快照数据");
             let entry = snapshot_entry(s, &job.target)?;
-            ensure!(
-                version(&entry.snapshot.version)? < version(&current)?,
-                "请选择低于当前版本的快照"
-            );
             entry.snapshot.version
+        }
+        Operation::InstallHistorical => {
+            ensure!(job.confirm_data_restore, "需要确认旧版使用全新的本地数据");
+            ensure!(
+                version(&job.target)? < version(&current)?,
+                "请选择低于当前版本的公开 Release"
+            );
+            job.target.clone()
         }
     };
     let record = Record {
@@ -565,14 +598,38 @@ fn transact(s: &Settings, record: &mut Record) -> Result<()> {
             )
         }
         Operation::Rollback => {
-            checkpoint(s, record, Phase::Verify, "正在校验旧版快照与镜像")?;
+            checkpoint(s, record, Phase::Verify, "正在校验所选快照与镜像")?;
             let entry = snapshot(s, &record.request.target)?;
             prepare_image(s, &entry.manifest)?;
             checkpoint(s, record, Phase::Backup, "正在备份当前版本")?;
             let backup = operations::backup(s, false)?;
             mark_safety(s, record, &backup)?;
             apply(s, &entry, true, || {
-                checkpoint(s, record, Phase::Health, "正在等待旧版启动和健康检查")
+                checkpoint(
+                    s,
+                    record,
+                    Phase::Health,
+                    "正在等待快照对应版本启动和健康检查",
+                )
+            })
+        }
+        Operation::InstallHistorical => {
+            checkpoint(s, record, Phase::Download, "正在下载历史发布包")?;
+            let (package, mut manifest) =
+                release::prepare(s, &record.request.target, "latest", None, None)?;
+            checkpoint(s, record, Phase::Verify, "正在核对镜像与发布清单")?;
+            operations::verify_release_image(&package, &mut manifest)?;
+            let target = operations::historical_settings(s, &manifest)?;
+            checkpoint(
+                s,
+                record,
+                Phase::Backup,
+                "正在完整备份当前版本的数据库和配置",
+            )?;
+            let backup = operations::backup(s, false)?;
+            mark_safety(s, record, &backup)?;
+            operations::apply_historical(target, &manifest, || {
+                checkpoint(s, record, Phase::Health, "正在初始化旧版数据并检查健康状态")
             })
         }
     }
@@ -641,35 +698,39 @@ fn execute(root: &Path, mut record: Record) -> Result<()> {
 }
 
 type Listings = Arc<Mutex<(String, Vec<PublishedVersion>)>>;
-fn inventory(s: &Settings, releases: &Listings) -> Result<Inventory> {
-    let (releases_status, mut releases) = releases.lock().unwrap().clone();
-    let installed = Settings::load(&s.root)?
-        .values
-        .get("MAIL_WEB_VERSION")
-        .map(|tag| version(&format!("v{tag}")))
-        .transpose()?;
-    if let Some(installed) = &installed {
-        releases.retain(|release| version(&release.version).is_ok_and(|v| &v > installed));
-    }
+fn registered_snapshots(s: &Settings) -> Result<Vec<Snapshot>> {
     let mut snapshots = Vec::new();
     for entry in fs::read_dir(state(&s.root).join("snapshots"))? {
         let entry = entry?;
         let id = entry.file_name().to_string_lossy().into_owned();
         if id_valid(&id)
             && let Ok(item) = load::<Entry>(&entry.path().join("snapshot.json"))
-            && installed.as_ref().is_none_or(|installed| {
-                version(&item.snapshot.version).is_ok_and(|v| &v < installed)
-            })
+            && item.snapshot.id == id
         {
             snapshots.push(item.snapshot);
         }
     }
     snapshots.sort_by_key(|s| std::cmp::Reverse(s.created_at));
+    Ok(snapshots)
+}
+fn inventory(s: &Settings, releases: &Listings, catalog: bool) -> Result<Inventory> {
+    let (releases_status, mut releases) = releases.lock().unwrap().clone();
+    let mut snapshots = registered_snapshots(s)?;
+    if !catalog {
+        let installed = version(&current(&Settings::load(&s.root)?)?)?;
+        releases.retain(|item| {
+            item.unavailable_reason.is_none()
+                && exact_version(&item.version).is_some_and(|version| version > installed)
+        });
+        snapshots
+            .retain(|item| exact_version(&item.version).is_some_and(|version| version < installed));
+    }
     Ok(Inventory {
         releases,
         releases_status,
         snapshots,
         job: recent(s)?.map(|r| r.job),
+        historical_switch: catalog,
     })
 }
 fn peer_uid(stream: &UnixStream) -> Result<u32> {
@@ -704,7 +765,8 @@ fn connection(s: &Settings, releases: &Listings, mut stream: UnixStream) -> Resu
             "版本请求无效"
         );
         match serde_json::from_slice::<Request>(&line)? {
-            Request::Status => Ok(serde_json::to_value(inventory(s, releases)?)?),
+            Request::Status => Ok(serde_json::to_value(inventory(s, releases, false)?)?),
+            Request::Catalog => Ok(serde_json::to_value(inventory(s, releases, true)?)?),
             Request::Job { id } => {
                 ensure!(id_valid(&id), "任务 ID 无效");
                 let record: Record = load(&record_path(s, &id)).context("任务不存在")?;
@@ -820,6 +882,8 @@ mod tests {
         old.target = "v0.4.0-alpha.2".into();
         assert!(submit(&s, old.clone(), actor.clone()).is_err());
         old.operation = Operation::Rollback;
+        assert!(submit(&s, old.clone(), actor.clone()).is_err());
+        old.operation = Operation::InstallHistorical;
         assert!(submit(&s, old.clone(), actor.clone()).is_err());
         old.confirm_data_restore = true;
         old.target = "../backups/untrusted".into();

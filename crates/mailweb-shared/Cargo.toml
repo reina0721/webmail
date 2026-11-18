@@ -12,4 +12,5 @@ openapi = ["dep:utoipa"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
+semver = "1"
 utoipa = { version = "5", optional = true }

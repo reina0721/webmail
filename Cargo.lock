@@ -1797,7 +1797,7 @@ dependencies = [
 
 [[package]]
 name = "mail-web"
-version = "0.4.0-alpha.14"
+version = "0.4.0-alpha.15"
 dependencies = [
  "aes-gcm",
  "ammonia",
@@ -1842,13 +1842,14 @@ dependencies = [
 name = "mailweb-shared"
 version = "0.1.0"
 dependencies = [
+ "semver",
  "serde",
  "utoipa",
 ]
 
 [[package]]
 name = "mailwebctl"
-version = "0.4.0-alpha.14"
+version = "0.4.0-alpha.15"
 dependencies = [
  "anyhow",
  "clap",

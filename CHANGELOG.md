@@ -4,6 +4,14 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+## [0.4.0-alpha.15] - 2026-11-18
+
+### Added
+
+- List all published GitHub Releases in the console, including historical and unavailable platform builds.
+- Install historical Releases with clean local data after retaining the current version's snapshot, and restore registered snapshots in either direction.
+- Inspect host-side snapshot IDs and switch tasks from the management CLI after returning to a version without a console integration.
+
 ## [0.4.0-alpha.14] - 2026-11-18
 
 ### Added

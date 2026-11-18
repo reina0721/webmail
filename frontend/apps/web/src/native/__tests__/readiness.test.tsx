@@ -62,6 +62,31 @@ it("shows pending feedback and a visible completion summary for unsuccessful che
   resolve({ ...report, checkedAt: 2 });
   expect(await screen.findByText(/检查完成：1\/2 项通过/)).toBeInTheDocument();
 });
+it.each([
+  [true, true, true, "公开注册已开启。", "人机与收信验证已通过。"],
+  [true, false, false, "注册策略已开启，当前暂停接受注册。", "先通过自动检查"],
+  [false, true, false, "公开注册未开启。", "勾选「允许公开注册」并保存注册策略"],
+])(
+  "states the current policy and verification result (policy=%s, verified=%s, open=%s)",
+  async (requestedEnabled, ready, effectiveEnabled, registrationStatus, verificationStatus) => {
+    request.mockResolvedValue({
+      ...report,
+      requestedEnabled,
+      ready,
+      effectiveEnabled,
+      humanVerifiedAt: ready ? 123 : 0,
+      items: ready ? report.items.map((item) => ({ ...item, status: "passed" })) : report.items,
+    });
+    render(<RegistrationReadiness />);
+    const status = await screen.findByText(registrationStatus);
+    expect(status.parentElement).toHaveTextContent(verificationStatus);
+    fireEvent.click(screen.getByRole("button", { name: "检查注册条件" }));
+    expect(
+      await screen.findByText(ready ? "自动检查全部通过。" : /检查完成：1\/2 项通过/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/下一步点击/)).not.toBeInTheDocument();
+  },
+);
 it("exposes the real human-and-mail verification link after all automatic checks pass", async () => {
   const passing = {
     ...report,

@@ -4,6 +4,13 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+## [0.4.0-alpha.12] - 2026-11-18
+
+### Fixed
+
+- Show the actual public registration and verification status above the checklist.
+- Match the setup guide to console actions and document the final registration switch.
+
 ## [0.4.0-alpha.11] - 2026-11-18
 
 ### Fixed

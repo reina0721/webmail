@@ -110,7 +110,6 @@ export function useReadiness({
         );
         if (request !== generation.current) return;
         setUrl(result.url);
-        setNotice("验证链接已生成。请打开验证页，完成人机验证和验证码收信。");
         await load();
         return;
       }
@@ -124,7 +123,7 @@ export function useReadiness({
       const failed = report.items.filter((item) => item.status !== "passed");
       const summary = failed.length
         ? `检查完成：${report.items.length - failed.length}/${report.items.length} 项通过。请处理：${failed.map((item) => item.label).join("、")}。`
-        : "自动检查全部通过。下一步点击“生成收信验证链接”。";
+        : "自动检查全部通过。";
       setNotice(
         action === "hook" ? "Stalwart 回调已更新。" + summary : summary,
       );

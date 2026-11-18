@@ -34,6 +34,18 @@ export function RegistrationReadiness({
     (item) => item.reason === "turnstile_missing",
   );
   const canVerify = !!v?.items.length && !failed.length;
+  const registrationStatus = v?.effectiveEnabled
+    ? "公开注册已开启。"
+    : v?.requestedEnabled
+      ? "注册策略已开启，当前暂停接受注册。"
+      : "公开注册未开启。";
+  const verificationStatus = v?.ready
+    ? v.effectiveEnabled
+      ? "人机与收信验证已通过。"
+      : "人机与收信验证已通过。勾选「允许公开注册」并保存注册策略即可开放。"
+    : canVerify
+      ? "自动检查已通过。请生成收信验证链接，完成人机验证和验证码收信。"
+      : "先通过自动检查，再完成人机与收信验证。";
   const canRepairHook =
     !!v &&
     !v.stale &&
@@ -60,7 +72,11 @@ export function RegistrationReadiness({
     <section className="console-panel">
       <header>
         <h2>注册条件与健康诊断</h2>
-        <p>先通过自动检查，再完成人机与收信验证。通过后即可开启公开注册。</p>
+        {v && (
+          <p>
+            <strong>{registrationStatus}</strong> {verificationStatus}
+          </p>
+        )}
       </header>
       <div className="console-actions">
         <Action
@@ -109,11 +125,18 @@ export function RegistrationReadiness({
         <p role="status">正在验证主地址并更新 Stalwart 回调…</p>
       )}
       {c.notice && <p role="status">{c.notice}</p>}
+      {c.url && (
+        <p role="status">
+          {v?.ready
+            ? "复验链接已生成。"
+            : "验证链接已生成。请打开验证页，完成人机验证和验证码收信。"}
+        </p>
+      )}
       {c.url && copyResult?.url === c.url && (
         <p role="status">{copyResult.message}</p>
       )}
       {c.error && <p role="alert">{c.error}</p>}
-      {!canVerify && v && (
+      {!canVerify && v && !v.ready && (
         <p>
           收信验证入口将在所有自动检查通过后启用。
           {v.items.length

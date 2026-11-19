@@ -1,3 +1,9 @@
 [workspace]
 members = ["backend", "crates/mailwebctl", "crates/mailweb-shared"]
 resolver = "2"
+
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.release]
+strip = "symbols"

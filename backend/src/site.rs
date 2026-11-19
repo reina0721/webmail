@@ -1052,14 +1052,14 @@ fn absolute_url(origin: &str, url: &str) -> String {
 
 fn strip_tag_block(html: &str, open: &str, close: &str) -> String {
     let lower = html.to_ascii_lowercase();
-    if let Some(start) = lower.find(open) {
-        if let Some(rel_end) = lower[start..].find(close) {
-            let end = start + rel_end + close.len();
-            let mut out = String::with_capacity(html.len());
-            out.push_str(&html[..start]);
-            out.push_str(&html[end..]);
-            return out;
-        }
+    if let Some(start) = lower.find(open)
+        && let Some(rel_end) = lower[start..].find(close)
+    {
+        let end = start + rel_end + close.len();
+        let mut out = String::with_capacity(html.len());
+        out.push_str(&html[..start]);
+        out.push_str(&html[end..]);
+        return out;
     }
     html.to_owned()
 }

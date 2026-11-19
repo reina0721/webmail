@@ -67,10 +67,50 @@ jobs:
             *-*) echo 'Prerelease: production evidence is not promoted';;
             *) jq -e '.readyForPublicRegistration == true' docs/acceptance.json;;
           esac
+  fast-check:
+    name: Fast workspace checks
+    needs: metadata
+    if: ${{ !cancelled() && needs.metadata.result == 'success' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: corepack enable && corepack prepare pnpm@10.22.0 --activate
+      - run: pnpm install --frozen-lockfile
+        working-directory: frontend
+      - name: Check repository, boundaries, and frontend types
+        run: |
+          set -eu
+          python3 tooling/check-repository.py
+          node frontend/tooling/check-boundaries.mjs
+          node frontend/tooling/check-boundaries-fixtures.mjs
+          node tooling/check-persistence.mjs
+          node tooling/check-upstream.mjs
+          pnpm --dir frontend typecheck
+      - name: Install Rust lint components
+        run: rustup component add rustfmt clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: fast-check
+          cache-on-failure: 'true'
+      - name: Check workspace formatting, Linux CLI build, Clippy, and OpenAPI contract
+        run: |
+          set -eu
+          cargo fmt --all -- --check
+          cargo check --locked --workspace --all-targets
+          cargo clippy --locked --workspace --all-targets -- -D warnings
+          cargo run --locked -p mail-web -- --openapi > /tmp/openapi.json
+          diff -u backend/contract/openapi.json /tmp/openapi.json
+          pnpm --dir frontend exec openapi-typescript ../backend/contract/openapi.json -o /tmp/generated-api.ts
+          diff -u frontend/apps/web/src/platform/lib/generated-api.ts /tmp/generated-api.ts
   checks:
     name: Build release (${{ matrix.architecture }})
-    needs: [metadata, preflight]
-    if: ${{ !cancelled() && needs.metadata.result == 'success' && (needs.preflight.result == 'success' || needs.preflight.result == 'skipped') }}
+    needs: metadata
+    if: ${{ !cancelled() && needs.metadata.result == 'success' }}
     strategy:
       fail-fast: false
       matrix:
@@ -82,16 +122,65 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
-      - name: Build native application
+      - uses: docker/setup-buildx-action@v3
+      - name: Compute third-party dependency cache key
+        id: deps
+        run: |
+          set -eu
+          hash=$(python3 -c "import hashlib, pathlib; lock=pathlib.Path('Cargo.lock').read_text(); pkgs=[b for b in lock.split('\n[[package]]') if 'source = ' in b]; print(hashlib.sha256(('\n'.join(pkgs)+pathlib.Path('Cargo.toml').read_text()).encode()).hexdigest()[:16])")
+          echo "hash=$hash" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: rustcache
+        with:
+          path: ${{ runner.temp }}/rustcache
+          key: rust-deps-${{ matrix.architecture }}-${{ steps.deps.outputs.hash }}
+          restore-keys: |
+            rust-deps-${{ matrix.architecture }}-
+      - name: Prepare external Rust dependency cache and parallel compression tool
         env:
           ARCHITECTURE: ${{ matrix.architecture }}
-        run: docker build --platform "linux/$ARCHITECTURE" --build-arg MAIL_WEB_REVISION="$GITHUB_SHA" -t mail-web:ci .
+          CACHE_HIT: ${{ steps.rustcache.outputs.cache-hit }}
+        run: |
+          set -eu
+          mkdir -p "$RUNNER_TEMP/rustcache" "$RUNNER_TEMP/cli-out"
+          if ! command -v pigz >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y --no-install-recommends pigz
+          fi
+          if [ "$CACHE_HIT" != "true" ]; then
+            docker buildx build --platform "linux/$ARCHITECTURE" --target rust-cache-export \
+              --output "type=local,dest=$RUNNER_TEMP/rustcache" \
+              --build-context "rustcache=$RUNNER_TEMP/rustcache" .
+          fi
+      - name: Build native application and CLI in parallel
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          set -eu
+          docker buildx build --platform "linux/$ARCHITECTURE" --load \
+            --build-arg MAIL_WEB_REVISION="$GITHUB_SHA" \
+            --build-arg MAIL_WEB_SKIP_NEXT_TYPECHECK=1 \
+            --build-context "rustcache=$RUNNER_TEMP/rustcache" \
+            --cache-from "type=gha,scope=app-$ARCHITECTURE" \
+            --cache-to "type=gha,scope=app-$ARCHITECTURE,mode=max" \
+            -t mail-web:ci . &
+          pid_app=$!
+          docker buildx build --platform "linux/$ARCHITECTURE" \
+            --target cli-artifact \
+            --output "type=local,dest=$RUNNER_TEMP/cli-out" \
+            --build-context "rustcache=$RUNNER_TEMP/rustcache" \
+            --cache-from "type=gha,scope=cli-$ARCHITECTURE" \
+            --cache-to "type=gha,scope=cli-$ARCHITECTURE,mode=max" \
+            . &
+          pid_cli=$!
+          wait "$pid_app"
+          wait "$pid_cli"
       - run: docker run --rm --pull never mail-web:ci --runtime-info
       - name: Package verified native release
         if: needs.metadata.outputs.release == 'true'
         env:
           VERSION: ${{ needs.metadata.outputs.version }}
           ARCHITECTURE: ${{ matrix.architecture }}
+          MAIL_WEB_CLI_BIN: ${{ runner.temp }}/cli-out/mailwebctl
         run: |
           docker tag mail-web:ci "mail-web:${VERSION#v}"
           sh tooling/package-release.sh "$VERSION" "$ARCHITECTURE"
@@ -104,7 +193,7 @@ jobs:
           compression-level: 0
   draft:
     if: needs.metadata.outputs.release == 'true'
-    needs: [metadata, checks]
+    needs: [metadata, preflight, fast-check, checks]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

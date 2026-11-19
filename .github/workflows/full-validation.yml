@@ -157,6 +157,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
       - run: corepack enable && corepack prepare pnpm@10.22.0 --activate
       - run: pnpm install --frozen-lockfile
         working-directory: frontend
@@ -166,6 +168,9 @@ jobs:
       # The Docker quality target below runs the full client suite once.
       - run: node --test tests/motion-styles.test.mjs tests/operation-id.test.mjs tests/admin-access.test.mjs tests/setup-guidance.test.mjs tests/platform-account-context.test.mjs
       - run: rustup update stable && rustup default stable && rustup component add rustfmt clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: full-validation-${{ matrix.architecture }}
       - run: cargo fmt --all -- --check && cargo test --locked --workspace && cargo clippy --locked --workspace --all-targets -- -D warnings
       - run: mkdir -p build && cargo run --locked -p mail-web -- --openapi > build/openapi.json && diff -u backend/contract/openapi.json build/openapi.json
       - run: pnpm --dir frontend exec openapi-typescript ../backend/contract/openapi.json -o apps/web/src/platform/lib/generated-api.ts && git diff --exit-code frontend/apps/web/src/platform/lib/generated-api.ts

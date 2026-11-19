@@ -9,10 +9,12 @@ const full=YAML.parse(fs.readFileSync(new URL('../.github/workflows/full-validat
 const runs=job=>job.steps.map(step=>step.run??'').join('\n');
 test('publication depends on native builds and checksums; installation runs after publication',()=>{
  assert.deepEqual(quick.jobs.publish.needs,['metadata','draft']);
+ assert.deepEqual(quick.jobs.draft.needs,['metadata','preflight','fast-check','checks']);
  assert.equal(quick.jobs['release-install'],undefined);
  for(const job of [quick.jobs.checks,full.jobs.installation])assert.deepEqual(job.strategy.matrix.include.map(item=>item.architecture),['amd64','arm64']);
  assert.doesNotMatch(runs(quick.jobs.checks),/vitest|cargo test|run-integration|test-env.sh/);
- assert.match(runs(quick.jobs.checks),/docker build/);
+ assert.match(runs(quick.jobs.checks),/docker buildx? build/);
+ assert.match(runs(quick.jobs['fast-check']),/cargo check --locked --workspace/);
  assert.match(runs(quick.jobs.draft),/sha256sum -c SHA256SUMS/);
  assert.match(full.jobs.installation.if,/outputs.release == 'true'/);
  assert.match(runs(full.jobs.installation),/tests\/release-install.sh/);

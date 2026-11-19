@@ -14,6 +14,9 @@ const config: NextConfig = {
   output: devUpstream ? undefined : "export",
   trailingSlash: true,
   skipTrailingSlashRedirect: !!devUpstream,
+  ...(process.env.MAIL_WEB_SKIP_NEXT_TYPECHECK === "1"
+    ? { typescript: { ignoreBuildErrors: true } }
+    : {}),
   transpilePackages: [
     "@mail-web/ui",
     "@community-go/state-foundation",

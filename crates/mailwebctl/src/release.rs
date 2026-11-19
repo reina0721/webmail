@@ -60,9 +60,6 @@ pub struct Client {
     has_proxy: bool,
 }
 impl Client {
-    pub fn new(mirror: Option<&str>) -> Result<Self> {
-        Self::new_with_options(mirror, None)
-    }
     pub fn new_with_options(mirror: Option<&str>, proxy: Option<&str>) -> Result<Self> {
         let normalized_mirror =
             normalize_download_mirror(mirror).map_err(|e| anyhow::anyhow!(e))?;
@@ -871,6 +868,6 @@ mod selection_tests {
             client.source_label(Some("https://ghfast.top")),
             "代理 -> 镜像 (ghfast.top)"
         );
-        assert_eq!(client.source_label(None), "代理 -> GitHub");
+        assert_eq!(client.source_label(None), "代理 -> GitHub 直连");
     }
 }

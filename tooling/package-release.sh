@@ -21,9 +21,23 @@ mkdir -p "$destination"
 stage=$(mktemp -d "$root/build/release-stage.XXXXXX")
 trap 'rm -rf "$stage"' EXIT HUP INT TERM
 mkdir -p "$stage/package/bin" "$stage/cli/bin"
-docker build --platform "linux/$architecture" --target cli-artifact --output "type=local,dest=$stage/cli-build" .
-cp "$stage/cli-build/mailwebctl" "$stage/cli/bin/mailwebctl"
+if [ -n "${MAIL_WEB_CLI_BIN:-}" ]; then
+  test -f "$MAIL_WEB_CLI_BIN" || { echo "Missing prebuilt CLI at $MAIL_WEB_CLI_BIN" >&2; exit 1; }
+  cp "$MAIL_WEB_CLI_BIN" "$stage/cli/bin/mailwebctl"
+else
+  docker build --platform "linux/$architecture" --target cli-artifact --output "type=local,dest=$stage/cli-build" .
+  cp "$stage/cli-build/mailwebctl" "$stage/cli/bin/mailwebctl"
+fi
 chmod 755 "$stage/cli/bin/mailwebctl"
+pack_gz() {
+  archive=$1
+  dir=$2
+  if command -v pigz >/dev/null 2>&1; then
+    tar -I pigz -cf "$archive" -C "$dir" .
+  else
+    tar -czf "$archive" -C "$dir" .
+  fi
+}
 python3 - "$stage/cli/bin/mailwebctl" "$architecture" <<'PY'
 import pathlib, struct, sys
 with pathlib.Path(sys.argv[1]).open('rb') as stream:
@@ -36,7 +50,7 @@ cp LICENSE NOTICE "$stage/cli/"
 mkdir -p "$stage/cli/docs/upstream"
 cp -R docs/upstream/dsh "$stage/cli/docs/upstream/"
 printf '{"version":"%s","architecture":"linux/%s"}\n' "$version" "$architecture" > "$stage/cli/cli-manifest.json"
-tar -czf "$destination/mailwebctl-linux-$architecture.tar.gz" -C "$stage/cli" .
+pack_gz "$destination/mailwebctl-linux-$architecture.tar.gz" "$stage/cli"
 cp "$stage/cli/bin/mailwebctl" "$stage/package/bin/"
 test "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$image")" = "linux/$architecture"
 runtime=$(docker run --rm --pull never "$image" --runtime-info)
@@ -50,9 +64,13 @@ cp compose.yaml .env.example README.md README_ZH.md CONTRIBUTING.md CHANGELOG.md
 cp -R deploy docs examples "$stage/package/"
 cp -R backend/contract "$stage/package/"
 # The source corresponds to the recorded commit, never to test-generated state.
-git archive --format=tar.gz HEAD > "$stage/package/source.tar.gz"
+if command -v pigz >/dev/null 2>&1; then
+  git archive --format=tar HEAD | pigz > "$stage/package/source.tar.gz"
+else
+  git archive --format=tar.gz HEAD > "$stage/package/source.tar.gz"
+fi
 python3 tooling/release_metadata.py verify-source "$version" --inputs "$stage/package/source.tar.gz"
 (cd "$stage/package"; sha256sum image.tar > image.sha256)
-tar -czf "$destination/mail-web-linux-$architecture.tar.gz" -C "$stage/package" .
+pack_gz "$destination/mail-web-linux-$architecture.tar.gz" "$stage/package"
 cp "$stage/package/release-manifest.json" "$destination/release-manifest-linux-$architecture.json"
 printf '%s\n' "$destination"

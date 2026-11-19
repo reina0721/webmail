@@ -4,6 +4,22 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+## [0.4.0-alpha.19] - 2026-11-19
+
+### Changed
+
+- Overhaul the release build pipeline for speed and fail-fast feedback: add a parallel `fast-check` job (workspace Rust/CLI check, Clippy, frontend typecheck, repository & OpenAPI contract checks), externalize third-party Rust dependency caching across version bumps, build `mail-web` and `mailwebctl` concurrently via Buildx, skip redundant in-image Next.js typechecking in CI, and compress release archives in parallel with `pigz`.
+- Set `[profile.dev] debug = "line-tables-only"` and `[profile.release] strip = "symbols"` to shrink release bundles and speed up local test links.
+- Add `Swatinem/rust-cache` and `pnpm` store caching to `full-validation.yml`.
+
+### Added
+
+- Add `tooling/pre-release-check.sh` for fast pre-push validation, including Linux `mailwebctl` compilation verification via local Docker when available.
+
+### Fixed
+
+- Collapse nested `if let` in `backend/src/site.rs` to satisfy `clippy::collapsible_if` in `full-validation.yml`.
+
 ## [0.4.0-alpha.18] - 2026-11-19
 
 ### Added

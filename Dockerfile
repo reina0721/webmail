@@ -31,7 +31,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY backend/Cargo.toml backend/Cargo.toml
 COPY crates/mailweb-shared/Cargo.toml crates/mailweb-shared/Cargo.toml
 COPY crates/mailwebctl/Cargo.toml crates/mailwebctl/Cargo.toml
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
+RUN --mount=type=cache,id=mailweb-cargo-registry,target=/usr/local/cargo/registry \
     mkdir -p backend/src crates/mailweb-shared/src crates/mailwebctl/src /export/app \
  && printf 'fn main() {}\n' > backend/src/main.rs \
  && printf 'fn main() {}\n' > crates/mailwebctl/src/main.rs \
@@ -50,8 +50,8 @@ COPY crates/ ./crates/
 COPY compose.yaml install.sh ./
 COPY deploy/ ./deploy/
 RUN --mount=type=bind,from=rustcache,target=/seed \
-    --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/source/target \
+    --mount=type=cache,id=mailweb-cargo-registry,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=mailweb-app-target,target=/source/target \
     if [ ! -d target/release/.fingerprint ] && [ -d /seed/app/release ]; then mkdir -p target/release && cp -a /seed/app/release/. target/release/; fi \
  && find backend/src backend/migrations crates -type f -exec touch {} + \
  && touch backend/Cargo.toml crates/mailweb-shared/Cargo.toml crates/mailwebctl/Cargo.toml \
@@ -71,7 +71,7 @@ RUN cp frontend/apps/web/src/platform/lib/generated-api.ts /tmp/api-before.ts &&
 
 FROM backend AS backend-quality
 RUN rustup component add rustfmt clippy
-RUN --mount=type=cache,target=/usr/local/cargo/registry --mount=type=cache,target=/source/target cargo fmt --all -- --check && cargo test --locked --workspace && cargo clippy --locked --workspace --all-targets -- -D warnings && cargo run --locked -p mail-web -- --openapi > /tmp/openapi.json && diff -u backend/contract/openapi.json /tmp/openapi.json && touch /source/backend-quality.done
+RUN --mount=type=cache,id=mailweb-cargo-registry,target=/usr/local/cargo/registry --mount=type=cache,id=mailweb-app-target,target=/source/target cargo fmt --all -- --check && cargo test --locked --workspace && cargo clippy --locked --workspace --all-targets -- -D warnings && cargo run --locked -p mail-web -- --openapi > /tmp/openapi.json && diff -u backend/contract/openapi.json /tmp/openapi.json && touch /source/backend-quality.done
 
 FROM client-quality AS quality
 COPY --from=backend-quality /source/backend-quality.done /source/backend-quality.done
@@ -94,7 +94,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY backend/Cargo.toml backend/Cargo.toml
 COPY crates/mailweb-shared/Cargo.toml crates/mailweb-shared/Cargo.toml
 COPY crates/mailwebctl/Cargo.toml crates/mailwebctl/Cargo.toml
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
+RUN --mount=type=cache,id=mailweb-cargo-registry-alpine,target=/usr/local/cargo/registry \
     mkdir -p backend/src crates/mailweb-shared/src crates/mailwebctl/src /export/cli \
  && printf 'fn main() {}\n' > backend/src/main.rs \
  && printf 'fn main() {}\n' > crates/mailwebctl/src/main.rs \
@@ -112,8 +112,8 @@ COPY crates/ ./crates/
 COPY compose.yaml install.sh ./
 COPY deploy/ ./deploy/
 RUN --mount=type=bind,from=rustcache,target=/seed \
-    --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/source/target \
+    --mount=type=cache,id=mailweb-cargo-registry-alpine,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=mailweb-cli-target,target=/source/target \
     if [ ! -d target/release/.fingerprint ] && [ -d /seed/cli/release ]; then mkdir -p target/release && cp -a /seed/cli/release/. target/release/; fi \
  && find crates compose.yaml deploy/mail-web.sh deploy/install.sh -type f -exec touch {} + \
  && cargo build --locked --release -p mailwebctl && mkdir /output && cp target/release/mailwebctl /output/mailwebctl

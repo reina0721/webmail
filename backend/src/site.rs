@@ -546,20 +546,21 @@ fn detect_image_mime(kind: &str, bytes: &[u8]) -> Result<&'static str> {
     if bytes.starts_with(&[0x00, 0x00, 0x01, 0x00]) && kind == "favicon" {
         return Ok("image/x-icon");
     }
-    if kind != "og-image" && kind != "apple-touch-icon" {
-        if let Ok(text) = std::str::from_utf8(bytes) {
-            let trimmed = text.trim_start_matches('\u{feff}').trim_start();
-            let lower = trimmed.to_ascii_lowercase();
-            if (lower.starts_with("<svg") || lower.starts_with("<?xml"))
-                && lower.contains("<svg")
-                && !lower.contains("<script")
-                && !lower.contains("<foreignobject")
-                && !lower.contains("javascript:")
-                && !lower.contains("vbscript:")
-                && !has_inline_event_handler(&lower)
-            {
-                return Ok("image/svg+xml");
-            }
+    if kind != "og-image"
+        && kind != "apple-touch-icon"
+        && let Ok(text) = std::str::from_utf8(bytes)
+    {
+        let trimmed = text.trim_start_matches('\u{feff}').trim_start();
+        let lower = trimmed.to_ascii_lowercase();
+        if (lower.starts_with("<svg") || lower.starts_with("<?xml"))
+            && lower.contains("<svg")
+            && !lower.contains("<script")
+            && !lower.contains("<foreignobject")
+            && !lower.contains("javascript:")
+            && !lower.contains("vbscript:")
+            && !has_inline_event_handler(&lower)
+        {
+            return Ok("image/svg+xml");
         }
     }
     Err(Error(StatusCode::BAD_REQUEST, "site_asset_unsupported"))
@@ -577,10 +578,10 @@ fn has_inline_event_handler(lower_svg: &str) -> bool {
                 || bytes[i - 1] == b'/')
         {
             let rest = &lower_svg[i + 2..];
-            if let Some(eq) = rest.find('=') {
-                if rest[..eq].bytes().all(|b| b.is_ascii_alphabetic()) {
-                    return true;
-                }
+            if let Some(eq) = rest.find('=')
+                && rest[..eq].bytes().all(|b| b.is_ascii_alphabetic())
+            {
+                return true;
             }
         }
     }

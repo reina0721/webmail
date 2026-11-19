@@ -519,6 +519,7 @@ fn validate_archive_path(path: &Path) -> Result<()> {
     }
     Ok(())
 }
+#[cfg(test)]
 pub fn prepare(
     s: &Settings,
     version: &str,

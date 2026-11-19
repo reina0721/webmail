@@ -11,6 +11,7 @@ tests/runtime/
 /backups/
 /releases/
 frontend/apps/web/dist/
+frontend/apps/web/public/background-webp/
 frontend/apps/web/*.tsbuildinfo
 frontend/apps/web/next-env.d.ts
 frontend/packages/config/

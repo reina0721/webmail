@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Action, FileField, TextField } from "@mail-web/ui";
 import { api, errorMessage } from "@platform/lib/api";
+import { AuthBackgroundUpload } from "./auth-background-upload";
 
 export function SiteAssetField({
   kind,
@@ -15,6 +16,7 @@ export function SiteAssetField({
   onChangeUrl,
   onUploaded,
   onReset,
+  runMutation,
 }: {
   kind:
     | "favicon"
@@ -35,24 +37,32 @@ export function SiteAssetField({
   onChangeUrl: (url: string) => void;
   onUploaded: (kind: string, url: string) => void;
   onReset: (kind: string) => Promise<void>;
+  runMutation?: (operation: () => Promise<void>) => Promise<boolean>;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  async function upload(file: File) {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await api<{ kind: string; url: string }>(
+      `/admin/site/assets/${kind}`,
+      { method: "POST", body: form },
+    );
+    onUploaded(res.kind, res.url);
+  }
+
+  async function write(operation: () => Promise<void>) {
+    if (runMutation) return runMutation(operation);
+    await operation();
+    return true;
+  }
 
   async function handleFile(file: File) {
     setBusy(true);
     setError("");
     try {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await api<{ kind: string; url: string }>(
-        `/admin/site/assets/${kind}`,
-        {
-          method: "POST",
-          body: form,
-        },
-      );
-      onUploaded(res.kind, res.url);
+      await write(() => upload(file));
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -64,13 +74,24 @@ export function SiteAssetField({
     setBusy(true);
     setError("");
     try {
-      await onReset(kind);
+      await write(() => onReset(kind));
     } catch (e) {
       setError(errorMessage(e));
     } finally {
       setBusy(false);
     }
   }
+
+  const reset = (uploaded || value !== defaultValue) && (
+    <Action
+      variant="quiet"
+      size="sm"
+      disabled={disabled || busy}
+      onPress={() => void handleReset()}
+    >
+      恢复默认
+    </Action>
+  );
 
   return (
     <div className="console-asset-card">
@@ -90,28 +111,31 @@ export function SiteAssetField({
         disabled={disabled || busy}
         onChange={(e) => onChangeUrl(e.target.value)}
       />
-      <div className="console-actions">
-        <FileField
-          label={busy ? "上传中…" : "上传图片"}
-          accept={
-            kind === "og-image" || kind === "apple-touch-icon"
-              ? "image/png,image/jpeg,image/webp"
-              : "image/svg+xml,image/png,image/jpeg,image/webp,image/x-icon,.svg,.png,.jpg,.jpeg,.webp,.ico"
-          }
+      {kind === "auth-background" ? (
+        <AuthBackgroundUpload
           disabled={disabled || busy}
-          onFile={(file) => void handleFile(file)}
-        />
-        {(uploaded || value !== defaultValue) && (
-          <Action
-            variant="quiet"
-            size="sm"
+          onUpload={(file) => {
+            setError("");
+            return write(() => upload(file));
+          }}
+        >
+          {reset}
+        </AuthBackgroundUpload>
+      ) : (
+        <div className="console-actions">
+          <FileField
+            label={busy ? "上传中…" : "上传图片"}
+            accept={
+              kind === "og-image" || kind === "apple-touch-icon"
+                ? "image/png,image/jpeg,image/webp"
+                : "image/svg+xml,image/png,image/jpeg,image/webp,image/x-icon,.svg,.png,.jpg,.jpeg,.webp,.ico"
+            }
             disabled={disabled || busy}
-            onPress={() => void handleReset()}
-          >
-            恢复默认
-          </Action>
-        )}
-      </div>
+            onFile={(file) => void handleFile(file)}
+          />
+          {reset}
+        </div>
+      )}
       {error && <p role="alert">{error}</p>}
     </div>
   );

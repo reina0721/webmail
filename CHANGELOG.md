@@ -4,6 +4,13 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+## [0.4.0-alpha.20] - 2026-11-19
+
+### Added
+
+- Add browser-side compression and an upload preview for the shared sign-in, registration, and password recovery background. Administrators can upload the original, set dimensions and quality manually, or compress to a target size using JPEG, WebP, or PNG.
+- Add an on-demand WebP encoder for browsers without native Canvas WebP encoding.
+
 ## [0.4.0-alpha.19] - 2026-11-19
 
 ### Changed

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Action,
   CheckboxField,
@@ -29,7 +29,9 @@ export function SiteMetadataSettings({
   const setGlobalMetadata = useSiteSettings((s) => s.setMetadata);
   const [draft, setDraft] = useState<SiteMetadata | null>(null);
   const [saved, setSaved] = useState<SiteMetadata | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [activeWrite, setActiveWrite] = useState<"settings" | "asset" | null>(null);
+  const siteWriteLock = useRef(false);
+  const busy = activeWrite !== null;
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -59,28 +61,40 @@ export function SiteMetadataSettings({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function runSiteWrite(operation: () => Promise<void>, kind: "settings" | "asset" = "asset") {
+    if (siteWriteLock.current) return false;
+    siteWriteLock.current = true;
+    setActiveWrite(kind);
+    try {
+      await operation();
+      return true;
+    } finally {
+      siteWriteLock.current = false;
+      setActiveWrite(null);
+    }
+  }
+
   async function saveAll() {
-    if (!draft) return;
-    setBusy(true);
+    if (!draft || siteWriteLock.current) return;
     setNotice("");
     setError("");
     try {
-      const { uploadedAssets: _ignore, ...payload } = draft;
-      const updated = mergeSiteMetadata(
-        await api<SiteMetadata>("/admin/site", {
-          method: "PUT",
-          body: JSON.stringify(payload),
-        }),
-      );
-      setDraft(updated);
-      setSaved(updated);
-      setGlobalMetadata(updated);
-      onBrandSaved?.(updated.brand);
-      setNotice("站点信息、图标、SEO 与登录页外观已保存并即时生效，无需重启服务。");
+      await runSiteWrite(async () => {
+        const { uploadedAssets: _ignore, ...payload } = draft;
+        const updated = mergeSiteMetadata(
+          await api<SiteMetadata>("/admin/site", {
+            method: "PUT",
+            body: JSON.stringify(payload),
+          }),
+        );
+        setDraft(updated);
+        setSaved(updated);
+        setGlobalMetadata(updated);
+        onBrandSaved?.(updated.brand);
+        setNotice("站点信息、图标、SEO 与登录页外观已保存并即时生效，无需重启服务。");
+      }, "settings");
     } catch (e) {
       setError(errorMessage(e));
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -369,11 +383,12 @@ export function SiteMetadataSettings({
         <SiteAssetField
           kind="auth-background"
           label="登录 / 注册 / 找回页面背景图片"
-          hint="支持上传 JPG、PNG、WebP 或 SVG 图片（最大 5 MiB），或填写图片 URL。"
+          hint="支持 JPG、PNG、WebP 或 SVG，也可填写图片 URL。上传文件最大为 5 MiB。"
           value={draft.authBackgroundUrl}
           defaultValue={DEFAULT_SITE_METADATA.authBackgroundUrl}
           uploaded={draft.uploadedAssets.includes("auth-background")}
           disabled={busy}
+          runMutation={runSiteWrite}
           onChangeUrl={(url) => updateField("authBackgroundUrl", url)}
           onUploaded={(k, url) => handleUploaded("authBackgroundUrl", k, url)}
           onReset={(k) => handleResetAsset("authBackgroundUrl", k)}
@@ -600,8 +615,8 @@ export function SiteMetadataSettings({
 
         <div className="console-actions">
           <Action
-            disabled={!dirty}
-            loading={busy}
+            disabled={!dirty || busy}
+            loading={activeWrite === "settings"}
             onPress={() => void saveAll()}
           >
             保存站点、图标与 SEO 配置

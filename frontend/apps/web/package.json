@@ -5,10 +5,11 @@
     "build": "pnpm workers && next build && node native-build.mjs",
     "typecheck": "next typegen && tsc --noEmit",
     "dev": "pnpm workers && next dev -p 4180",
-    "workers": "node upstream-scripts/build-pst-worker.mjs && node upstream-scripts/build-store-worker.mjs && node upstream-scripts/build-push-preview.mjs",
+    "workers": "node upstream-scripts/build-pst-worker.mjs && node upstream-scripts/build-store-worker.mjs && node upstream-scripts/build-push-preview.mjs && node upstream-scripts/build-background-webp.mjs",
     "test:client": "vitest run src/native src/lib/__tests__/web-push.test.ts src/components/__tests__/push-notification-prompt.test.tsx src/components/offline src/lib/offline src/components/mail-transfer src/lib/mail-export src/stores src/components/ui src/components/email src/components/mail src/components/calendar src/components/contacts src/components/files src/components/settings src/components/layout src/components/command-palette src/components/popout src/lib/popout src/components/providers/__tests__/push-bindings-host.test.tsx src/components/providers/__tests__/notification-actions-host*.test.tsx src/lib/__tests__/jmap-* src/lib/mail-import src/lib/sieve src/lib/outgoing src/lib/__tests__/calendar* src/lib/contacts src/lib/__tests__/account-archive.test.ts src/lib/__tests__/account-archive-client.test.ts src/lib/__tests__/platform-*.test.ts src/lib/pwa-notify src/lib/__tests__/sw-build-caches.test.ts src/lib/__tests__/sw-offline-shell.test.ts src/lib/__tests__/sw-push-redacted.test.ts src/lib/__tests__/sw-push-subscription-change.test.ts --exclude src/lib/__tests__/calendar-agenda-route.test.ts"
   },
   "dependencies": {
+    "@jsquash/webp": "1.5.0",
     "next": "^16.3.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

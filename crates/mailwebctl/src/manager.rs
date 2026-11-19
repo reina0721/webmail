@@ -363,7 +363,7 @@ pub fn run(s: &Settings, action: &Action) -> Result<()> {
             ensure!(*yes, "恢复会替换本机数据，请先备份并指定 --yes");
             let _lock = s.lock()?;
             let entry = snapshot(&s, id)?;
-            prepare_image(&s, &entry.manifest)?;
+            prepare_image(&s, &entry.manifest, None)?;
             let backup = operations::backup(&s, false)?;
             let safety = retain(&s, &backup, now());
             let safety = match safety {
@@ -374,8 +374,8 @@ pub fn run(s: &Settings, action: &Action) -> Result<()> {
                 }
             };
             println!("切换前快照：{}", safety.snapshot.id);
-            if let Err(error) = apply(&s, &entry, true, || Ok(())) {
-                apply(&s, &safety, false, || Ok(()))?;
+            if let Err(error) = apply(&s, &entry, true, None, || Ok(())) {
+                apply(&s, &safety, false, None, || Ok(()))?;
                 return Err(error).context("恢复失败，已恢复切换前的版本");
             }
             Ok(())
@@ -453,7 +453,7 @@ fn retain(s: &Settings, source: &Path, created_at: u64) -> Result<Entry> {
     let mut manifest: Manifest = load(&archive.path().join("config/installed-release.json"))
         .context("快照需要匹配的发布清单")?;
     ensure!(manifest.version == tag, "快照与发布清单版本不一致");
-    manifest.image_id = prepare_image(s, &manifest)?;
+    manifest.image_id = prepare_image(s, &manifest, None)?;
     let entry = Entry {
         snapshot: Snapshot {
             id: snapshot_id(),

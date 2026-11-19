@@ -5,8 +5,13 @@ import {
   Action,
   Autocomplete,
   ConfirmDialog,
+  ConsoleAccordionSection,
+  ConsoleSectionCard,
+  ConsoleStatusBanner,
+  ConsoleStatusChip,
   LinearProgress,
   SelectField,
+  SystemUpdateAltOutlined,
   TextField,
 } from "@mail-web/ui";
 import { api, ApiError, errorMessage } from "@platform/lib/api";
@@ -69,8 +74,19 @@ export function Versions() {
   const [configFeedback, setConfigFeedback] = useState("");
   const [notice, setNotice] = useState("");
   const [refresh, setRefresh] = useState(0);
+  const [networkExpanded, setNetworkExpanded] = useState(false);
   const jobId = job?.id;
   const active = !!job && !finished(job);
+
+  useEffect(() => {
+    if (
+      job?.phase === "download" ||
+      mirrorInput.trim() ||
+      proxyInput.trim()
+    ) {
+      setNetworkExpanded(true);
+    }
+  }, [job?.phase, mirrorInput, proxyInput]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -269,11 +285,21 @@ export function Versions() {
       : view?.managerIssue === "unavailable"
         ? "管理服务未响应。请检查宿主机服务状态后刷新。"
         : "宿主机管理服务未连接。请先在安装目录启用，再刷新。";
+
   return (
     <>
-      <section className={`console-panel ${styles.panel}`}>
-        <header className={styles.header}>
-          <h2>运行版本</h2>
+      <ConsoleSectionCard
+        title="运行版本"
+        icon={<SystemUpdateAltOutlined fontSize="small" />}
+        badge={
+          view
+            ? {
+                label: view.managerOnline ? "管理在线" : "管理未连接",
+                tone: view.managerOnline ? "success" : "warning",
+              }
+            : undefined
+        }
+        headerAction={
           <Action
             variant="quiet"
             size="sm"
@@ -281,7 +307,9 @@ export function Versions() {
           >
             刷新版本状态
           </Action>
-        </header>
+        }
+        className={styles.panel}
+      >
         {view ? (
           <>
             <dl className={styles.summary}>
@@ -296,20 +324,21 @@ export function Versions() {
               <div>
                 <dt>宿主机版本管理</dt>
                 <dd>
-                  <span
-                    className={`console-badge${view.managerOnline ? " good" : ""}`}
-                  >
-                    {view.managerOnline ? "在线" : "未连接"}
-                  </span>
+                  <ConsoleStatusChip
+                    label={view.managerOnline ? "在线" : "未连接"}
+                    tone={view.managerOnline ? "success" : "warning"}
+                  />
                 </dd>
               </div>
             </dl>
-            <details className={styles.build}>
-              <summary>构建信息</summary>
+            <ConsoleAccordionSection
+              title="构建信息"
+              description="查看当前运行构建的 Git 源码提交哈希。"
+            >
               <p>
                 源码提交 <code>{view.revision}</code>
               </p>
-            </details>
+            </ConsoleAccordionSection>
             <div className={styles.controls}>
               <div className={styles.row}>
                 <Autocomplete
@@ -396,25 +425,25 @@ export function Versions() {
                 )}
               </div>
               {!view.managerOnline && (
-                <p role="status">
+                <ConsoleStatusBanner severity="warning" role="status">
                   {connectionMessage}{" "}
                   <code>sudo ./mailweb version-manager enable</code>
-                </p>
+                </ConsoleStatusBanner>
               )}
               {release?.historical &&
                 view.managerOnline &&
                 !historicalEnabled && (
-                  <p role="status">
+                  <ConsoleStatusBanner severity="info" role="status">
                     宿主机管理服务需要更新。更新 CLI 后请运行{" "}
                     <code>sudo ./mailweb version-manager enable</code>。
-                  </p>
+                  </ConsoleStatusBanner>
                 )}
               {view.inventory.releasesStatus === "unavailable" && (
-                <p role="status">
+                <ConsoleStatusBanner severity="warning" role="status">
                   {view.inventory.releases.length
                     ? "GitHub 暂时不可用，正在显示上次读取的版本。"
                     : "暂时无法读取 GitHub 发布版本。"}
-                </p>
+                </ConsoleStatusBanner>
               )}
               {view.inventory.snapshots.length > 0 && (
                 <div className={styles.row}>
@@ -444,11 +473,17 @@ export function Versions() {
                   </Action>
                 </div>
               )}
-              <div className={styles.networkConfig}>
-                <h3>下载加速与代理设置</h3>
-                <p className={styles.hint}>
-                  用于加速 GitHub 发布清单查询与升级包下载；所有包仍会强制校验 SHA-256 与源码提交。
-                </p>
+              <ConsoleAccordionSection
+                title="下载加速与代理设置"
+                description="用于加速 GitHub 发布清单查询与升级包下载；所有包仍会强制校验 SHA-256 与源码提交。"
+                expanded={networkExpanded}
+                onExpandedChange={setNetworkExpanded}
+                badge={
+                  mirrorInput.trim() || proxyInput.trim()
+                    ? { label: "已配置加速", tone: "info" }
+                    : { label: "直连模式", tone: "default" }
+                }
+              >
                 <div className={styles.networkFields}>
                   <TextField
                     label="GitHub 下载加速镜像 URL"
@@ -511,93 +546,109 @@ export function Versions() {
                 {configFeedback && (
                   <p className={styles.hint}>{configFeedback}</p>
                 )}
-              </div>
+              </ConsoleAccordionSection>
             </div>
           </>
         ) : (
           <p role="status">正在读取运行版本…</p>
         )}
-      </section>
+      </ConsoleSectionCard>
       {job && (
-        <section className="console-panel" aria-live="polite">
-          <h2>最近的版本任务</h2>
-          <p>
-            {job.targetVersion} · {phases[job.phase]}
-          </p>
-          <p>{job.message}</p>
-          {(job.phase === "download" || job.downloadedBytes != null) && (
-            <div className={styles.progressBlock}>
-              {(() => {
-                const downloaded = job.downloadedBytes ?? 0;
-                const total = job.totalBytes ?? null;
-                const percent =
-                  total && total > 0
-                    ? Math.min(100, Math.round((downloaded / total) * 100))
-                    : null;
-                return (
-                  <>
-                    <LinearProgress
-                      aria-label="下载进度"
-                      variant={percent === null ? "indeterminate" : "determinate"}
-                      value={percent ?? 0}
-                    />
-                    <p className={styles.progressMeta}>
-                      已下载 {formatBytes(downloaded)}
-                      {total != null ? ` / ${formatBytes(total)}` : ""}
-                      {percent !== null ? ` (${percent}%)` : ""}
-                      {job.phase === "download" && job.speedBytesPerSec != null
-                        ? ` · ${formatBytes(job.speedBytesPerSec)}/s`
-                        : ""}
-                      {job.sourceLabel ? ` · 来源：${job.sourceLabel}` : ""}
-                    </p>
-                    {job.phase === "download" &&
-                      job.speedBytesPerSec != null &&
-                      job.speedBytesPerSec > 0 &&
-                      job.speedBytesPerSec < slowSpeedBytes && (
-                        <p className={styles.hint}>
-                          当前下载较慢，可先取消下载并在上方配置加速镜像或代理；已下载分片会自动断点续传。
-                        </p>
-                      )}
-                  </>
-                );
-              })()}
-            </div>
-          )}
-          {(job.phase === "queued" || job.phase === "download") && (
-            <div className={styles.progressActions}>
-              <Action
-                variant="quiet"
-                size="sm"
-                disabled={cancelling}
-                onPress={() => void cancelActiveJob()}
-              >
-                {cancelling ? "正在取消…" : "取消下载"}
-              </Action>
-            </div>
-          )}
-          {job.runningVersion && <p>实际运行版本 {job.runningVersion}</p>}
-          {job.recoveryCommand && (
+        <ConsoleSectionCard
+          title="最近的版本任务"
+          icon={<SystemUpdateAltOutlined fontSize="small" />}
+          badge={{
+            label: phases[job.phase],
+            tone:
+              job.phase === "succeeded" || job.phase === "recovered"
+                ? "success"
+                : job.phase === "failed"
+                  ? "error"
+                  : "info",
+          }}
+        >
+          <div aria-live="polite" className="space-y-3">
             <p>
-              宿主机恢复命令 <code>{job.recoveryCommand}</code>
+              {job.targetVersion} · {phases[job.phase]}
             </p>
-          )}
-          {!view?.managerOnline && (
+            <p>{job.message}</p>
+            {(job.phase === "download" || job.downloadedBytes != null) && (
+              <div className={styles.progressBlock}>
+                {(() => {
+                  const downloaded = job.downloadedBytes ?? 0;
+                  const total = job.totalBytes ?? null;
+                  const percent =
+                    total && total > 0
+                      ? Math.min(100, Math.round((downloaded / total) * 100))
+                      : null;
+                  return (
+                    <>
+                      <LinearProgress
+                        aria-label="下载进度"
+                        variant={
+                          percent === null ? "indeterminate" : "determinate"
+                        }
+                        value={percent ?? 0}
+                      />
+                      <p className={styles.progressMeta}>
+                        已下载 {formatBytes(downloaded)}
+                        {total != null ? ` / ${formatBytes(total)}` : ""}
+                        {percent !== null ? ` (${percent}%)` : ""}
+                        {job.phase === "download" &&
+                        job.speedBytesPerSec != null
+                          ? ` · ${formatBytes(job.speedBytesPerSec)}/s`
+                          : ""}
+                        {job.sourceLabel ? ` · 来源：${job.sourceLabel}` : ""}
+                      </p>
+                      {job.phase === "download" &&
+                        job.speedBytesPerSec != null &&
+                        job.speedBytesPerSec > 0 &&
+                        job.speedBytesPerSec < slowSpeedBytes && (
+                          <p className={styles.hint}>
+                            当前下载较慢，可先取消下载并在上方配置加速镜像或代理；已下载分片会自动断点续传。
+                          </p>
+                        )}
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+            {(job.phase === "queued" || job.phase === "download") && (
+              <div className={styles.progressActions}>
+                <Action
+                  variant="quiet"
+                  size="sm"
+                  disabled={cancelling}
+                  onPress={() => void cancelActiveJob()}
+                >
+                  {cancelling ? "正在取消…" : "取消下载"}
+                </Action>
+              </div>
+            )}
+            {job.runningVersion && <p>实际运行版本 {job.runningVersion}</p>}
+            {job.recoveryCommand && (
+              <p>
+                宿主机恢复命令 <code>{job.recoveryCommand}</code>
+              </p>
+            )}
+            {!view?.managerOnline && (
+              <p>
+                宿主机任务详情{" "}
+                <code>
+                  sudo ./bin/mailweb-version-manager version-manager job {job.id}
+                </code>
+              </p>
+            )}
             <p>
-              宿主机任务详情{" "}
-              <code>
-                sudo ./bin/mailweb-version-manager version-manager job {job.id}
-              </code>
+              任务 ID <code>{job.id}</code>
             </p>
-          )}
-          <p>
-            任务 ID <code>{job.id}</code>
-          </p>
-        </section>
+          </div>
+        </ConsoleSectionCard>
       )}
       {notice && (
-        <p className="console-alert" role="status">
+        <ConsoleStatusBanner severity="info" role="status">
           {notice}
-        </p>
+        </ConsoleStatusBanner>
       )}
       <ConfirmDialog
         triggerLabel="确认切换版本"

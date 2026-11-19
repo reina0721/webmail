@@ -2,10 +2,14 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Action,
+  ConfirmDialog,
+  ConsoleSectionCard,
+  ConsoleStatusBanner,
+  OpenInNewOutlined,
   PasswordField,
   SelectField,
+  ShieldOutlined,
   TextField,
-  ConfirmDialog,
 } from "@mail-web/ui";
 import { api, ApiError, errorMessage } from "@platform/lib/api";
 import { useInstallationLeave } from "@platform/host/use-installation-leave";
@@ -46,7 +50,7 @@ export function TurnstileSetup({
     [error, setError] = useState("");
   const alive = useRef(false),
     generation = useRef(0),
-    panel = useRef<HTMLElement>(null);
+    panel = useRef<HTMLDivElement>(null);
   const hostname = publicOrigin ? new URL(publicOrigin).hostname : "";
   const usableHostname =
     publicOrigin === undefined ||
@@ -184,206 +188,227 @@ export function TurnstileSetup({
       if (alive.current && at === generation.current) pending(false);
     }
   }
+
+  const statusBadge = configured
+    ? binding && hostname && hostnameAllowed === false
+      ? { label: "域名需修复", tone: "warning" as const }
+      : { label: "已就绪", tone: "success" as const }
+    : siteKey && !turnstileKeyValid(siteKey)
+      ? { label: "格式无效", tone: "warning" as const }
+      : { label: "未配置", tone: "default" as const };
+
   return (
-    <section className="console-panel" id="turnstile-setup" ref={panel}>
-      <header>
-        <h2>自动配置 Turnstile 人机验证</h2>
-        <p>
-          Webmail 在 Cloudflare 创建或修复验证组件，用于公开注册和找回密码。
-          Cloudflare 生成 Site Key 和 Secret，Webmail 会自动保存。
+    <div id="turnstile-setup" ref={panel}>
+      <ConsoleSectionCard
+        title="自动配置 Turnstile 人机验证"
+        description="Webmail 在 Cloudflare 创建或修复验证组件，用于公开注册和找回密码。Cloudflare 生成 Site Key 和 Secret，Webmail 会自动保存。"
+        icon={<ShieldOutlined fontSize="small" />}
+        badge={statusBadge}
+      >
+        {!usableHostname && (
+          <ConsoleStatusBanner severity="warning" role="status">
+            请先在上方保存 Webmail 的 HTTPS 域名。当前 IP 可用于直接使用邮箱。
+          </ConsoleStatusBanner>
+        )}
+        <dl className="console-form-grid">
+          <div>
+            <dt className="console-hint">当前 Webmail 主机名</dt>
+            <dd>{hostname || "请先设置主地址"}</dd>
+          </div>
+          <div>
+            <dt className="console-hint">Cloudflare 账号 ID</dt>
+            <dd>{binding ? <code>{binding.accountId}</code> : "尚无确认记录"}</dd>
+          </div>
+          <div>
+            <dt className="console-hint">Cloudflare 组件名称</dt>
+            <dd>
+              {binding ? <code>{binding.widgetName}</code> : "尚无确认记录"}
+            </dd>
+          </div>
+          <div>
+            <dt className="console-hint">Cloudflare 上次确认的域名</dt>
+            <dd>{binding?.hostnames.join("、") || "尚无确认记录"}</dd>
+          </div>
+          <div>
+            <dt className="console-hint">Site Key · 浏览器使用的公开标识</dt>
+            <dd>
+              {turnstileKeyValid(siteKey) ? (
+                <code>{siteKey}</code>
+              ) : siteKey ? (
+                "保存的值格式无效"
+              ) : configuration ? (
+                "未保存"
+              ) : (
+                "尚未读取"
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt className="console-hint">Secret · 服务端校验密钥</dt>
+            <dd>
+              {secretSet ? "已加密保存" : configuration ? "未保存" : "尚未读取"}
+            </dd>
+          </div>
+        </dl>
+        {binding && hostname && (
+          <ConsoleStatusBanner
+            severity={hostnameAllowed ? "success" : "warning"}
+            role="status"
+          >
+            {hostnameAllowed
+              ? "上次核对时，组件已允许当前域名。"
+              : "当前域名不在上次确认的绑定范围内，请核对并修复。"}{" "}
+            核对时间 {new Date(binding.checkedAt).toLocaleString()}。
+          </ConsoleStatusBanner>
+        )}
+        {!binding && configured && (
+          <ConsoleStatusBanner severity="info" role="status">
+            密钥已保存。请用 Cloudflare API Token 核对组件和当前域名。
+          </ConsoleStatusBanner>
+        )}
+        <p className="console-hint">
+          API Token 用于本次创建或修复。多数情况下填写同一个 Token
+          即可自动选中账号。
         </p>
-      </header>
-      {!usableHostname && (
-        <p>
-          请先在上方保存 Webmail 的 HTTPS 域名。当前 IP 可用于直接使用邮箱。
-        </p>
-      )}
-      <dl className="console-form-grid">
-        <div>
-          <dt className="console-hint">当前 Webmail 主机名</dt>
-          <dd>{hostname || "请先设置主地址"}</dd>
-        </div>
-        <div>
-          <dt className="console-hint">Cloudflare 账号 ID</dt>
-          <dd>{binding ? <code>{binding.accountId}</code> : "尚无确认记录"}</dd>
-        </div>
-        <div>
-          <dt className="console-hint">Cloudflare 组件名称</dt>
-          <dd>
-            {binding ? <code>{binding.widgetName}</code> : "尚无确认记录"}
-          </dd>
-        </div>
-        <div>
-          <dt className="console-hint">Cloudflare 上次确认的域名</dt>
-          <dd>{binding?.hostnames.join("、") || "尚无确认记录"}</dd>
-        </div>
-        <div>
-          <dt className="console-hint">Site Key · 浏览器使用的公开标识</dt>
-          <dd>
-            {turnstileKeyValid(siteKey) ? (
-              <code>{siteKey}</code>
-            ) : siteKey ? (
-              "保存的值格式无效"
-            ) : configuration ? (
-              "未保存"
-            ) : (
-              "尚未读取"
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt className="console-hint">Secret · 服务端校验密钥</dt>
-          <dd>
-            {secretSet ? "已加密保存" : configuration ? "未保存" : "尚未读取"}
-          </dd>
-        </div>
-      </dl>
-      {binding && hostname && (
-        <p role="status">
-          {hostnameAllowed
-            ? "上次核对时，组件已允许当前域名。"
-            : "当前域名不在上次确认的绑定范围内，请核对并修复。"}{" "}
-          核对时间 {new Date(binding.checkedAt).toLocaleString()}。
-        </p>
-      )}
-      {!binding && configured && (
-        <p role="status">
-          密钥已保存。请用 Cloudflare API Token 核对组件和当前域名。
-        </p>
-      )}
-      <p>
-        API Token 用于本次创建或修复。多数情况下填写同一个 Token
-        即可自动选中账号。
-      </p>
-      <div className="console-form-grid">
-        <PasswordField
-          label="Cloudflare API Token"
-          purpose="current"
-          value={key}
-          disabled={busy || blocked}
-          onChange={(e) => {
-            setKey(e.target.value);
-            setAccount("");
-            setAccounts(null);
-            setNotice("");
-            setError("");
-            setMissing(false);
-          }}
-        />
-        {accounts && accounts.length > 1 ? (
-          <SelectField
-            label="Cloudflare 账号"
-            value={account}
-            disabled={busy || blocked}
-            options={accounts.map((value) => ({
-              value: value.id,
-              label: value.name,
-            }))}
-            onValueChange={(value) => {
-              setAccount(value);
-              setMissing(false);
-              setError("");
-            }}
-          />
-        ) : (
-          <TextField
-            label="Cloudflare Account ID（通常可留空）"
-            value={account || (accounts?.length === 1 ? accounts[0].id : "")}
+        <div className="console-form-grid">
+          <PasswordField
+            label="Cloudflare API Token"
+            purpose="current"
+            value={key}
             disabled={busy || blocked}
             onChange={(e) => {
-              setAccount(e.target.value);
+              setKey(e.target.value);
+              setAccount("");
               setAccounts(null);
+              setNotice("");
+              setError("");
               setMissing(false);
-              setError("");
             }}
-            hint="如果 Token 无法读取账号，在这里填入 32 位 Account ID。"
           />
-        )}
-      </div>
-      <a
-        className="console-link"
-        href="https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/"
-        target="_blank"
-        rel="noreferrer"
-      >
-        在 Cloudflare 找到 Account ID ↗
-      </a>
-      <div className="console-actions">
-        <Action
-          loading={busy}
-          disabled={
-            !key.trim() ||
-            busy ||
-            blocked ||
-            (accounts !== null && accounts.length > 1 && !account) ||
-            (!!effectiveAccount && !/^[a-fA-F0-9]{32}$/.test(effectiveAccount))
-          }
-          onPress={() => void configure()}
+          {accounts && accounts.length > 1 ? (
+            <SelectField
+              label="Cloudflare 账号"
+              value={account}
+              disabled={busy || blocked}
+              options={accounts.map((value) => ({
+                value: value.id,
+                label: value.name,
+              }))}
+              onValueChange={(value) => {
+                setAccount(value);
+                setMissing(false);
+                setError("");
+              }}
+            />
+          ) : (
+            <TextField
+              label="Cloudflare Account ID（通常可留空）"
+              value={account || (accounts?.length === 1 ? accounts[0].id : "")}
+              disabled={busy || blocked}
+              onChange={(e) => {
+                setAccount(e.target.value);
+                setAccounts(null);
+                setMissing(false);
+                setError("");
+              }}
+              hint="如果 Token 无法读取账号，在这里填入 32 位 Account ID。"
+            />
+          )}
+        </div>
+        <a
+          className="console-link"
+          href="https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/"
+          target="_blank"
+          rel="noreferrer"
         >
-          {phase === "accounts"
-            ? "正在读取 Cloudflare 账号"
-            : phase === "configure"
-              ? configured
-                ? "正在核对验证组件"
-                : "正在创建验证组件"
-              : configured
-                ? "核对并修复现有组件"
-                : "自动创建并保存验证配置"}
-        </Action>
-        {missing && (
+          在 Cloudflare 找到 Account ID
+          <OpenInNewOutlined sx={{ fontSize: 15 }} />
+        </a>
+        <div className="console-actions">
           <Action
-            variant="secondary"
-            disabled={busy || blocked}
-            onPress={() => void configure(true)}
+            loading={busy}
+            disabled={
+              !key.trim() ||
+              busy ||
+              blocked ||
+              (accounts !== null && accounts.length > 1 && !account) ||
+              (!!effectiveAccount && !/^[a-fA-F0-9]{32}$/.test(effectiveAccount))
+            }
+            onPress={() => void configure()}
           >
-            在此账号创建替代组件
+            {phase === "accounts"
+              ? "正在读取 Cloudflare 账号"
+              : phase === "configure"
+                ? configured
+                  ? "正在核对验证组件"
+                  : "正在创建验证组件"
+                : configured
+                  ? "核对并修复现有组件"
+                  : "自动创建并保存验证配置"}
           </Action>
+          {missing && (
+            <Action
+              variant="secondary"
+              disabled={busy || blocked}
+              onPress={() => void configure(true)}
+            >
+              在此账号创建替代组件
+            </Action>
+          )}
+          <Action
+            variant="quiet"
+            disabled={busy}
+            onPress={() => {
+              void read()
+                .then((value) => {
+                  setConfiguration(value);
+                  setError("");
+                  setNotice(
+                    value.turnstileSecretSet &&
+                      turnstileKeyValid(value.settings.turnstileSiteKey ?? "")
+                      ? "已重新读取 Webmail 保存的密钥与上次核对结果。需要检查 Cloudflare 上的当前状态时，请使用上方的核对按钮。"
+                      : "已重新读取 Webmail 设置。请使用上方的 API Token 配置 Turnstile。",
+                  );
+                })
+                .catch((e) => setError(errorMessage(e)));
+            }}
+          >
+            读取配置状态
+          </Action>
+        </div>
+        {disabled && <p className="console-hint">请先保存或清除本页正在编辑的其他配置。</p>}
+        {busy && <p role="status">正在处理，请稍候…</p>}
+        {notice && (
+          <ConsoleStatusBanner severity="info" role="status">
+            {notice}
+          </ConsoleStatusBanner>
         )}
-      </div>
-      {disabled && <p>请先保存或清除本页正在编辑的其他配置。</p>}
-      {busy && <p role="status">正在处理，请稍候…</p>}
-      {notice && <p role="status">{notice}</p>}
-      {error && <p role="alert">{error}</p>}
-      {configured && (
-        <p>
-          <a className="console-link" href="/console/registration/">
-            进入注册与收信验证 →
-          </a>{" "}
-          在该页完成真人验证和收信后即可开启注册。
-        </p>
-      )}
-      <Action
-        variant="quiet"
-        disabled={busy}
-        onPress={() => {
-          void read()
-            .then((value) => {
-              setConfiguration(value);
-              setError("");
-              setNotice(
-                value.turnstileSecretSet &&
-                  turnstileKeyValid(value.settings.turnstileSiteKey ?? "")
-                  ? "已重新读取 Webmail 保存的密钥与上次核对结果。需要检查 Cloudflare 上的当前状态时，请使用上方的核对按钮。"
-                  : "已重新读取 Webmail 设置。请使用上方的 API Token 配置 Turnstile。",
-              );
-            })
-            .catch((e) => setError(errorMessage(e)));
-        }}
-      >
-        读取配置状态
-      </Action>
-      <ConfirmDialog
-        triggerLabel="离开"
-        isOpen={!!leave.href}
-        onOpenChange={(open) => {
-          if (!open) leave.cancel();
-        }}
-        title="离开验证配置？"
-        description="尚未使用的 API Token 会从页面清除。"
-        cancelLabel="继续配置"
-        confirmLabel="离开"
-        onConfirm={leave.leave}
-      />
-    </section>
+        {error && (
+          <ConsoleStatusBanner severity="error" role="alert">
+            {error}
+          </ConsoleStatusBanner>
+        )}
+        {configured && (
+          <p>
+            <a className="console-link" href="/console/registration/">
+              进入注册与收信验证 →
+            </a>{" "}
+            在该页完成真人验证和收信后即可开启注册。
+          </p>
+        )}
+        <ConfirmDialog
+          triggerLabel="离开"
+          isOpen={!!leave.href}
+          onOpenChange={(open) => {
+            if (!open) leave.cancel();
+          }}
+          title="离开验证配置？"
+          description="尚未使用的 API Token 会从页面清除。"
+          cancelLabel="继续配置"
+          confirmLabel="离开"
+          onConfirm={leave.leave}
+        />
+      </ConsoleSectionCard>
+    </div>
   );
 }

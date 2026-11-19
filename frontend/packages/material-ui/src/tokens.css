@@ -1,35 +1,94 @@
 :root {
-  --accent: #dc547f;
-  --accent-soft: #fff0f5;
-  --canvas: #fcf9fb;
-  --paper: #fff;
+  --accent: #e05681;
+  --accent-soft: #fdeef3;
+  --accent-50: #e05681;
+  --accent-5: color-mix(in oklab, var(--accent-50), #ffffff 92%);
+  --accent-10: color-mix(in oklab, var(--accent-50), #ffffff 84%);
+  --accent-20: color-mix(in oklab, var(--accent-50), #ffffff 68%);
+  --accent-30: color-mix(in oklab, var(--accent-50), #ffffff 45%);
+  --accent-40: color-mix(in oklab, var(--accent-50), #ffffff 20%);
+  --accent-60: color-mix(in oklab, var(--accent-50), #000000 10%);
+  --accent-70: color-mix(in oklab, var(--accent-50), #000000 22%);
+  --accent-80: color-mix(in oklab, var(--accent-50), #000000 34%);
+  --accent-shadow: color-mix(in oklab, var(--accent-50), #9e939a 84%);
+  --icon-muted: #6f5f6c;
+
+  /* L0–L5 Tonal Surface Elevation (kirakira.moe × Mail Web) */
+  --surface-canvas: #faf6f8;
+  --surface-sidebar: #fdf9fb;
+  --surface-topbar: rgb(255 255 255 / 0.84);
+  --surface-card: #ffffff;
+  --surface-inset: #f5edf1;
+  --surface-overlay: rgb(255 252 254 / 0.92);
+  --hover-overlay: color-mix(in oklab, var(--accent-50), transparent 95%);
+
+  --canvas: var(--surface-canvas);
+  --paper: var(--surface-card);
   --ink: #342d38;
-  --muted: #817586;
-  --line: #eee6ed;
-  --shadow: 0 2px 10px #55304408;
+  --muted: #7e707d;
+  --line: #eee3e9;
+  --shadow: 0 4px 16px color-mix(in oklab, var(--accent-shadow), transparent 86%), 0 1px 3px color-mix(in oklab, var(--accent-shadow), transparent 92%);
+  --shadow-card: 0 4px 14px color-mix(in oklab, var(--accent-shadow), transparent 84%), 0 1px 3px color-mix(in oklab, var(--accent-shadow), transparent 92%);
+  --shadow-flyout: 0 12px 32px color-mix(in oklab, var(--accent-shadow), transparent 72%), 0 2px 8px color-mix(in oklab, var(--accent-shadow), transparent 86%);
+  --shadow-tint: #5530440a;
+  --rail-glow: #eaa0bb0f;
+  --toast-shadow: #5530441a;
+  --overlay-shadow: #55304426;
+  --hover-shadow: #55304414;
   --radius: 12px;
   --motion: 180ms;
-  --success: #2c826b;
+
+  --success: #257b63;
+  --success-soft: #eaf6f1;
+  --warning: #b86c16;
+  --warning-soft: #fef5e7;
   --danger: #c84653;
+  --danger-soft: #fdecef;
+  --info: #2d6fb8;
+  --info-soft: #eef5fc;
   color-scheme: light;
 }
-:root[data-theme="dark"] {
-  --accent: #ff9bbb;
+
+:root[data-theme="dark"],
+:root.dark {
+  --accent: #f497b8;
   --accent-soft: #392432;
-  --canvas: #17151c;
-  --paper: #211d27;
+  --accent-50: #f497b8;
+  --accent-5: color-mix(in oklab, var(--accent-50), #151218 86%);
+  --accent-10: color-mix(in oklab, var(--accent-50), #151218 76%);
+  --accent-20: color-mix(in oklab, var(--accent-50), #151218 62%);
+  --accent-30: color-mix(in oklab, var(--accent-50), #151218 38%);
+  --accent-40: color-mix(in oklab, var(--accent-50), #ffffff 14%);
+  --accent-60: color-mix(in oklab, var(--accent-50), #ffffff 22%);
+  --accent-70: color-mix(in oklab, var(--accent-50), #ffffff 38%);
+  --accent-80: color-mix(in oklab, var(--accent-50), #ffffff 56%);
+  --accent-shadow: #0d090e;
+  --icon-muted: #bdb0bc;
+
+  /* L0–L5 Tonal Surface Elevation (Dark) */
+  --surface-canvas: #151218;
+  --surface-sidebar: #1c1721;
+  --surface-topbar: rgb(28 23 33 / 0.84);
+  --surface-card: #231d29;
+  --surface-inset: #2b2433;
+  --surface-overlay: rgb(35 29 41 / 0.92);
+  --hover-overlay: color-mix(in oklab, var(--accent-50), transparent 92%);
+
+  --canvas: var(--surface-canvas);
+  --paper: var(--surface-card);
   --ink: #f5edf3;
   --muted: #b5aab8;
-  --line: #38303e;
-  --shadow: 0 2px 10px #0002;
+  --line: #3b3143;
+  --shadow: 0 4px 18px rgb(0 0 0 / 0.32), 0 1px 4px rgb(0 0 0 / 0.22);
+  --shadow-card: 0 4px 16px rgb(0 0 0 / 0.28), 0 1px 3px rgb(0 0 0 / 0.18);
+  --shadow-flyout: 0 14px 36px rgb(0 0 0 / 0.45), 0 2px 10px rgb(0 0 0 / 0.28);
   --success: #7ad5b1;
+  --success-soft: #1a332b;
+  --warning: #f5bc69;
+  --warning-soft: #36291a;
   --danger: #ff929c;
+  --danger-soft: #3b2026;
+  --info: #8ec1ff;
+  --info-soft: #1b2b3d;
   color-scheme: dark;
-}
-:root {
-  --shadow-tint: #55304408;
-  --rail-glow: #eaa0bb0b;
-  --toast-shadow: #55304418;
-  --overlay-shadow: #55304425;
-  --hover-shadow: #55304412;
 }

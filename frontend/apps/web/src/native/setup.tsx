@@ -4,11 +4,19 @@ import Link from "next/link";
 import { errorCodeMessage } from "@platform/lib/api";
 import {
   Action,
-  TextField,
-  PasswordField,
-  SelectField,
+  BuildOutlined,
   CheckboxField,
   ConfirmDialog,
+  ConsoleAccordionSection,
+  ConsoleSectionCard,
+  ConsoleStatusBanner,
+  DnsOutlined,
+  OpenInNewOutlined,
+  PasswordField,
+  PublicOutlined,
+  SelectField,
+  ShieldOutlined,
+  TextField,
 } from "@mail-web/ui";
 import {
   setupResourceNames,
@@ -54,14 +62,12 @@ export function ConsoleSetup() {
     <div className="console-setup">
       {c.pending && !c.status && <p role="status">正在读取安装状态…</p>}
       {installed && !repair && !running && (
-        <section className="console-panel">
-          <header>
-            <h2>邮件服务已连接</h2>
-            <p>
-              {c.status?.domain} 已可使用邮箱。要改 Webmail
-              地址或开启注册，从对应设置继续。
-            </p>
-          </header>
+        <ConsoleSectionCard
+          title="邮件服务已连接"
+          description={`${c.status?.domain} 已可使用邮箱。要改 Webmail 地址或开启注册，从对应设置继续。`}
+          icon={<BuildOutlined fontSize="small" />}
+          badge={{ label: "已连接", tone: "success" }}
+        >
           <div className="console-actions">
             <Link
               className="console-link"
@@ -76,30 +82,36 @@ export function ConsoleSetup() {
               返回邮箱 →
             </Link>
           </div>
-          <details>
-            <summary>修复 Stalwart 连接或权限</summary>
-            <p>
+          <ConsoleAccordionSection
+            title="修复 Stalwart 连接或权限"
+            description="需要修复 Stalwart 连接或权限时，用它重新授权并检查邮件服务资源。"
+          >
+            <p className="console-hint">
               需要修复 Stalwart 连接或权限时，用它重新授权并检查邮件服务资源。
             </p>
-            <Action
-              variant="secondary"
-              disabled={locked || !c.loaded}
-              onPress={() => setRepair(true)}
-            >
-              开始邮件服务修复
-            </Action>
-          </details>
-        </section>
+            <div className="console-actions">
+              <Action
+                variant="secondary"
+                disabled={locked || !c.loaded}
+                onPress={() => setRepair(true)}
+              >
+                开始邮件服务修复
+              </Action>
+            </div>
+          </ConsoleAccordionSection>
+        </ConsoleSectionCard>
       )}
       {(!installed || repair) && (
-        <section className="console-panel">
-          <header>
-            <h2>{repair ? "修复邮件服务" : "安装访问"}</h2>
-            <p>
-              使用部署工具生成的安装链接，或粘贴安装令牌。已登录 Webmail
-              运营管理员可直接继续。
-            </p>
-          </header>
+        <ConsoleSectionCard
+          title={repair ? "修复邮件服务" : "安装访问"}
+          description="使用部署工具生成的安装链接，或粘贴安装令牌。已登录 Webmail 运营管理员可直接继续。"
+          icon={<BuildOutlined fontSize="small" />}
+          badge={
+            repair
+              ? { label: "修复模式", tone: "warning" }
+              : { label: "初始安装", tone: "primary" }
+          }
+        >
           <PasswordField
             label="安装令牌"
             purpose="current"
@@ -107,7 +119,7 @@ export function ConsoleSetup() {
             onChange={(e) => c.setToken(e.target.value)}
           />
           {c.pending && <p role="status">正在处理，请稍候…</p>}
-        </section>
+        </ConsoleSectionCard>
       )}
       {(!installed || repair || c.error) && (
         <div className="console-actions">
@@ -121,16 +133,31 @@ export function ConsoleSetup() {
           </Action>
         </div>
       )}
-      {c.reloadNotice && <p role="status">{c.reloadNotice}</p>}
+      {c.reloadNotice && (
+        <ConsoleStatusBanner severity="info" role="status">
+          {c.reloadNotice}
+        </ConsoleStatusBanner>
+      )}
       {c.error && (
-        <div className="console-alert" role="alert">
+        <ConsoleStatusBanner severity="error" role="alert">
           {c.error}
-        </div>
+        </ConsoleStatusBanner>
       )}
       {c.job &&
         (!installed || running || (repair && c.job.status !== "completed")) && (
-          <section className="console-panel">
-            <h2>{jobStates[c.job.status] ?? "邮件服务配置状态"}</h2>
+          <ConsoleSectionCard
+            title={jobStates[c.job.status] ?? "邮件服务配置状态"}
+            icon={<DnsOutlined fontSize="small" />}
+            badge={{
+              label: c.job.status,
+              tone:
+                c.job.status === "completed"
+                  ? "success"
+                  : c.job.status === "failed"
+                    ? "error"
+                    : "info",
+            }}
+          >
             {running && (
               <p role="status">
                 {c.job.step
@@ -138,7 +165,11 @@ export function ConsoleSetup() {
                   : "正在准备配置…"}
               </p>
             )}
-            {c.job.error && <p role="alert">{errorCodeMessage(c.job.error)}</p>}
+            {c.job.error && (
+              <ConsoleStatusBanner severity="error" role="alert">
+                {errorCodeMessage(c.job.error)}
+              </ConsoleStatusBanner>
+            )}
             {showForm && !authorized && c.job.status !== "completed" && (
               <p>修复后请重新验证 Stalwart 权限，再检查并应用原来的配置。</p>
             )}
@@ -158,27 +189,31 @@ export function ConsoleSetup() {
               </Link>
             ) : (
               c.job.status === "running" && (
-                <Action
-                  variant="secondary"
-                  disabled={c.pending}
-                  onPress={() => void c.cancel()}
-                >
-                  停止后续步骤
-                </Action>
+                <div className="console-actions">
+                  <Action
+                    variant="secondary"
+                    disabled={c.pending}
+                    onPress={() => void c.cancel()}
+                  >
+                    停止后续步骤
+                  </Action>
+                </div>
               )
             )}
-          </section>
+          </ConsoleSectionCard>
         )}
       {showForm && (
         <>
-          <section className="console-panel">
-            <header>
-              <h2>连接 Stalwart</h2>
-              <p>
-                这里使用邮件服务器的管理员凭据。下一步再选择实际登录 Webmail
-                的运营邮箱。
-              </p>
-            </header>
+          <ConsoleSectionCard
+            title="连接 Stalwart"
+            description="这里使用邮件服务器的管理员凭据。下一步再选择实际登录 Webmail 的运营邮箱。"
+            icon={<DnsOutlined fontSize="small" />}
+            badge={
+              authorized
+                ? { label: "已授权", tone: "success" }
+                : { label: "待验证", tone: "default" }
+            }
+          >
             <div className="console-form-grid">
               <TextField
                 label="Stalwart HTTPS 地址"
@@ -223,41 +258,43 @@ export function ConsoleSetup() {
                 />
               )}
             </div>
-            <Action
-              loading={c.pending && !authorized}
-              disabled={
-                locked ||
-                !c.base.trim() ||
-                (c.mode === "key"
-                  ? !c.apiKey.trim()
-                  : !c.username.trim() || !c.password)
-              }
-              onPress={() => void c.authorize()}
-            >
-              验证 Stalwart 权限
-            </Action>
+            <div className="console-actions">
+              <Action
+                loading={c.pending && !authorized}
+                disabled={
+                  locked ||
+                  !c.base.trim() ||
+                  (c.mode === "key"
+                    ? !c.apiKey.trim()
+                    : !c.username.trim() || !c.password)
+                }
+                onPress={() => void c.authorize()}
+              >
+                验证 Stalwart 权限
+              </Action>
+            </div>
             {authorized && (
-              <p role="status">
+              <ConsoleStatusBanner severity="success" role="status">
                 Stalwart 授权已取得。请继续填写站点与运营邮箱。
-              </p>
+              </ConsoleStatusBanner>
             )}
-          </section>
-          <section className="console-panel" id="installation-turnstile">
-            <header>
-              <h2>Turnstile 人机验证（可选）</h2>
-              <p>
-                开启公开注册时使用。配置成功后，Cloudflare 会生成验证组件、Site
-                Key 和 Secret。
-              </p>
-              {installed && (
+          </ConsoleSectionCard>
+          <ConsoleSectionCard
+            id="installation-turnstile"
+            title="Turnstile 人机验证（可选）"
+            description="开启公开注册时使用。配置成功后，Cloudflare 会生成验证组件、Site Key 和 Secret。"
+            icon={<ShieldOutlined fontSize="small" />}
+            headerAction={
+              installed ? (
                 <Link
                   className="console-link"
                   href="/console/site/#turnstile-setup"
                 >
                   只修复现有 Turnstile 组件 →
                 </Link>
-              )}
-            </header>
+              ) : undefined
+            }
+          >
             <div className="console-form-grid">
               <PasswordField
                 purpose="current"
@@ -296,18 +333,16 @@ export function ConsoleSetup() {
               target="_blank"
               rel="noreferrer"
             >
-              在 Cloudflare 找到 Account ID ↗
+              在 Cloudflare 找到 Account ID
+              <OpenInNewOutlined sx={{ fontSize: 15 }} />
             </a>
-          </section>
+          </ConsoleSectionCard>
           {authorized && (
-            <section className="console-panel">
-              <header>
-                <h2>站点与运营邮箱</h2>
-                <p>
-                  运营邮箱必须是所选域名下的普通邮箱。它可以登录 Webmail
-                  管理控制台。
-                </p>
-              </header>
+            <ConsoleSectionCard
+              title="站点与运营邮箱"
+              description="运营邮箱必须是所选域名下的普通邮箱。它可以登录 Webmail 管理控制台。"
+              icon={<PublicOutlined fontSize="small" />}
+            >
               <div className="console-form-grid">
                 <TextField
                   label="站点名称"
@@ -370,8 +405,10 @@ export function ConsoleSetup() {
                   disabled={locked}
                 />
               </div>
-              <details>
-                <summary>域名与用户目录选项</summary>
+              <ConsoleAccordionSection
+                title="域名与用户目录选项"
+                description="控制是否自动创建缺失域名以及是否开启服务器级用户目录查询。"
+              >
                 <CheckboxField
                   checked={c.spec.createDomain}
                   onCheckedChange={(value) => c.change("createDomain", value)}
@@ -386,19 +423,24 @@ export function ConsoleSetup() {
                   disabled={locked}
                   label="启用同服务器用户目录（影响该 Stalwart 的全部用户）"
                 />
-              </details>
-              <Action
-                loading={c.pending}
-                disabled={locked}
-                onPress={() => void c.preflight()}
-              >
-                检查安装配置
-              </Action>
-            </section>
+              </ConsoleAccordionSection>
+              <div className="console-actions">
+                <Action
+                  loading={c.pending}
+                  disabled={locked}
+                  onPress={() => void c.preflight()}
+                >
+                  检查安装配置
+                </Action>
+              </div>
+            </ConsoleSectionCard>
           )}
           {authorized && c.preview && (
-            <section className="console-panel">
-              <h2>确认配置</h2>
+            <ConsoleSectionCard
+              title="确认配置"
+              icon={<BuildOutlined fontSize="small" />}
+              badge={{ label: "待应用", tone: "primary" }}
+            >
               <p>
                 Webmail 主地址 <code>{c.spec.publicOrigin}</code>
               </p>
@@ -413,25 +455,25 @@ export function ConsoleSetup() {
                   <li key={item}>{item}</li>
                 ))}
               </ul>
-              <Action
-                loading={c.pending}
-                disabled={locked}
-                onPress={() => void c.start()}
-              >
-                应用配置
-              </Action>
-            </section>
+              <div className="console-actions">
+                <Action
+                  loading={c.pending}
+                  disabled={locked}
+                  onPress={() => void c.start()}
+                >
+                  应用配置
+                </Action>
+              </div>
+            </ConsoleSectionCard>
           )}
         </>
       )}
       {resources.length > 0 && (
-        <section className="console-panel">
-          <header>
-            <h2>安装任务生成的资源</h2>
-            <p>
-              以下标识来自本次或上次安装任务。站点设置显示当前使用的组件与绑定域名。
-            </p>
-          </header>
+        <ConsoleSectionCard
+          title="安装任务生成的资源"
+          description="以下标识来自本次或上次安装任务。站点设置显示当前使用的组件与绑定域名。"
+          icon={<DnsOutlined fontSize="small" />}
+        >
           <dl className="console-form-grid">
             {resources.map(([kind, value]) => (
               <div key={kind}>
@@ -447,7 +489,7 @@ export function ConsoleSetup() {
               Cloudflare Account ID <code>{c.job.spec.cloudflareAccount}</code>
             </p>
           )}
-        </section>
+        </ConsoleSectionCard>
       )}
       <ConfirmDialog
         triggerLabel="离开"

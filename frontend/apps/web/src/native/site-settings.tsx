@@ -1,6 +1,17 @@
 "use client";
 import { useState } from "react";
-import { Action, TextField, PasswordField, ConfirmDialog } from "@mail-web/ui";
+import {
+  Action,
+  ConfirmDialog,
+  ConsoleAccordionSection,
+  ConsoleSectionCard,
+  ConsoleStatusBanner,
+  OpenInNewOutlined,
+  PasswordField,
+  PublicOutlined,
+  ShieldOutlined,
+  TextField,
+} from "@mail-web/ui";
 import { api, errorMessage } from "@platform/lib/api";
 import { useInstallationLeave } from "@platform/host/use-installation-leave";
 import type { components } from "@platform/lib/generated-api";
@@ -13,10 +24,12 @@ type SiteUpdate = components["schemas"]["SiteUpdate"];
 export function SiteSettings({
   initial,
   directAccessUrl,
+  mode = "all",
   onSave,
 }: {
   initial: Settings;
   directAccessUrl?: string | null;
+  mode?: "all" | "general" | "turnstile-manual";
   onSave: (value: SiteUpdate) => Promise<void>;
 }) {
   const [value, setValue] = useState({
@@ -63,8 +76,8 @@ export function SiteSettings({
       setValue(update);
       setNotice(
         update.publicOrigin !== initial.publicOrigin
-          ? "主地址已保存。请打开主地址确认邮箱能正常访问，再到下方核对 Turnstile 组件是否允许新域名。"
-          : "站点名称已保存。",
+          ? "主地址已保存。请打开主地址确认邮箱能正常访问，再到「Turnstile 人机验证」分区核对是否允许新域名。"
+          : "站点名称与访问地址已保存。",
       );
     } catch (e) {
       setError(errorMessage(e));
@@ -100,120 +113,164 @@ export function SiteSettings({
     }
   }
 
+  const showGeneral = mode === "all" || mode === "general";
+  const showTurnstileAuto = mode === "all";
+  const showTurnstileManual = mode === "all" || mode === "turnstile-manual";
+
   return (
     <>
-      <section className="console-panel">
-        <header>
-          <h2>站点名称与访问地址</h2>
-          <p>
-            主地址用于公开注册、找回密码和验证链接。先把域名反代到
-            Webmail，并确认 HTTPS 可以访问。
-          </p>
-        </header>
-        <div className="console-form-grid">
-          <TextField
-            label="站点名称"
-            value={value.brand}
-            disabled={locked}
-            onChange={(e) => setValue({ ...value, brand: e.target.value })}
-          />
-          <TextField
-            label="公开访问来源（主地址）"
-            value={value.publicOrigin}
-            disabled={locked}
-            onChange={(e) =>
-              setValue({ ...value, publicOrigin: e.target.value })
-            }
-          />
-        </div>
-        {directAccessUrl && (
-          <p>
-            IP 备用入口{" "}
-            <a className="console-link" href={directAccessUrl}>
-              {directAccessUrl}
-            </a>
-          </p>
-        )}
-        <div className="console-actions">
-          <Action
-            disabled={!dirty || automaticBusy}
-            loading={busy && dirty}
-            onPress={() => void saveSite()}
-          >
-            保存站点配置
-          </Action>
-          {initial.publicOrigin && (
-            <a
-              className="console-link"
-              href={initial.publicOrigin}
-              target="_blank"
-              rel="noreferrer"
-            >
-              打开已保存的主地址 ↗
-            </a>
-          )}
-        </div>
-        {notice && <p role="status">{notice}</p>}
-        {error && <p role="alert">{error}</p>}
-      </section>
-      <TurnstileSetup
-        publicOrigin={initial.publicOrigin}
-        disabled={dirty || busy || editingKeys}
-        onBusyChange={setAutomaticBusy}
-      />
-      <section className="console-panel">
-        <header>
-          <h2>手动配置已有的 Turnstile 组件（可选）</h2>
-          <p>
-            使用上方自动配置后可跳过。若已有 Cloudflare 组件，可手动保存该组件的
-            Site Key 和 Secret。
-          </p>
-        </header>
-        {legacyKey && (
-          <p>
-            原来保存的 Site Key
-            格式无效。可在上方自动创建组件，或在这里填入正确的两把密钥。
-          </p>
-        )}
-        <div className="console-form-grid">
-          <TextField
-            label="Turnstile Site Key"
-            disabled={locked}
-            value={siteKey}
-            onChange={(e) => setSiteKey(e.target.value)}
-          />
-          <PasswordField
-            label="Turnstile Secret"
-            purpose="new"
-            disabled={locked}
-            value={secret}
-            onChange={(e) => setSecret(e.target.value)}
-          />
-        </div>
-        <div className="console-actions">
-          <Action
-            disabled={!editingKeys || dirty || automaticBusy}
-            loading={busy && editingKeys}
-            onPress={() => void saveKeys()}
-          >
-            保存 Turnstile 密钥
-          </Action>
-          {editingKeys && (
-            <Action
-              variant="quiet"
+      {showGeneral && (
+        <ConsoleSectionCard
+          title="站点名称与访问地址"
+          description="主地址用于公开注册、找回密码和验证链接。先把域名反代到 Webmail，并确认 HTTPS 可以访问。"
+          icon={<PublicOutlined fontSize="small" />}
+          badge={
+            dirty
+              ? { label: "有未保存更改", tone: "warning" }
+              : initial.publicOrigin
+                ? { label: "已配置", tone: "success" }
+                : undefined
+          }
+        >
+          <div className="console-form-grid">
+            <TextField
+              label="站点名称"
+              value={value.brand}
               disabled={locked}
-              onPress={() => {
-                setSiteKey("");
-                setSecret("");
-                setManualMessage("");
-              }}
-            >
-              清除输入
-            </Action>
+              onChange={(e) => setValue({ ...value, brand: e.target.value })}
+            />
+            <TextField
+              label="公开访问来源（主地址）"
+              value={value.publicOrigin}
+              disabled={locked}
+              onChange={(e) =>
+                setValue({ ...value, publicOrigin: e.target.value })
+              }
+            />
+          </div>
+          {directAccessUrl && (
+            <p className="console-hint">
+              IP 备用入口{" "}
+              <a className="console-link" href={directAccessUrl}>
+                {directAccessUrl}
+              </a>
+            </p>
           )}
-        </div>
-        {manualMessage && <p role="status">{manualMessage}</p>}
-      </section>
+          <div className="console-actions">
+            <Action
+              disabled={!dirty || automaticBusy}
+              loading={busy && dirty}
+              onPress={() => void saveSite()}
+            >
+              保存站点配置
+            </Action>
+            {dirty && (
+              <Action
+                variant="quiet"
+                disabled={locked}
+                onPress={() => {
+                  setValue({
+                    brand: initial.brand,
+                    publicOrigin: initial.publicOrigin,
+                  });
+                  setError("");
+                  setNotice("");
+                }}
+              >
+                还原更改
+              </Action>
+            )}
+            {initial.publicOrigin && (
+              <a
+                className="console-link"
+                href={initial.publicOrigin}
+                target="_blank"
+                rel="noreferrer"
+              >
+                打开已保存的主地址
+                <OpenInNewOutlined sx={{ fontSize: 15 }} />
+              </a>
+            )}
+          </div>
+          {notice && (
+            <ConsoleStatusBanner severity="success">{notice}</ConsoleStatusBanner>
+          )}
+          {error && (
+            <ConsoleStatusBanner severity="error">{error}</ConsoleStatusBanner>
+          )}
+        </ConsoleSectionCard>
+      )}
+
+      {showTurnstileAuto && (
+        <TurnstileSetup
+          publicOrigin={initial.publicOrigin}
+          disabled={dirty || busy || editingKeys}
+          onBusyChange={setAutomaticBusy}
+        />
+      )}
+
+      {showTurnstileManual && (
+        <ConsoleAccordionSection
+          title="手动配置已有的 Turnstile 组件（可选）"
+          description="使用上方自动配置后可跳过。若已有 Cloudflare 组件，可手动保存该组件的 Site Key 和 Secret。"
+          icon={<ShieldOutlined fontSize="small" />}
+          badge={
+            legacyKey
+              ? { label: "旧密钥需修复", tone: "warning" }
+              : { label: "备用配置", tone: "default" }
+          }
+          defaultExpanded={legacyKey}
+        >
+          {legacyKey && (
+            <ConsoleStatusBanner severity="warning">
+              原来保存的 Site Key 格式无效。可在自动配置中重新创建组件，或在这里填入正确的两把密钥。
+            </ConsoleStatusBanner>
+          )}
+          <div className="console-form-grid">
+            <TextField
+              label="Turnstile Site Key"
+              disabled={locked}
+              value={siteKey}
+              onChange={(e) => setSiteKey(e.target.value)}
+            />
+            <PasswordField
+              label="Turnstile Secret"
+              purpose="new"
+              disabled={locked}
+              value={secret}
+              onChange={(e) => setSecret(e.target.value)}
+            />
+          </div>
+          <div className="console-actions">
+            <Action
+              disabled={!editingKeys || dirty || automaticBusy}
+              loading={busy && editingKeys}
+              onPress={() => void saveKeys()}
+            >
+              保存 Turnstile 密钥
+            </Action>
+            {editingKeys && (
+              <Action
+                variant="quiet"
+                disabled={locked}
+                onPress={() => {
+                  setSiteKey("");
+                  setSecret("");
+                  setManualMessage("");
+                }}
+              >
+                清除输入
+              </Action>
+            )}
+          </div>
+          {manualMessage && (
+            <ConsoleStatusBanner severity="info">
+              {manualMessage}
+            </ConsoleStatusBanner>
+          )}
+        </ConsoleAccordionSection>
+      )}
+
       <ConfirmDialog
         triggerLabel="离开"
         isOpen={!!leave.href}

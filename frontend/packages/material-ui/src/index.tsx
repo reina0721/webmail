@@ -72,11 +72,18 @@ export {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Drawer,
+  Collapse,
+  Popover,
+  Badge,
+  Breadcrumbs,
+  AlertTitle,
   Button,
   IconButton,
   Tooltip,
   CircularProgress,
 } from "@mui/material";
+export * from "./console-shell";
 export { default as MailOutlined } from "@mui/icons-material/MailOutlined";
 export { default as CalendarMonthOutlined } from "@mui/icons-material/CalendarMonthOutlined";
 export { default as PeopleOutlined } from "@mui/icons-material/PeopleOutlined";
@@ -102,6 +109,35 @@ export { default as FormatListBulleted } from "@mui/icons-material/FormatListBul
 export { default as FormatListNumbered } from "@mui/icons-material/FormatListNumbered";
 export { default as Undo } from "@mui/icons-material/Undo";
 export { default as Redo } from "@mui/icons-material/Redo";
+export { default as SpaceDashboardOutlined } from "@mui/icons-material/SpaceDashboardOutlined";
+export { default as GroupOutlined } from "@mui/icons-material/GroupOutlined";
+export { default as DnsOutlined } from "@mui/icons-material/DnsOutlined";
+export { default as VerifiedUserOutlined } from "@mui/icons-material/VerifiedUserOutlined";
+export { default as TuneOutlined } from "@mui/icons-material/TuneOutlined";
+export { default as MonitorHeartOutlined } from "@mui/icons-material/MonitorHeartOutlined";
+export { default as SystemUpdateAltOutlined } from "@mui/icons-material/SystemUpdateAltOutlined";
+export { default as BuildOutlined } from "@mui/icons-material/BuildOutlined";
+export { default as PublicOutlined } from "@mui/icons-material/PublicOutlined";
+export { default as PaletteOutlined } from "@mui/icons-material/PaletteOutlined";
+export { default as TravelExploreOutlined } from "@mui/icons-material/TravelExploreOutlined";
+export { default as ShieldOutlined } from "@mui/icons-material/ShieldOutlined";
+export { default as MarkEmailReadOutlined } from "@mui/icons-material/MarkEmailReadOutlined";
+export { default as TaskAltOutlined } from "@mui/icons-material/TaskAltOutlined";
+export { default as FactCheckOutlined } from "@mui/icons-material/FactCheckOutlined";
+export { default as ForwardToInboxOutlined } from "@mui/icons-material/ForwardToInboxOutlined";
+export { default as HistoryOutlined } from "@mui/icons-material/HistoryOutlined";
+export { default as CheckCircleOutlined } from "@mui/icons-material/CheckCircleOutlined";
+export { default as ErrorOutlineOutlined } from "@mui/icons-material/ErrorOutlineOutlined";
+export { default as WarningAmberOutlined } from "@mui/icons-material/WarningAmberOutlined";
+export { default as InfoOutlined } from "@mui/icons-material/InfoOutlined";
+export { default as RefreshOutlined } from "@mui/icons-material/RefreshOutlined";
+export { default as ContentCopyOutlined } from "@mui/icons-material/ContentCopyOutlined";
+export { default as OpenInNewOutlined } from "@mui/icons-material/OpenInNewOutlined";
+export { default as SaveOutlined } from "@mui/icons-material/SaveOutlined";
+export { default as RestartAltOutlined } from "@mui/icons-material/RestartAltOutlined";
+export { default as DarkModeOutlined } from "@mui/icons-material/DarkModeOutlined";
+export { default as LightModeOutlined } from "@mui/icons-material/LightModeOutlined";
+export { default as ExpandMoreOutlined } from "@mui/icons-material/ExpandMoreOutlined";
 type ActionProps = {
   children: ReactNode;
   leadingIcon?: ReactNode;
@@ -633,6 +669,7 @@ export function DrawerSurface({
   title,
   description,
   children,
+  footer,
   defaultOpen = false,
   isOpen,
   onOpenChange,
@@ -642,6 +679,7 @@ export function DrawerSurface({
   closeLabel: string;
   placement?: "left" | "right";
   composition?: string;
+  footer?: ReactNode;
 }) {
   const [internal, setInternal] = useState(defaultOpen);
   const open = isOpen ?? internal;
@@ -659,28 +697,60 @@ export function DrawerSurface({
       )}
       <Drawer anchor={placement} open={open} onClose={() => set(false)}>
         <Box
-          sx={{ width: "min(480px, 92vw)", p: 3 }}
+          sx={{
+            width: "min(480px, 92vw)",
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            bgcolor: "var(--surface-card)",
+          }}
           role="dialog"
           aria-labelledby={titleId}
         >
           <Box
             sx={{
+              px: 3,
+              pt: 2.5,
+              pb: 2,
+              borderBottom: "1px solid var(--line)",
               display: "flex",
-              alignItems: "center",
+              alignItems: "flex-start",
               justifyContent: "space-between",
+              gap: 1.5,
             }}
           >
-            <Typography id={titleId} variant="h6">
-              {title}
-            </Typography>
+            <Box>
+              <Typography id={titleId} variant="h6">
+                {title}
+              </Typography>
+              {description && (
+                <Typography color="text.secondary" variant="body2" sx={{ mt: 0.5 }}>
+                  {description}
+                </Typography>
+              )}
+            </Box>
             <IconButton aria-label={closeLabel} onClick={() => set(false)}>
               ×
             </IconButton>
           </Box>
-          <Typography color="text.secondary" sx={{ mb: 3 }}>
-            {description}
-          </Typography>
-          {children}
+          <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", p: 3 }}>
+            {children}
+          </Box>
+          {footer && (
+            <Box
+              sx={{
+                px: 3,
+                py: 2,
+                borderTop: "1px solid var(--line)",
+                bgcolor: "var(--surface-sidebar)",
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 1,
+              }}
+            >
+              {footer}
+            </Box>
+          )}
         </Box>
       </Drawer>
     </>

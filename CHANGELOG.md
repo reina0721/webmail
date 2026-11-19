@@ -4,6 +4,13 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+## [0.4.0-alpha.21] - 2026-11-19
+
+### Changed
+
+- Redesign the administration console with a Material Design sidebar, responsive navigation, and consistent settings layouts.
+- Group site settings and operational tools into dedicated tabs, and refresh the mail services, setup, and version management pages.
+
 ## [0.4.0-alpha.20] - 2026-11-19
 
 ### Added

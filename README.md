@@ -45,7 +45,7 @@ curl -fsSL https://raw.githubusercontent.com/reina0721/webmail/main/install.sh |
   --bind 127.0.0.1 --port 18090 --public-origin https://mail.example.org
 ```
 
-Replace the example origin with your own. The default channel includes prereleases; use `--channel stable` for stable releases or `--version v0.4.0-alpha.20` for an exact version with assets for your architecture. See the [deployment guide](docs/deployment.md), [Stalwart setup](docs/stalwart-setup.md) and [runnable example](examples/install-unattended.sh).
+Replace the example origin with your own. The default channel includes prereleases; use `--channel stable` for stable releases or `--version v0.4.0-alpha.21` for an exact version with assets for your architecture. See the [deployment guide](docs/deployment.md), [Stalwart setup](docs/stalwart-setup.md) and [runnable example](examples/install-unattended.sh).
 
 | Method | Intended use | Server behavior |
 | --- | --- | --- |
@@ -59,7 +59,7 @@ The CLI configures installation paths, container names and listening addresses. 
 Infrastructure configuration uses the existing [.env.example](.env.example):
 
 ```dotenv
-MAIL_WEB_VERSION=0.4.0-alpha.20
+MAIL_WEB_VERSION=0.4.0-alpha.21
 CONTAINER_NAME=mail-web
 LISTEN_ADDRESS=127.0.0.1
 PORT=18090

@@ -705,6 +705,8 @@ async fn health(State(app): State<Arc<App>>) -> Result<Json<Value>> {
         deployment::status,
         deployment::submit,
         deployment::job,
+        deployment::cancel,
+        deployment::save_download_config,
         connections::list,
         connections::save,
         connections::prepare,

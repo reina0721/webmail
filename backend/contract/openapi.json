@@ -6,7 +6,7 @@
     "license": {
       "name": ""
     },
-    "version": "0.4.0-alpha.17"
+    "version": "0.4.0-alpha.18"
   },
   "paths": {
     "/api/push/action": {
@@ -435,6 +435,9 @@
               }
             }
           },
+          "400": {
+            "description": "Invalid download mirror"
+          },
           "403": {
             "description": "Operator required"
           },
@@ -479,6 +482,87 @@
           },
           "404": {
             "description": "Job not found"
+          },
+          "503": {
+            "description": "Version manager unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/deployment/jobs/{id}/cancel": {
+      "post": {
+        "tags": [
+          "deployment"
+        ],
+        "operationId": "cancel_deployment_job",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Operator required"
+          },
+          "409": {
+            "description": "Job cannot be cancelled"
+          },
+          "503": {
+            "description": "Version manager unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/deployment/settings": {
+      "put": {
+        "tags": [
+          "deployment"
+        ],
+        "operationId": "save_deployment_settings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DownloadConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadConfig"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid download mirror or proxy"
+          },
+          "403": {
+            "description": "Operator required"
+          },
+          "409": {
+            "description": "Host rejected configuration"
           },
           "503": {
             "description": "Version manager unavailable"
@@ -3387,6 +3471,24 @@
           }
         }
       },
+      "DownloadConfig": {
+        "type": "object",
+        "properties": {
+          "downloadMirror": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "releaseProxy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "Draft": {
         "type": "object",
         "required": [
@@ -3548,6 +3650,12 @@
           "snapshots"
         ],
         "properties": {
+          "downloadMirror": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "historicalSwitch": {
             "type": "boolean"
           },
@@ -3559,6 +3667,12 @@
               {
                 "$ref": "#/components/schemas/Job"
               }
+            ]
+          },
+          "releaseProxy": {
+            "type": [
+              "string",
+              "null"
             ]
           },
           "releases": {
@@ -3588,6 +3702,14 @@
           "message"
         ],
         "properties": {
+          "downloadedBytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
           "id": {
             "type": "string"
           },
@@ -3612,8 +3734,30 @@
               "null"
             ]
           },
+          "sourceLabel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "speedBytesPerSec": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
           "targetVersion": {
             "type": "string"
+          },
+          "totalBytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
           }
         }
       },
@@ -4369,6 +4513,12 @@
         "properties": {
           "confirmDataRestore": {
             "type": "boolean"
+          },
+          "downloadMirror": {
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "expectedVersion": {
             "type": "string"

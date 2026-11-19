@@ -33,6 +33,8 @@ struct Cli {
     repository: Option<String>,
     #[arg(long, global = true)]
     download_mirror: Option<String>,
+    #[arg(long, global = true)]
+    release_proxy: Option<String>,
     #[arg(long,global=true,default_value="latest",value_parser=["latest","stable"])]
     channel: String,
     #[arg(long, short = 'y', global = true)]

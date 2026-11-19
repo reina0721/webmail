@@ -4,6 +4,18 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+## [0.4.0-alpha.18] - 2026-11-19
+
+### Added
+
+- Support persistent custom GitHub download mirror (`DOWNLOAD_MIRROR`) and HTTP/HTTPS release proxy (`RELEASE_PROXY` / `--release-proxy`), configurable and saved directly in `/console/versions/`.
+- Add real-time download progress reporting (`downloadedBytes`, `totalBytes`, `speedBytesPerSec`, `sourceLabel`), slow-speed hint, and `POST /api/v1/admin/deployment/jobs/{id}/cancel` cancellation in the host version manager and console UI.
+
+### Fixed
+
+- Replace the fixed 600-second total transfer timeout in `mailwebctl` release downloads with connect/keepalive/45-second idle-read detection plus HTTP `Range` resumable `.part` downloads so slow links reliably complete verified upgrades.
+- Automatically sync and gracefully restart `mailweb-version-manager` after a managed self-upgrade succeeds.
+
 ## [0.4.0-alpha.17] - 2026-11-19
 
 ### Added

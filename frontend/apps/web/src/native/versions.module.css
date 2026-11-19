@@ -67,3 +67,46 @@
   gap: 2px;
   overflow-wrap: anywhere;
 }
+
+.networkConfig {
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+}
+
+.networkConfig h3 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.networkFields {
+  display: grid;
+  gap: 10px;
+}
+
+.networkActions,
+.progressActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.hint {
+  color: var(--color-muted-foreground);
+  font-size: 12px;
+  margin: 0;
+}
+
+.progressBlock {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.progressMeta {
+  color: var(--color-muted-foreground);
+  font-size: 13px;
+}

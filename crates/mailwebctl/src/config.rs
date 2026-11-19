@@ -312,6 +312,41 @@ impl Settings {
             .collect::<String>();
         atomic(&self.root.join(".env"), text.as_bytes(), 0o600)
     }
+    pub fn download_mirror(&self) -> Option<&str> {
+        self.values
+            .get("DOWNLOAD_MIRROR")
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+    }
+    pub fn release_proxy(&self) -> Option<&str> {
+        self.values
+            .get("RELEASE_PROXY")
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+    }
+    pub fn set_download_config(&mut self, mirror: Option<&str>, proxy: Option<&str>) -> Result<()> {
+        let mirror = mailweb_shared::deployment::normalize_download_mirror(mirror)
+            .map_err(|_| anyhow::anyhow!("下载加速镜像必须是无凭据 HTTPS 地址"))?;
+        let proxy = mailweb_shared::deployment::normalize_release_proxy(proxy)
+            .map_err(|_| anyhow::anyhow!("网络代理必须是有效的 HTTP 或 HTTPS 地址"))?;
+        match mirror {
+            Some(v) => {
+                self.values.insert("DOWNLOAD_MIRROR".into(), v);
+            }
+            None => {
+                self.values.remove("DOWNLOAD_MIRROR");
+            }
+        }
+        match proxy {
+            Some(v) => {
+                self.values.insert("RELEASE_PROXY".into(), v);
+            }
+            None => {
+                self.values.remove("RELEASE_PROXY");
+            }
+        }
+        self.save()
+    }
     pub fn probe_ip(&self) -> IpAddr {
         if self.bind.is_unspecified() {
             if self.bind.is_ipv6() {

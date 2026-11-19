@@ -5,18 +5,19 @@ use crate::{
     config::{self, Settings},
     docker, image, operations,
     platform::Architecture,
-    release::{self, Manifest},
+    release::{self, DownloadProgress, Manifest},
 };
 use anyhow::{Context, Result, ensure};
 use clap::Parser;
 use mailweb_shared::deployment::{
-    Inventory, Job, MAX_REQUEST, Operation, Phase, PublishedVersion, Request, Snapshot, Submit,
-    exact_version,
+    DownloadConfig, Inventory, Job, MAX_REQUEST, Operation, Phase, PublishedVersion, Request,
+    Snapshot, Submit, exact_version, normalize_download_mirror,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
+    cell::{Cell, RefCell},
     fs::{self, File, OpenOptions},
     io::{BufRead, BufReader, Read, Write},
     os::unix::{
@@ -25,9 +26,12 @@ use std::{
     },
     path::{Path, PathBuf},
     process::Command,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Condvar, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
     thread,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 const PRIVATE: &str = ".version-manager";
@@ -238,16 +242,20 @@ fn state(root: &Path) -> PathBuf {
     root.join(PRIVATE)
 }
 
+fn service_name(s: &Settings) -> String {
+    format!(
+        "mailweb-version-{}.service",
+        &hex::encode(Sha256::digest(s.root.as_os_str().as_encoded_bytes()))[..16]
+    )
+}
+
 fn enable(s: &Settings) -> Result<()> {
     docker::require()?;
     current(s)?;
     docker::owned(s)?;
     let lock = s.lock()?;
     let old = fs::read(s.root.join("compose.yaml"))?;
-    let name = format!(
-        "mailweb-version-{}.service",
-        &hex::encode(Sha256::digest(s.root.as_os_str().as_encoded_bytes()))[..16]
-    );
+    let name = service_name(s);
     let binary = s.root.join("bin/mailweb-version-manager");
     let quote = |p: &Path| -> Result<String> {
         let value = p.to_str().context("安装目录需要 UTF-8")?;
@@ -459,7 +467,11 @@ fn retain(s: &Settings, source: &Path, created_at: u64) -> Result<Entry> {
     File::open(&root)?.sync_all()?;
     Ok(entry)
 }
-fn prepare_image(s: &Settings, manifest: &Manifest) -> Result<String> {
+fn prepare_image(
+    s: &Settings,
+    manifest: &Manifest,
+    download_mirror: Option<&str>,
+) -> Result<String> {
     let tag = version(&manifest.version)?;
     ensure!(
         manifest.image == format!("mail-web:{tag}")
@@ -469,7 +481,17 @@ fn prepare_image(s: &Settings, manifest: &Manifest) -> Result<String> {
     if image::matches(&manifest.image, &manifest.image_id).unwrap_or(false) {
         return Ok(manifest.image_id.clone());
     }
-    let (package, source) = release::prepare(s, &manifest.version, "latest", None, None)?;
+    let mirror = download_mirror.or_else(|| s.download_mirror());
+    let (package, source) = release::prepare_with_options(
+        s,
+        &manifest.version,
+        "latest",
+        mirror,
+        s.release_proxy(),
+        None,
+        None,
+        &mut |_| {},
+    )?;
     let canonical =
         image::declared_config_id(&package.join("image.tar"), &source.image, &source.image_id)?;
     let expected = image::declared_config_id(
@@ -496,9 +518,10 @@ fn apply(
     s: &Settings,
     entry: &Entry,
     revoke: bool,
+    download_mirror: Option<&str>,
     starting: impl FnOnce() -> Result<()>,
 ) -> Result<()> {
-    prepare_image(s, &entry.manifest)?;
+    prepare_image(s, &entry.manifest, download_mirror)?;
     operations::apply_managed_snapshot(
         s,
         &snapshot_dir(s, &entry.snapshot.id),
@@ -598,6 +621,10 @@ fn submit(s: &Settings, job: Submit, actor: String) -> Result<(Record, bool)> {
             message: "任务已接受".into(),
             running_version: Some(current),
             recovery_command: None,
+            downloaded_bytes: None,
+            total_bytes: None,
+            speed_bytes_per_sec: None,
+            source_label: None,
         },
         request: job,
         actor,
@@ -607,25 +634,71 @@ fn submit(s: &Settings, job: Submit, actor: String) -> Result<(Record, bool)> {
     store(&path, &record)?;
     Ok((record, true))
 }
-fn transact(s: &Settings, record: &mut Record) -> Result<()> {
+fn update_download_progress(
+    s: &Settings,
+    record: &mut Record,
+    last_saved: &Cell<Option<Instant>>,
+    progress: DownloadProgress,
+) {
+    record.job.downloaded_bytes = Some(progress.downloaded_bytes);
+    record.job.total_bytes = progress.total_bytes;
+    record.job.speed_bytes_per_sec = Some(progress.speed_bytes_per_sec);
+    record.job.source_label = Some(progress.source_label);
+    let now_tick = Instant::now();
+    let should_save = match last_saved.get() {
+        None => true,
+        Some(prev) => {
+            now_tick.duration_since(prev) >= Duration::from_secs(1)
+                || progress
+                    .total_bytes
+                    .is_some_and(|total| progress.downloaded_bytes >= total)
+        }
+    };
+    if should_save {
+        let _ = store(&record_path(s, &record.job.id), record);
+        last_saved.set(Some(now_tick));
+    }
+}
+
+fn transact(s: &Settings, record: &mut Record, cancel: &AtomicBool) -> Result<()> {
     ensure!(
         current(s)? == record.request.expected_version,
         "运行版本已改变，请刷新后重试"
     );
+    let job_mirror = normalize_download_mirror(record.request.download_mirror.as_deref())
+        .map_err(|_| anyhow::anyhow!("下载加速镜像地址无效"))?;
     match record.request.operation {
         Operation::Update => {
             let target = record.request.target.clone();
-            let cli = Cli::try_parse_from(["mailwebctl", "update", "--yes", "--version", &target])?;
+            let mut argv = vec![
+                "mailwebctl".to_owned(),
+                "update".to_owned(),
+                "--yes".to_owned(),
+                "--version".to_owned(),
+                target.clone(),
+            ];
+            if let Some(ref m) = job_mirror {
+                argv.push("--download-mirror".to_owned());
+                argv.push(m.clone());
+            }
+            let cli = Cli::try_parse_from(argv)?;
             let mut updated = s.clone();
-            operations::install(
+            let state_cell = RefCell::new(record);
+            let last_saved = Cell::new(None);
+            operations::install_managed(
                 &mut updated,
                 s,
                 &cli,
                 &target,
                 None,
+                Some(cancel),
                 &mut |phase, backup| {
+                    let mut r = state_cell.borrow_mut();
+                    if phase != Phase::Download {
+                        r.job.speed_bytes_per_sec = None;
+                    }
                     if let Some(backup) = backup {
-                        return mark_safety(s, record, backup);
+                        return mark_safety(s, *r, backup);
                     }
                     let message = match phase {
                         Phase::Download => "正在下载发布包",
@@ -634,18 +707,22 @@ fn transact(s: &Settings, record: &mut Record) -> Result<()> {
                         Phase::Health => "正在等待新版本启动和健康检查",
                         _ => "正在切换版本",
                     };
-                    checkpoint(s, record, phase, message)
+                    checkpoint(s, *r, phase, message)
+                },
+                &mut |progress| {
+                    let mut r = state_cell.borrow_mut();
+                    update_download_progress(s, *r, &last_saved, progress);
                 },
             )
         }
         Operation::Rollback => {
             checkpoint(s, record, Phase::Verify, "正在校验所选快照与镜像")?;
             let entry = snapshot(s, &record.request.target)?;
-            prepare_image(s, &entry.manifest)?;
+            prepare_image(s, &entry.manifest, job_mirror.as_deref())?;
             checkpoint(s, record, Phase::Backup, "正在备份当前版本")?;
             let backup = operations::backup(s, false)?;
             mark_safety(s, record, &backup)?;
-            apply(s, &entry, true, || {
+            apply(s, &entry, true, job_mirror.as_deref(), || {
                 checkpoint(
                     s,
                     record,
@@ -656,8 +733,29 @@ fn transact(s: &Settings, record: &mut Record) -> Result<()> {
         }
         Operation::InstallHistorical => {
             checkpoint(s, record, Phase::Download, "正在下载历史发布包")?;
-            let (package, mut manifest) =
-                release::prepare(s, &record.request.target, "latest", None, None)?;
+            let mirror = job_mirror
+                .as_deref()
+                .or_else(|| s.download_mirror())
+                .map(str::to_owned);
+            let target_tag = record.request.target.clone();
+            let (package, mut manifest) = {
+                let state_cell = RefCell::new(&mut *record);
+                let last_saved = Cell::new(None);
+                release::prepare_with_options(
+                    s,
+                    &target_tag,
+                    "latest",
+                    mirror.as_deref(),
+                    s.release_proxy(),
+                    None,
+                    Some(cancel),
+                    &mut |progress| {
+                        let mut r = state_cell.borrow_mut();
+                        update_download_progress(s, *r, &last_saved, progress);
+                    },
+                )?
+            };
+            record.job.speed_bytes_per_sec = None;
             checkpoint(s, record, Phase::Verify, "正在核对镜像与发布清单")?;
             operations::verify_release_image(&package, &mut manifest)?;
             let target = operations::historical_settings(s, &manifest)?;
@@ -676,10 +774,11 @@ fn transact(s: &Settings, record: &mut Record) -> Result<()> {
     }
 }
 fn recover(s: &Settings, record: &mut Record, message: &str) -> Result<()> {
+    record.job.speed_bytes_per_sec = None;
     let before = record.job.phase;
     let restored = if let Some(id) = record.safety.clone() {
         checkpoint(s, record, Phase::Recovering, "正在恢复切换前的快照")?;
-        snapshot(s, &id).and_then(|entry| apply(s, &entry, false, || Ok(())))
+        snapshot(s, &id).and_then(|entry| apply(s, &entry, false, None, || Ok(())))
     } else if before == Phase::Backup && record.previously_running {
         docker::start(s)
     } else {
@@ -705,14 +804,34 @@ fn recover(s: &Settings, record: &mut Record, message: &str) -> Result<()> {
         }
     }
 }
-fn execute(root: &Path, mut record: Record) -> Result<()> {
+fn restart_if_self_updated(s: &Settings) {
+    let Ok(current_exe) = std::env::current_exe() else {
+        return;
+    };
+    let Some(name) = current_exe.file_name().and_then(|n| n.to_str()) else {
+        return;
+    };
+    if !name.starts_with("mailweb-version-manager") {
+        return;
+    }
+    let installed_mgr = s.root.join("bin/mailweb-version-manager");
+    let current_bytes = fs::read(&current_exe).ok();
+    let next_bytes = fs::read(&installed_mgr).ok();
+    if current_bytes.is_some() && next_bytes.is_some() && current_bytes != next_bytes {
+        let unit = service_name(s);
+        let _ = Command::new("systemctl")
+            .args(["restart", "--no-block", &unit])
+            .status();
+    }
+}
+fn execute(root: &Path, mut record: Record, cancel: &AtomicBool) -> Result<()> {
     let s = instance(root)?;
     let _lock = match s.lock() {
         Ok(lock) => lock,
         Err(error) => return checkpoint(&s, &mut record, Phase::Failed, &error.to_string()),
     };
     record.previously_running = docker::running(&s);
-    let result = transact(&s, &mut record).and_then(|()| {
+    let result = transact(&s, &mut record, cancel).and_then(|()| {
         record.job.running_version = running_version(&s);
         ensure!(
             record.job.running_version.as_deref() == Some(&record.job.target_version),
@@ -721,9 +840,24 @@ fn execute(root: &Path, mut record: Record) -> Result<()> {
         Ok(())
     });
     match result {
-        Ok(()) => checkpoint(&s, &mut record, Phase::Succeeded, "版本切换完成"),
+        Ok(()) => {
+            record.job.speed_bytes_per_sec = None;
+            checkpoint(&s, &mut record, Phase::Succeeded, "版本切换完成")?;
+            restart_if_self_updated(&s);
+            Ok(())
+        }
         Err(error) => {
             eprintln!("版本切换失败：{error:#}");
+            if cancel.load(Ordering::Relaxed) && record.safety.is_none() {
+                record.job.speed_bytes_per_sec = None;
+                record.job.running_version = running_version(&s);
+                return checkpoint(
+                    &s,
+                    &mut record,
+                    Phase::Failed,
+                    "下载已取消，已保留断点数据，可修改镜像或代理后重试",
+                );
+            }
             // Host diagnostics can contain paths or Docker output. Keep the web
             // response to actionable, non-sensitive messages.
             let message = match record.job.phase {
@@ -739,6 +873,35 @@ fn execute(root: &Path, mut record: Record) -> Result<()> {
 }
 
 type Listings = Arc<Mutex<(String, Vec<PublishedVersion>)>>;
+type CancelRegistry = Arc<Mutex<Option<(String, Arc<AtomicBool>)>>>;
+
+#[derive(Clone, Default)]
+struct CatalogWake {
+    signal: Arc<(Mutex<bool>, Condvar)>,
+}
+impl CatalogWake {
+    fn notify(&self) {
+        let (lock, cvar) = &*self.signal;
+        *lock.lock().unwrap() = true;
+        cvar.notify_all();
+    }
+    fn wait(&self, dur: Duration) {
+        let (lock, cvar) = &*self.signal;
+        let mut woken = lock.lock().unwrap();
+        if !*woken {
+            let (guard, _) = cvar.wait_timeout(woken, dur).unwrap();
+            woken = guard;
+        }
+        *woken = false;
+    }
+}
+
+struct ActiveJobGuard(CancelRegistry);
+impl Drop for ActiveJobGuard {
+    fn drop(&mut self) {
+        *self.0.lock().unwrap() = None;
+    }
+}
 fn registered_snapshots(s: &Settings) -> Result<Vec<Snapshot>> {
     let mut snapshots = Vec::new();
     for entry in fs::read_dir(state(&s.root).join("snapshots"))? {
@@ -755,10 +918,11 @@ fn registered_snapshots(s: &Settings) -> Result<Vec<Snapshot>> {
     Ok(snapshots)
 }
 fn inventory(s: &Settings, releases: &Listings, catalog: bool) -> Result<Inventory> {
+    let live = Settings::load(&s.root)?;
     let (releases_status, mut releases) = releases.lock().unwrap().clone();
     let mut snapshots = registered_snapshots(s)?;
     if !catalog {
-        let installed = version(&current(&Settings::load(&s.root)?)?)?;
+        let installed = version(&current(&live)?)?;
         releases.retain(|item| {
             item.unavailable_reason.is_none()
                 && exact_version(&item.version).is_some_and(|version| version > installed)
@@ -772,6 +936,8 @@ fn inventory(s: &Settings, releases: &Listings, catalog: bool) -> Result<Invento
         snapshots,
         job: recent(s)?.map(|r| r.job),
         historical_switch: catalog,
+        download_mirror: live.download_mirror().map(str::to_owned),
+        release_proxy: live.release_proxy().map(str::to_owned),
     })
 }
 fn peer_uid(stream: &UnixStream) -> Result<u32> {
@@ -790,7 +956,13 @@ fn peer_uid(stream: &UnixStream) -> Result<u32> {
     ensure!(status == 0, "无法核对版本管理连接身份");
     Ok(cred.uid)
 }
-fn connection(s: &Settings, releases: &Listings, mut stream: UnixStream) -> Result<()> {
+fn connection(
+    s: &Settings,
+    releases: &Listings,
+    cancels: &CancelRegistry,
+    wake: &CatalogWake,
+    mut stream: UnixStream,
+) -> Result<()> {
     let uid = peer_uid(&stream)?;
     ensure!(
         uid == 0 || uid == app_uid(s)?,
@@ -822,14 +994,59 @@ fn connection(s: &Settings, releases: &Listings, mut stream: UnixStream) -> Resu
                 let (record, start) = submit(&current, job, actor)?;
                 let view = serde_json::to_value(&record.job)?;
                 if start {
+                    let cancel_flag = Arc::new(AtomicBool::new(false));
+                    *cancels.lock().unwrap() = Some((record.job.id.clone(), cancel_flag.clone()));
+                    let cancels = cancels.clone();
                     let root = s.root.clone();
                     thread::spawn(move || {
-                        if let Err(error) = execute(&root, record) {
+                        let _guard = ActiveJobGuard(cancels);
+                        if let Err(error) = execute(&root, record, &cancel_flag) {
                             eprintln!("版本任务中断：{error:#}");
                         }
                     });
                 }
                 Ok(view)
+            }
+            Request::Cancel { id } => {
+                ensure!(id_valid(&id), "任务 ID 无效");
+                let path = record_path(s, &id);
+                let record: Record = load(&path).context("任务不存在")?;
+                ensure!(!record.job.phase.finished(), "当前任务已结束");
+                ensure!(
+                    matches!(record.job.phase, Phase::Queued | Phase::Download),
+                    "当前阶段不可取消"
+                );
+                let flagged = {
+                    let guard = cancels.lock().unwrap();
+                    if let Some((active_id, flag)) = guard.as_ref()
+                        && active_id == &id
+                    {
+                        flag.store(true, Ordering::Relaxed);
+                        true
+                    } else {
+                        false
+                    }
+                };
+                ensure!(flagged, "当前任务不可取消或正在收尾");
+                Ok(serde_json::to_value(record.job)?)
+            }
+            Request::SetDownloadConfig {
+                download_mirror,
+                release_proxy,
+            } => {
+                let mut current = instance(&s.root)?;
+                ensure!(
+                    recent(&current)?.is_none_or(|r| r.job.phase.finished()),
+                    "当前有版本任务正在运行，请先取消或等待完成"
+                );
+                let _lock = current.lock()?;
+                current
+                    .set_download_config(download_mirror.as_deref(), release_proxy.as_deref())?;
+                wake.notify();
+                Ok(serde_json::to_value(DownloadConfig {
+                    download_mirror: current.download_mirror().map(str::to_owned),
+                    release_proxy: current.release_proxy().map(str::to_owned),
+                })?)
             }
         }
     })();
@@ -868,12 +1085,17 @@ fn serve(s: &Settings) -> Result<()> {
     fs::set_permissions(&path, fs::Permissions::from_mode(0o660))?;
     chown(&path, Some(0), Some(gid))?;
     let releases = Arc::new(Mutex::new(("loading".into(), Vec::new())));
+    let cancels: CancelRegistry = Arc::new(Mutex::new(None));
+    let wake = CatalogWake::default();
     let catalog = releases.clone();
+    let catalog_wake = wake.clone();
     let root = s.root.clone();
     thread::spawn(move || {
         loop {
-            let result = Settings::load(&root)
-                .and_then(|s| release::Client::new(None)?.published(&s.repository));
+            let result = Settings::load(&root).and_then(|s| {
+                release::Client::new_with_options(s.download_mirror(), s.release_proxy())?
+                    .published(&s.repository)
+            });
             let delay = if result.is_ok() { 300 } else { 45 };
             {
                 let mut cache = catalog.lock().unwrap();
@@ -885,13 +1107,13 @@ fn serve(s: &Settings) -> Result<()> {
                     }
                 }
             }
-            thread::sleep(Duration::from_secs(delay));
+            catalog_wake.wait(Duration::from_secs(delay));
         }
     });
     for stream in listener.incoming() {
         if let Err(error) = stream
             .map_err(Into::into)
-            .and_then(|stream| connection(s, &releases, stream))
+            .and_then(|stream| connection(s, &releases, &cancels, &wake, stream))
         {
             eprintln!("版本管理连接失败：{error:#}");
         }
@@ -909,13 +1131,18 @@ mod tests {
         fs::write(dir.path().join(".env"), "MAIL_WEB_VERSION=0.4.0-alpha.4\n").unwrap();
         fs::create_dir_all(dir.path().join(PRIVATE).join("jobs")).unwrap();
         fs::create_dir_all(dir.path().join(PRIVATE).join("snapshots")).unwrap();
-        let s = Settings::load(dir.path()).unwrap();
+        let mut s = Settings::load(dir.path()).unwrap();
+        s.set_download_config(Some("https://ghfast.top/"), Some("http://127.0.0.1:7890/"))
+            .unwrap();
+        assert_eq!(s.download_mirror(), Some("https://ghfast.top"));
+        assert_eq!(s.release_proxy(), Some("http://127.0.0.1:7890"));
         let mut request = Submit {
             id: "a".repeat(32),
             expected_version: "v0.4.0-alpha.3".into(),
             operation: Operation::Update,
             target: "v0.4.0-alpha.5".into(),
             confirm_data_restore: false,
+            download_mirror: None,
         };
         let actor = "b".repeat(32);
         assert!(submit(&s, request.clone(), actor.clone()).is_err());

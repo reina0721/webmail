@@ -212,6 +212,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/deployment/jobs/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancel_deployment_job"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/deployment/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["save_deployment_settings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/directory": {
         parameters: {
             query?: never;
@@ -1423,6 +1455,10 @@ export interface components {
             publicOrigin?: string | null;
             stalwartUrl: string;
         };
+        DownloadConfig: {
+            downloadMirror?: string | null;
+            releaseProxy?: string | null;
+        };
         Draft: {
             attachments: components["schemas"]["Attachment"][];
             bcc: string[];
@@ -1457,20 +1493,29 @@ export interface components {
             version: string;
         };
         Inventory: {
+            downloadMirror?: string | null;
             historicalSwitch?: boolean;
             job?: null | components["schemas"]["Job"];
+            releaseProxy?: string | null;
             releases: components["schemas"]["PublishedVersion"][];
             releasesStatus: string;
             snapshots: components["schemas"]["Snapshot"][];
         };
         Job: {
+            /** Format: int64 */
+            downloadedBytes?: number | null;
             id: string;
             message: string;
             operation: components["schemas"]["Operation"];
             phase: components["schemas"]["Phase"];
             recoveryCommand?: string | null;
             runningVersion?: string | null;
+            sourceLabel?: string | null;
+            /** Format: int64 */
+            speedBytesPerSec?: number | null;
             targetVersion: string;
+            /** Format: int64 */
+            totalBytes?: number | null;
         };
         Login: {
             email: string;
@@ -1712,6 +1757,7 @@ export interface components {
         };
         Submit: {
             confirmDataRestore?: boolean;
+            downloadMirror?: string | null;
             expectedVersion: string;
             id: string;
             operation: components["schemas"]["Operation"];
@@ -2223,6 +2269,13 @@ export interface operations {
                     "application/json": components["schemas"]["Job"];
                 };
             };
+            /** @description Invalid download mirror */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Operator required */
             403: {
                 headers: {
@@ -2274,6 +2327,99 @@ export interface operations {
             };
             /** @description Job not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Version manager unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    cancel_deployment_job: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description Operator required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Job cannot be cancelled */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Version manager unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    save_deployment_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DownloadConfig"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadConfig"];
+                };
+            };
+            /** @description Invalid download mirror or proxy */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Operator required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Host rejected configuration */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

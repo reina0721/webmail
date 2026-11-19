@@ -3,15 +3,35 @@
 use crate::config::{self, Settings};
 use crate::platform::Architecture;
 use anyhow::{Context, Result, bail, ensure};
-use mailweb_shared::deployment::{GithubRelease as Release, PublishedVersion, release_catalog};
+use mailweb_shared::deployment::{
+    GithubRelease as Release, PublishedVersion, normalize_download_mirror, normalize_release_proxy,
+    release_catalog,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    fs::{self, File},
+    fs::{self, File, OpenOptions},
     io::{Read, Write},
     path::{Component, Path, PathBuf},
-    time::Duration,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc,
+    },
+    time::{Duration, Instant},
 };
+
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
+const METADATA_TIMEOUT: Duration = Duration::from_secs(30);
+const READ_IDLE_TIMEOUT: Duration = Duration::from_secs(45);
+const PROGRESS_INTERVAL: Duration = Duration::from_millis(800);
+
+#[derive(Debug, Clone)]
+pub struct DownloadProgress {
+    pub downloaded_bytes: u64,
+    pub total_bytes: Option<u64>,
+    pub speed_bytes_per_sec: u64,
+    pub source_label: String,
+}
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Manifest {
@@ -37,38 +57,44 @@ impl Manifest {
 pub struct Client {
     http: reqwest::blocking::Client,
     mirror: Option<String>,
+    has_proxy: bool,
 }
 impl Client {
     pub fn new(mirror: Option<&str>) -> Result<Self> {
-        if let Some(m) = mirror {
-            let u = reqwest::Url::parse(m)?;
-            ensure!(
-                u.scheme() == "https"
-                    && u.username().is_empty()
-                    && u.password().is_none()
-                    && u.query().is_none()
-                    && u.fragment().is_none(),
-                "下载代理必须是无凭据 HTTPS 地址"
-            )
+        Self::new_with_options(mirror, None)
+    }
+    pub fn new_with_options(mirror: Option<&str>, proxy: Option<&str>) -> Result<Self> {
+        let normalized_mirror =
+            normalize_download_mirror(mirror).map_err(|e| anyhow::anyhow!(e))?;
+        let normalized_proxy = normalize_release_proxy(proxy).map_err(|e| anyhow::anyhow!(e))?;
+        let mut builder = reqwest::blocking::Client::builder()
+            .user_agent(concat!("mailwebctl/", env!("CARGO_PKG_VERSION")))
+            .connect_timeout(CONNECT_TIMEOUT)
+            .timeout(None)
+            .tcp_keepalive(Some(Duration::from_secs(15)))
+            .tcp_keepalive_interval(Some(Duration::from_secs(10)))
+            .tcp_keepalive_retries(Some(3))
+            .https_only(true);
+        #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
+        {
+            builder = builder.tcp_user_timeout(Some(READ_IDLE_TIMEOUT));
         }
+        let has_proxy = if let Some(ref p) = normalized_proxy {
+            builder = builder.proxy(reqwest::Proxy::all(p).context("网络代理地址无效")?);
+            true
+        } else {
+            false
+        };
         Ok(Self {
-            http: reqwest::blocking::Client::builder()
-                .user_agent(concat!("mailwebctl/", env!("CARGO_PKG_VERSION")))
-                .connect_timeout(Duration::from_secs(15))
-                .timeout(Duration::from_secs(600))
-                .https_only(true)
-                .build()?,
-            mirror: mirror.map(|s| s.trim_end_matches('/').to_owned()),
+            http: builder.build()?,
+            mirror: normalized_mirror,
+            has_proxy,
         })
     }
     fn get(&self, url: &str) -> Result<reqwest::blocking::Response> {
-        let request = self.http.get(url);
-        let request = if reqwest::Url::parse(url)?.host_str() == Some("api.github.com") {
-            request.timeout(Duration::from_secs(30))
-        } else {
-            request
-        };
-        request
+        self.http
+            .get(url)
+            .timeout(METADATA_TIMEOUT)
             .send()?
             .error_for_status()
             .context("下载/版本查询失败")
@@ -125,51 +151,40 @@ impl Client {
         Ok(selected)
     }
     pub fn download(&self, url: &str, to: &Path) -> Result<()> {
+        self.download_with_progress(url, to, None, &mut |_| {})
+    }
+    pub fn download_with_progress(
+        &self,
+        url: &str,
+        to: &Path,
+        cancel: Option<&AtomicBool>,
+        on_progress: &mut dyn FnMut(DownloadProgress),
+    ) -> Result<()> {
         ensure!(url.starts_with("https://"), "下载必须使用 HTTPS");
-        let mut urls = Vec::new();
-        if let Some(m) = &self.mirror {
-            urls.push(format!("{m}/{url}"))
-        }
-        urls.push(url.into());
+        let candidates = self.download_candidates(url);
+        let (part, meta) = part_paths(to)?;
         let mut last = None;
-        for u in urls {
+        for (candidate_url, source_label) in candidates {
             for attempt in 0..3 {
-                let result = (|| -> Result<()> {
-                    let mut response = self.get(&u)?;
-                    let total = response.content_length();
-                    let mut temp =
-                        tempfile::NamedTempFile::new_in(to.parent().context("缺少下载目录")?)?;
-                    let mut buffer = [0; 65536];
-                    let mut bytes = 0u64;
-                    let mut announced = 0;
-                    loop {
-                        let n = response.read(&mut buffer)?;
-                        if n == 0 {
-                            break;
-                        }
-                        temp.write_all(&buffer[..n])?;
-                        bytes += n as u64;
-                        if bytes / 8388608 > announced {
-                            announced = bytes / 8388608;
-                            eprintln!(
-                                "下载 {} MiB / {}",
-                                bytes / 1048576,
-                                total
-                                    .map(|n| format!("{} MiB", n / 1048576))
-                                    .unwrap_or_else(|| "未知大小".into())
-                            )
-                        }
-                    }
-                    if let Some(n) = total {
-                        ensure!(n == bytes, "下载内容不完整")
-                    };
-                    temp.as_file().sync_all()?;
-                    temp.persist(to).map_err(|e| e.error)?;
-                    Ok(())
-                })();
+                if is_cancelled(cancel) {
+                    bail!("下载已取消");
+                }
+                let result = self.download_attempt(
+                    url,
+                    &candidate_url,
+                    &source_label,
+                    to,
+                    &part,
+                    &meta,
+                    cancel,
+                    on_progress,
+                );
                 match result {
                     Ok(()) => return Ok(()),
                     Err(e) => {
+                        if is_cancelled(cancel) {
+                            return Err(e);
+                        }
                         last = Some(e);
                         if attempt < 2 {
                             std::thread::sleep(Duration::from_secs(1));
@@ -180,6 +195,249 @@ impl Client {
         }
         Err(last.context("下载失败")?)
     }
+    fn download_candidates(&self, url: &str) -> Vec<(String, String)> {
+        let mut urls = Vec::new();
+        if let Some(m) = &self.mirror {
+            urls.push((format!("{m}/{url}"), self.source_label(Some(m))));
+        }
+        urls.push((url.to_owned(), self.source_label(None)));
+        urls
+    }
+    fn source_label(&self, mirror_url: Option<&str>) -> String {
+        let target = match mirror_url.and_then(|m| reqwest::Url::parse(m).ok()) {
+            Some(parsed) => format!("镜像 ({})", parsed.host_str().unwrap_or("custom")),
+            None => "GitHub 直连".to_owned(),
+        };
+        if self.has_proxy {
+            format!("代理 -> {target}")
+        } else {
+            target
+        }
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn download_attempt(
+        &self,
+        canonical_url: &str,
+        request_url: &str,
+        source_label: &str,
+        to: &Path,
+        part: &Path,
+        meta: &Path,
+        cancel: Option<&AtomicBool>,
+        on_progress: &mut dyn FnMut(DownloadProgress),
+    ) -> Result<()> {
+        let resume_offset = existing_resume_offset(part, meta, canonical_url);
+        let mut request = self.http.get(request_url);
+        if resume_offset > 0 {
+            request = request.header(reqwest::header::RANGE, format!("bytes={resume_offset}-"));
+        }
+        let response = request.send()?;
+        let status = response.status();
+        if status == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
+            if let Some(total) = response
+                .headers()
+                .get(reqwest::header::CONTENT_RANGE)
+                .and_then(|v| v.to_str().ok())
+                .and_then(parse_unsatisfied_total)
+                && resume_offset == total
+                && part.is_file()
+            {
+                let file = File::open(part)?;
+                file.sync_all()?;
+                drop(file);
+                finalize_part(part, meta, to)?;
+                on_progress(DownloadProgress {
+                    downloaded_bytes: total,
+                    total_bytes: Some(total),
+                    speed_bytes_per_sec: 0,
+                    source_label: source_label.to_owned(),
+                });
+                return Ok(());
+            }
+            clear_part(part, meta);
+            bail!("断点续传偏移无效，将重新下载");
+        }
+        let response = response.error_for_status().context("下载请求失败")?;
+        let (mut file, mut bytes, total) = if status == reqwest::StatusCode::PARTIAL_CONTENT {
+            let parsed_range = response
+                .headers()
+                .get(reqwest::header::CONTENT_RANGE)
+                .and_then(|v| v.to_str().ok())
+                .and_then(parse_content_range);
+            let Some((start, total_from_range)) = parsed_range else {
+                clear_part(part, meta);
+                bail!("服务器返回的 206 Content-Range 无法解析");
+            };
+            if start != resume_offset {
+                clear_part(part, meta);
+                bail!("服务器返回的续传起始位置不匹配");
+            }
+            let total = total_from_range.or_else(|| response.content_length().map(|n| start + n));
+            let file = OpenOptions::new().append(true).open(part)?;
+            (file, start, total)
+        } else {
+            fs::write(meta, canonical_url.as_bytes())?;
+            let file = File::create(part)?;
+            (file, 0u64, response.content_length())
+        };
+
+        on_progress(DownloadProgress {
+            downloaded_bytes: bytes,
+            total_bytes: total,
+            speed_bytes_per_sec: 0,
+            source_label: source_label.to_owned(),
+        });
+
+        let (tx, rx) = mpsc::sync_channel::<std::result::Result<Vec<u8>, String>>(4);
+        std::thread::spawn(move || {
+            let mut reader = response;
+            let mut buf = [0u8; 65536];
+            loop {
+                match reader.read(&mut buf) {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        if tx.send(Ok(buf[..n].to_vec())).is_err() {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        let _ = tx.send(Err(e.to_string()));
+                        break;
+                    }
+                }
+            }
+        });
+
+        let mut last_data = Instant::now();
+        let mut last_report = Instant::now();
+        let mut window_bytes = 0u64;
+        let mut announced = bytes / 8_388_608;
+
+        loop {
+            if is_cancelled(cancel) {
+                let _ = file.flush();
+                bail!("下载已取消");
+            }
+            match rx.recv_timeout(Duration::from_millis(500)) {
+                Ok(Ok(chunk)) => {
+                    file.write_all(&chunk)?;
+                    let len = chunk.len() as u64;
+                    bytes += len;
+                    window_bytes += len;
+                    last_data = Instant::now();
+                    let elapsed = last_report.elapsed();
+                    if elapsed >= PROGRESS_INTERVAL {
+                        let secs = elapsed.as_secs_f64().max(0.001);
+                        let speed = (window_bytes as f64 / secs) as u64;
+                        on_progress(DownloadProgress {
+                            downloaded_bytes: bytes,
+                            total_bytes: total,
+                            speed_bytes_per_sec: speed,
+                            source_label: source_label.to_owned(),
+                        });
+                        last_report = Instant::now();
+                        window_bytes = 0;
+                    }
+                    if bytes / 8_388_608 > announced {
+                        announced = bytes / 8_388_608;
+                        eprintln!(
+                            "下载 {} MiB / {} ({source_label})",
+                            bytes / 1_048_576,
+                            total
+                                .map(|n| format!("{} MiB", n / 1_048_576))
+                                .unwrap_or_else(|| "未知大小".into())
+                        );
+                    }
+                }
+                Ok(Err(e)) => {
+                    let _ = file.flush();
+                    bail!("读取下载流失败: {e}");
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    if last_data.elapsed() >= READ_IDLE_TIMEOUT {
+                        let _ = file.flush();
+                        bail!("下载读取超时（45 秒无新数据），将断点续传重试");
+                    }
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+        }
+
+        if let Some(n) = total {
+            ensure!(n == bytes, "下载内容不完整 ({bytes}/{n})");
+        }
+        file.sync_all()?;
+        drop(file);
+        finalize_part(part, meta, to)?;
+        let elapsed = last_report.elapsed().as_secs_f64().max(0.001);
+        on_progress(DownloadProgress {
+            downloaded_bytes: bytes,
+            total_bytes: total.or(Some(bytes)),
+            speed_bytes_per_sec: (window_bytes as f64 / elapsed) as u64,
+            source_label: source_label.to_owned(),
+        });
+        Ok(())
+    }
+}
+
+fn is_cancelled(cancel: Option<&AtomicBool>) -> bool {
+    cancel.is_some_and(|flag| flag.load(Ordering::Relaxed))
+}
+
+fn part_paths(to: &Path) -> Result<(PathBuf, PathBuf)> {
+    let parent = to.parent().context("缺少下载目录")?;
+    let name = to
+        .file_name()
+        .and_then(|s| s.to_str())
+        .context("目标文件名无效")?;
+    Ok((
+        parent.join(format!("{name}.part")),
+        parent.join(format!("{name}.part.meta")),
+    ))
+}
+
+fn existing_resume_offset(part: &Path, meta: &Path, canonical_url: &str) -> u64 {
+    let Ok(recorded) = fs::read_to_string(meta) else {
+        return 0;
+    };
+    if recorded.trim() != canonical_url {
+        clear_part(part, meta);
+        return 0;
+    }
+    fs::metadata(part).map(|m| m.len()).unwrap_or(0)
+}
+
+fn clear_part(part: &Path, meta: &Path) {
+    let _ = fs::remove_file(part);
+    let _ = fs::remove_file(meta);
+}
+
+fn finalize_part(part: &Path, meta: &Path, to: &Path) -> Result<()> {
+    fs::rename(part, to)?;
+    let _ = fs::remove_file(meta);
+    Ok(())
+}
+
+fn parse_content_range(value: &str) -> Option<(u64, Option<u64>)> {
+    let rest = value.trim().strip_prefix("bytes ")?.trim();
+    let (range_part, total_part) = rest.split_once('/')?;
+    let (start_str, _end_str) = range_part.split_once('-')?;
+    let start = start_str.trim().parse::<u64>().ok()?;
+    let total = if total_part.trim() == "*" {
+        None
+    } else {
+        Some(total_part.trim().parse::<u64>().ok()?)
+    };
+    Some((start, total))
+}
+
+fn parse_unsatisfied_total(value: &str) -> Option<u64> {
+    let rest = value.trim().strip_prefix("bytes ")?.trim();
+    let (range_part, total_part) = rest.split_once('/')?;
+    if range_part.trim() != "*" {
+        return None;
+    }
+    total_part.trim().parse::<u64>().ok()
 }
 fn select(all: Vec<Release>, channel: &str, arch: Architecture) -> Result<(String, String)> {
     let selected = all
@@ -271,6 +529,20 @@ pub fn prepare(
     mirror: Option<&str>,
     local: Option<&Path>,
 ) -> Result<(PathBuf, Manifest)> {
+    prepare_with_options(s, version, channel, mirror, None, local, None, &mut |_| {})
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn prepare_with_options(
+    s: &Settings,
+    version: &str,
+    channel: &str,
+    mirror: Option<&str>,
+    proxy: Option<&str>,
+    local: Option<&Path>,
+    cancel: Option<&AtomicBool>,
+    on_progress: &mut dyn FnMut(DownloadProgress),
+) -> Result<(PathBuf, Manifest)> {
     let arch = Architecture::current()?;
     let cache = s.root.join("releases");
     fs::create_dir_all(&cache)?;
@@ -287,20 +559,36 @@ pub fn prepare(
             bail!("--bundle 必须是应用发布 tar.gz，旁边需有 SHA256SUMS")
         }
     } else {
-        let client = Client::new(mirror)?;
+        let client = Client::new_with_options(mirror, proxy)?;
         let (tag, url) = client.resolve(&s.repository, version, channel)?;
         let dir = cache.join(&tag);
         fs::create_dir_all(&dir)?;
-        client.download(
+        let sums = dir.join("SHA256SUMS");
+        client.download_with_progress(
             &format!(
                 "https://github.com/{}/releases/download/{tag}/SHA256SUMS",
                 s.repository
             ),
-            &dir.join("SHA256SUMS"),
+            &sums,
+            cancel,
+            &mut |_| {},
         )?;
         let archive = dir.join(arch.app_asset());
-        client.download(&url, &archive)?;
-        verify(&archive, &dir.join("SHA256SUMS"), arch.app_asset())?;
+        if archive.is_file() && verify(&archive, &sums, arch.app_asset()).is_ok() {
+            let size = fs::metadata(&archive)?.len();
+            on_progress(DownloadProgress {
+                downloaded_bytes: size,
+                total_bytes: Some(size),
+                speed_bytes_per_sec: 0,
+                source_label: "本地已校验缓存".to_owned(),
+            });
+        } else {
+            client.download_with_progress(&url, &archive, cancel, on_progress)?;
+            if let Err(e) = verify(&archive, &sums, arch.app_asset()) {
+                let _ = fs::remove_file(&archive);
+                return Err(e);
+            }
+        }
         let stage = dir.join(format!("package-{}", rand::random::<u64>()));
         unpack(&archive, &stage)?;
         (stage, Some(tag))
@@ -543,5 +831,46 @@ mod selection_tests {
             .unwrap();
         b.into_inner().unwrap().finish().unwrap();
         assert!(unpack(&archive, &d.path().join("output")).is_err());
+    }
+    #[test]
+    fn content_range_and_resume_helpers_behave() {
+        assert_eq!(
+            parse_content_range("bytes 1024-2047/4096"),
+            Some((1024, Some(4096)))
+        );
+        assert_eq!(parse_content_range("bytes 0-99/*"), Some((0, None)));
+        assert_eq!(parse_content_range("items 0-99/100"), None);
+        assert_eq!(parse_unsatisfied_total("bytes */4096"), Some(4096));
+        assert_eq!(parse_unsatisfied_total("bytes 0-1/4096"), None);
+
+        let d = tempfile::tempdir().unwrap();
+        let target = d.path().join("pkg.tar.gz");
+        let (part, meta) = part_paths(&target).unwrap();
+        fs::write(&part, b"12345").unwrap();
+        fs::write(&meta, b"https://example.com/a.tar.gz").unwrap();
+        assert_eq!(
+            existing_resume_offset(&part, &meta, "https://example.com/a.tar.gz"),
+            5
+        );
+        assert_eq!(
+            existing_resume_offset(&part, &meta, "https://example.com/b.tar.gz"),
+            0
+        );
+        assert!(!part.exists() && !meta.exists());
+    }
+    #[test]
+    fn client_validates_mirror_and_proxy_options() {
+        assert!(Client::new_with_options(Some("https://ghfast.top/"), None).is_ok());
+        assert!(Client::new_with_options(Some("http://ghfast.top"), None).is_err());
+        assert!(Client::new_with_options(None, Some("http://127.0.0.1:7890")).is_ok());
+        assert!(Client::new_with_options(None, Some("socks5://127.0.0.1:1080")).is_err());
+        let client =
+            Client::new_with_options(Some("https://ghfast.top"), Some("http://127.0.0.1:7890"))
+                .unwrap();
+        assert_eq!(
+            client.source_label(Some("https://ghfast.top")),
+            "代理 -> 镜像 (ghfast.top)"
+        );
+        assert_eq!(client.source_label(None), "代理 -> GitHub");
     }
 }

@@ -5,6 +5,7 @@ import {
   Action,
   Autocomplete,
   ConfirmDialog,
+  LinearProgress,
   SelectField,
   TextField,
 } from "@mail-web/ui";
@@ -26,6 +27,13 @@ const endpoint = "/admin/deployment";
 const finished = (job: Job) =>
   ["succeeded", "recovered", "failed"].includes(job.phase);
 const date = (value: number) => new Date(value).toLocaleString();
+const formatBytes = (value: number) => {
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KiB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MiB`;
+};
+const slowSpeedBytes = 150 * 1024;
+const defaultMirrorPreset = "https://ghfast.top";
 const unavailable: Record<string, string> = {
   unsupported_tag: "标签格式不受支持",
   missing_platform_bundle: "缺少本机架构的安装包",
@@ -53,6 +61,12 @@ export function Versions() {
   const [rollback, setRollback] = useState("");
   const [confirm, setConfirm] = useState<Selection | null>(null);
   const [busy, setBusy] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [mirrorInput, setMirrorInput] = useState("");
+  const [proxyInput, setProxyInput] = useState("");
+  const [configDirty, setConfigDirty] = useState(false);
+  const [configFeedback, setConfigFeedback] = useState("");
   const [notice, setNotice] = useState("");
   const [refresh, setRefresh] = useState(0);
   const jobId = job?.id;
@@ -77,6 +91,10 @@ export function Versions() {
           if (controller.signal.aborted) return;
           setView(result);
           if (result.inventory.job) setJob(result.inventory.job);
+          if (!configDirty) {
+            setMirrorInput(result.inventory.downloadMirror ?? "");
+            setProxyInput(result.inventory.releaseProxy ?? "");
+          }
           setNotice("");
         }
       } catch (error) {
@@ -134,7 +152,65 @@ export function Versions() {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [jobId, active, refresh]);
+  }, [jobId, active, refresh, configDirty]);
+
+  async function saveDownloadConfig() {
+    if (!view) return;
+    setSavingConfig(true);
+    setConfigFeedback("");
+    setNotice("");
+    try {
+      const saved = await api<components["schemas"]["DownloadConfig"]>(
+        endpoint + "/settings",
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            downloadMirror: mirrorInput.trim() || null,
+            releaseProxy: proxyInput.trim() || null,
+          }),
+        },
+      );
+      setMirrorInput(saved.downloadMirror ?? "");
+      setProxyInput(saved.releaseProxy ?? "");
+      setConfigDirty(false);
+      setView((old) =>
+        old
+          ? {
+              ...old,
+              inventory: {
+                ...old.inventory,
+                downloadMirror: saved.downloadMirror ?? null,
+                releaseProxy: saved.releaseProxy ?? null,
+              },
+            }
+          : old,
+      );
+      setConfigFeedback("下载加速与代理设置已保存，正在刷新版本列表。");
+      setRefresh((v) => v + 1);
+    } catch (error) {
+      setNotice(errorMessage(error));
+    } finally {
+      setSavingConfig(false);
+    }
+  }
+
+  async function cancelActiveJob() {
+    if (!job) return;
+    setCancelling(true);
+    setNotice("");
+    try {
+      const updated = await api<Job>(
+        endpoint + "/jobs/" + job.id + "/cancel",
+        { method: "POST" },
+      );
+      setJob(updated);
+      setNotice("已发送取消请求，正在安全停止下载（已下载分片会保留）。");
+    } catch (error) {
+      setNotice(errorMessage(error));
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   async function start(action: Selection) {
     if (!view) return;
@@ -150,6 +226,7 @@ export function Versions() {
       target:
         typeof action.target === "string" ? action.target : action.target.id,
       confirmDataRestore: action.operation !== "update",
+      downloadMirror: view.inventory.downloadMirror ?? null,
     };
     try {
       setJob(
@@ -367,6 +444,74 @@ export function Versions() {
                   </Action>
                 </div>
               )}
+              <div className={styles.networkConfig}>
+                <h3>下载加速与代理设置</h3>
+                <p className={styles.hint}>
+                  用于加速 GitHub 发布清单查询与升级包下载；所有包仍会强制校验 SHA-256 与源码提交。
+                </p>
+                <div className={styles.networkFields}>
+                  <TextField
+                    label="GitHub 下载加速镜像 URL"
+                    placeholder={`例如 ${defaultMirrorPreset}`}
+                    value={mirrorInput}
+                    disabled={blocked || savingConfig}
+                    onChange={(event) => {
+                      setMirrorInput(event.target.value);
+                      setConfigDirty(true);
+                      setConfigFeedback("");
+                    }}
+                  />
+                  <TextField
+                    label="网络代理 URL（HTTP/HTTPS）"
+                    placeholder="例如 http://127.0.0.1:7890"
+                    value={proxyInput}
+                    disabled={blocked || savingConfig}
+                    onChange={(event) => {
+                      setProxyInput(event.target.value);
+                      setConfigDirty(true);
+                      setConfigFeedback("");
+                    }}
+                  />
+                </div>
+                <div className={styles.networkActions}>
+                  <Action
+                    variant="secondary"
+                    size="sm"
+                    disabled={blocked || savingConfig}
+                    onPress={() => void saveDownloadConfig()}
+                  >
+                    {savingConfig ? "正在保存…" : "保存下载设置"}
+                  </Action>
+                  <Action
+                    variant="quiet"
+                    size="sm"
+                    disabled={blocked || savingConfig}
+                    onPress={() => {
+                      setMirrorInput(defaultMirrorPreset);
+                      setConfigDirty(true);
+                      setConfigFeedback("");
+                    }}
+                  >
+                    填入 ghfast.top
+                  </Action>
+                  <Action
+                    variant="quiet"
+                    size="sm"
+                    disabled={blocked || savingConfig}
+                    onPress={() => {
+                      setMirrorInput("");
+                      setProxyInput("");
+                      setConfigDirty(true);
+                      setConfigFeedback("");
+                    }}
+                  >
+                    恢复直连
+                  </Action>
+                </div>
+                {configFeedback && (
+                  <p className={styles.hint}>{configFeedback}</p>
+                )}
+              </div>
             </div>
           </>
         ) : (
@@ -380,6 +525,56 @@ export function Versions() {
             {job.targetVersion} · {phases[job.phase]}
           </p>
           <p>{job.message}</p>
+          {(job.phase === "download" || job.downloadedBytes != null) && (
+            <div className={styles.progressBlock}>
+              {(() => {
+                const downloaded = job.downloadedBytes ?? 0;
+                const total = job.totalBytes ?? null;
+                const percent =
+                  total && total > 0
+                    ? Math.min(100, Math.round((downloaded / total) * 100))
+                    : null;
+                return (
+                  <>
+                    <LinearProgress
+                      aria-label="下载进度"
+                      variant={percent === null ? "indeterminate" : "determinate"}
+                      value={percent ?? 0}
+                    />
+                    <p className={styles.progressMeta}>
+                      已下载 {formatBytes(downloaded)}
+                      {total != null ? ` / ${formatBytes(total)}` : ""}
+                      {percent !== null ? ` (${percent}%)` : ""}
+                      {job.phase === "download" && job.speedBytesPerSec != null
+                        ? ` · ${formatBytes(job.speedBytesPerSec)}/s`
+                        : ""}
+                      {job.sourceLabel ? ` · 来源：${job.sourceLabel}` : ""}
+                    </p>
+                    {job.phase === "download" &&
+                      job.speedBytesPerSec != null &&
+                      job.speedBytesPerSec > 0 &&
+                      job.speedBytesPerSec < slowSpeedBytes && (
+                        <p className={styles.hint}>
+                          当前下载较慢，可先取消下载并在上方配置加速镜像或代理；已下载分片会自动断点续传。
+                        </p>
+                      )}
+                  </>
+                );
+              })()}
+            </div>
+          )}
+          {(job.phase === "queued" || job.phase === "download") && (
+            <div className={styles.progressActions}>
+              <Action
+                variant="quiet"
+                size="sm"
+                disabled={cancelling}
+                onPress={() => void cancelActiveJob()}
+              >
+                {cancelling ? "正在取消…" : "取消下载"}
+              </Action>
+            </div>
+          )}
           {job.runningVersion && <p>实际运行版本 {job.runningVersion}</p>}
           {job.recoveryCommand && (
             <p>

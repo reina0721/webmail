@@ -2,8 +2,9 @@ use super::*;
 #[cfg(unix)]
 use mailweb_shared::deployment::MAX_RESPONSE;
 use mailweb_shared::deployment::{
-    GithubRelease, Inventory, Job, PublishedVersion, Request, Submit, exact_version,
-    release_catalog, valid_repository,
+    DownloadConfig, GithubRelease, Inventory, Job, PublishedVersion, Request, Submit,
+    exact_version, normalize_download_mirror, normalize_release_proxy, release_catalog,
+    valid_repository,
 };
 use serde::de::DeserializeOwned;
 use std::{
@@ -130,8 +131,13 @@ struct Reply<T> {
 pub(super) fn routes() -> Router<Arc<App>> {
     Router::new()
         .route("/admin/deployment", get(status))
+        .route(
+            "/admin/deployment/settings",
+            axum::routing::put(save_download_config),
+        )
         .route("/admin/deployment/jobs", post(submit))
         .route("/admin/deployment/jobs/{id}", get(job))
+        .route("/admin/deployment/jobs/{id}/cancel", post(cancel))
         .layer(axum::extract::DefaultBodyLimit::max(
             mailweb_shared::deployment::MAX_REQUEST as usize,
         ))
@@ -232,13 +238,15 @@ pub(super) async fn status(
     }))
 }
 
-#[utoipa::path(post,path="/api/v1/admin/deployment/jobs",operation_id="submit_deployment_job",request_body=Submit,responses((status=202,body=Job),(status=403,description="Operator required"),(status=409,description="Host rejected the operation"),(status=503,description="Version manager unavailable")))]
+#[utoipa::path(post,path="/api/v1/admin/deployment/jobs",operation_id="submit_deployment_job",request_body=Submit,responses((status=202,body=Job),(status=400,description="Invalid download mirror"),(status=403,description="Operator required"),(status=409,description="Host rejected the operation"),(status=503,description="Version manager unavailable")))]
 pub(super) async fn submit(
     State(app): State<Arc<App>>,
     headers: HeaderMap,
-    Json(job): Json<Submit>,
+    Json(mut job): Json<Submit>,
 ) -> Result<Response> {
     let actor = operator(&app, &headers, true).await?;
+    job.download_mirror = normalize_download_mirror(job.download_mirror.as_deref())
+        .map_err(|code| Error(StatusCode::BAD_REQUEST, code))?;
     let result = host::<Job>(Request::Submit {
         job,
         actor: actor.user.to_string(),
@@ -266,4 +274,48 @@ pub(super) async fn job(
         .data
         .map(Json)
         .ok_or(Error(StatusCode::NOT_FOUND, "version_job_not_found"))
+}
+
+#[utoipa::path(post,path="/api/v1/admin/deployment/jobs/{id}/cancel",operation_id="cancel_deployment_job",params(("id"=String,Path)),responses((status=200,body=Job),(status=403,description="Operator required"),(status=409,description="Job cannot be cancelled"),(status=503,description="Version manager unavailable")))]
+pub(super) async fn cancel(
+    State(app): State<Arc<App>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<Response> {
+    operator(&app, &headers, true).await?;
+    let result = host::<Job>(Request::Cancel { id }).await?;
+    if let Some(data) = result.data {
+        return Ok((StatusCode::OK, Json(data)).into_response());
+    }
+    Ok((
+        StatusCode::CONFLICT,
+        Json(json!({"code":"version_job_rejected","message":result.error.unwrap_or_default()})),
+    )
+        .into_response())
+}
+
+#[utoipa::path(put,path="/api/v1/admin/deployment/settings",operation_id="save_deployment_settings",request_body=DownloadConfig,responses((status=200,body=DownloadConfig),(status=400,description="Invalid download mirror or proxy"),(status=403,description="Operator required"),(status=409,description="Host rejected configuration"),(status=503,description="Version manager unavailable")))]
+pub(super) async fn save_download_config(
+    State(app): State<Arc<App>>,
+    headers: HeaderMap,
+    Json(payload): Json<DownloadConfig>,
+) -> Result<Response> {
+    operator(&app, &headers, true).await?;
+    let download_mirror = normalize_download_mirror(payload.download_mirror.as_deref())
+        .map_err(|code| Error(StatusCode::BAD_REQUEST, code))?;
+    let release_proxy = normalize_release_proxy(payload.release_proxy.as_deref())
+        .map_err(|code| Error(StatusCode::BAD_REQUEST, code))?;
+    let result = host::<DownloadConfig>(Request::SetDownloadConfig {
+        download_mirror,
+        release_proxy,
+    })
+    .await?;
+    if let Some(data) = result.data {
+        return Ok((StatusCode::OK, Json(data)).into_response());
+    }
+    Ok((
+        StatusCode::CONFLICT,
+        Json(json!({"code":"version_job_rejected","message":result.error.unwrap_or_default()})),
+    )
+        .into_response())
 }

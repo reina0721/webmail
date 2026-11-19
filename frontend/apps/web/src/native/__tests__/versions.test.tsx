@@ -126,3 +126,88 @@ it("keeps the search text while the selected release is refreshed in the backgro
     vi.useRealTimers();
   }
 });
+
+it("displays download progress with cancel action and persists mirror/proxy settings", async () => {
+  const view = inventory(26);
+  const jobId = "d".repeat(32);
+  let currentJob: components["schemas"]["Job"] = {
+    id: jobId,
+    operation: "update",
+    targetVersion: "v0.4.0-alpha.18",
+    phase: "download",
+    message: "正在下载发布包",
+    downloadedBytes: 50 * 1024 * 1024,
+    totalBytes: 100 * 1024 * 1024,
+    speedBytesPerSec: 30 * 1024,
+    sourceLabel: "GitHub 直连",
+  };
+  let savedConfig: components["schemas"]["DownloadConfig"] = {
+    downloadMirror: null,
+    releaseProxy: null,
+  };
+  request.mockImplementation(async (path: string, options?: RequestInit) => {
+    if (path === "/admin/deployment") {
+      return {
+        ...view,
+        inventory: {
+          ...view.inventory,
+          downloadMirror: savedConfig.downloadMirror ?? null,
+          releaseProxy: savedConfig.releaseProxy ?? null,
+          job: currentJob,
+        },
+      };
+    }
+    if (path === `/admin/deployment/jobs/${jobId}`) {
+      return currentJob;
+    }
+    if (path === `/admin/deployment/jobs/${jobId}/cancel`) {
+      currentJob = {
+        ...currentJob,
+        phase: "failed",
+        speedBytesPerSec: null,
+        message: "下载已取消，已保留断点数据，可修改镜像或代理后重试",
+      };
+      return currentJob;
+    }
+    if (path === "/admin/deployment/settings" && options?.method === "PUT") {
+      savedConfig = JSON.parse(String(options.body));
+      return savedConfig;
+    }
+    return {};
+  });
+
+  render(<Versions />);
+  const progress = await screen.findByRole("progressbar", { name: "下载进度" });
+  expect(progress).toHaveAttribute("aria-valuenow", "50");
+  expect(
+    screen.getByText(/已下载 50\.0 MiB \/ 100\.0 MiB \(50%\) · 30\.0 KiB\/s · 来源：GitHub 直连/),
+  ).toBeInTheDocument();
+  expect(screen.getByText(/当前下载较慢/)).toBeInTheDocument();
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "取消下载" }));
+  });
+  expect(request).toHaveBeenCalledWith(
+    `/admin/deployment/jobs/${jobId}/cancel`,
+    { method: "POST" },
+  );
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "填入 ghfast.top" }));
+  });
+  const proxyField = screen.getByLabelText("网络代理 URL（HTTP/HTTPS）");
+  fireEvent.change(proxyField, { target: { value: "http://127.0.0.1:7890" } });
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "保存下载设置" }));
+  });
+  expect(request).toHaveBeenCalledWith("/admin/deployment/settings", {
+    method: "PUT",
+    body: JSON.stringify({
+      downloadMirror: "https://ghfast.top",
+      releaseProxy: "http://127.0.0.1:7890",
+    }),
+  });
+  expect(
+    await screen.findByText("下载加速与代理设置已保存，正在刷新版本列表。"),
+  ).toBeInTheDocument();
+});

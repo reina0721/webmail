@@ -4,7 +4,7 @@ use crate::{
     Cli, Command,
     config::{self, Settings},
     docker,
-    release::{self, Manifest},
+    release::{self, DownloadProgress, Manifest},
 };
 use anyhow::{Context, Result, bail, ensure};
 use mailweb_shared::deployment::Phase;
@@ -14,6 +14,7 @@ use std::{
     io::IsTerminal,
     path::{Path, PathBuf},
     process::Command as Process,
+    sync::atomic::AtomicBool,
 };
 const COMPOSE: &str = include_str!("../../../compose.yaml");
 const WRAPPER: &str = include_str!("../../../deploy/mail-web.sh");
@@ -111,9 +112,14 @@ pub fn run(cli: Cli) -> Result<()> {
             Ok(())
         }
         Command::Logs { follow, tail } => logs(&s, *follow, *tail),
-        Command::Doctor { network, fix } => {
-            doctor(&s, *network, *fix, cli.json, cli.download_mirror.as_deref())
-        }
+        Command::Doctor { network, fix } => doctor(
+            &s,
+            *network,
+            *fix,
+            cli.json,
+            resolve_download_mirror(&s, &cli),
+            resolve_release_proxy(&s, &cli),
+        ),
         Command::Backup => {
             let path = backup(&s, true)?;
             println!("{}", path.display());
@@ -130,11 +136,11 @@ pub fn run(cli: Cli) -> Result<()> {
             setup(&s, false, false)
         }
         Command::CheckUpdate { version } => {
-            let (tag, _) = release::Client::new(cli.download_mirror.as_deref())?.resolve(
-                &s.repository,
-                version,
-                &cli.channel,
-            )?;
+            let (tag, _) = release::Client::new_with_options(
+                resolve_download_mirror(&s, &cli),
+                resolve_release_proxy(&s, &cli),
+            )?
+            .resolve(&s.repository, version, &cli.channel)?;
             println!("{tag}");
             Ok(())
         }
@@ -258,6 +264,14 @@ fn ensure_not_downgrade(s: &Settings, version: &str) -> Result<()> {
     }
     Ok(())
 }
+pub(crate) fn resolve_download_mirror<'a>(s: &'a Settings, cli: &'a Cli) -> Option<&'a str> {
+    cli.download_mirror
+        .as_deref()
+        .or_else(|| s.download_mirror())
+}
+pub(crate) fn resolve_release_proxy<'a>(s: &'a Settings, cli: &'a Cli) -> Option<&'a str> {
+    cli.release_proxy.as_deref().or_else(|| s.release_proxy())
+}
 pub(crate) fn install(
     s: &mut Settings,
     old: &Settings,
@@ -266,18 +280,36 @@ pub(crate) fn install(
     bundle: Option<&Path>,
     progress: &mut dyn FnMut(Phase, Option<&Path>) -> Result<()>,
 ) -> Result<()> {
+    install_managed(s, old, cli, version, bundle, None, progress, &mut |_| {})
+}
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn install_managed(
+    s: &mut Settings,
+    old: &Settings,
+    cli: &Cli,
+    version: &str,
+    bundle: Option<&Path>,
+    cancel: Option<&AtomicBool>,
+    progress: &mut dyn FnMut(Phase, Option<&Path>) -> Result<()>,
+    on_download: &mut dyn FnMut(DownloadProgress),
+) -> Result<()> {
     if !matches!(cli.command, Command::Update { .. }) {
         config::wizard(s, cli)?;
     }
     let origin = desired_origin(s, old, cli)?;
     preflight(old, s, cli)?;
     progress(Phase::Download, None)?;
-    let (package, mut manifest) = release::prepare(
+    let mirror = resolve_download_mirror(s, cli).map(str::to_owned);
+    let proxy = resolve_release_proxy(s, cli).map(str::to_owned);
+    let (package, mut manifest) = release::prepare_with_options(
         s,
         version,
         &cli.channel,
-        cli.download_mirror.as_deref(),
+        mirror.as_deref(),
+        proxy.as_deref(),
         bundle,
+        cancel,
+        on_download,
     )?;
     progress(Phase::Verify, None)?;
     ensure_not_downgrade(s, &manifest.version)?;
@@ -418,7 +450,9 @@ fn install_cli(s: &Settings, source: Option<&Path>) -> Result<()> {
             && String::from_utf8_lossy(&output.stdout).starts_with("mailwebctl "),
         "包内管理 CLI 无效"
     );
-    config::atomic(&s.root.join("bin/mailwebctl"), &fs::read(source)?, 0o755)?;
+    let bytes = fs::read(source)?;
+    config::atomic(&s.root.join("bin/mailwebctl"), &bytes, 0o755)?;
+    sync_version_manager_binary(s, &bytes)?;
     // Relative symlink, adapted from DSH's project-root launcher.
     let launcher = s.root.join("mailweb");
     if launcher.exists() || launcher.is_symlink() {
@@ -438,6 +472,16 @@ fn install_cli(s: &Settings, source: Option<&Path>) -> Result<()> {
         0o755,
     )?;
     Ok(())
+}
+fn sync_version_manager_binary(s: &Settings, bytes: &[u8]) -> Result<()> {
+    let target = s.root.join("bin/mailweb-version-manager");
+    if !target.exists() {
+        return Ok(());
+    }
+    if fs::read(&target).ok().as_deref() == Some(bytes) {
+        return Ok(());
+    }
+    config::atomic(&target, bytes, 0o755)
 }
 fn configure(s: &mut Settings, old: &Settings, cli: &Cli) -> Result<()> {
     ensure!(old.root.join(".env").exists(), "尚未安装");
@@ -551,6 +595,7 @@ fn doctor(
     fix: bool,
     json_output: bool,
     mirror: Option<&str>,
+    proxy: Option<&str>,
 ) -> Result<()> {
     if fix {
         s.permissions()?
@@ -561,7 +606,7 @@ fn doctor(
     checks.push(json!({"check":"compose-config","passed":docker::compose(s,&["config","--quiet"],true).is_ok()}));
     checks.push(json!({"check":"managed-paths","passed":(["config","secrets","data","logs","backups","bin"].iter().all(|p|config::safe_tree(&s.root.join(p)).is_ok()))}));
     if network {
-        checks.push(json!({"check":"release-network","passed":release::Client::new(mirror)?.resolve(&s.repository,"latest","latest").is_ok()}))
+        checks.push(json!({"check":"release-network","passed":release::Client::new_with_options(mirror, proxy)?.resolve(&s.repository,"latest","latest").is_ok()}))
     }
     let good = checks.iter().all(|c| c["passed"] == true);
     if json_output {
@@ -1012,7 +1057,10 @@ fn restore(s: &Settings, snapshot: &Path, cli: &Cli) -> Result<()> {
     Ok(())
 }
 fn self_update(s: &Settings, cli: &Cli, version: &str) -> Result<()> {
-    let c = release::Client::new(cli.download_mirror.as_deref())?;
+    let c = release::Client::new_with_options(
+        resolve_download_mirror(s, cli),
+        resolve_release_proxy(s, cli),
+    )?;
     let (tag, _) = c.resolve(&s.repository, version, &cli.channel)?;
     let base = format!(
         "https://github.com/{}/releases/download/{tag}",

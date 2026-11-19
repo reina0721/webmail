@@ -24,6 +24,18 @@ pub struct Submit {
     pub target: String,
     #[serde(default)]
     pub confirm_data_restore: bool,
+    #[serde(default)]
+    pub download_mirror: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct DownloadConfig {
+    #[serde(default)]
+    pub download_mirror: Option<String>,
+    #[serde(default)]
+    pub release_proxy: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -31,8 +43,65 @@ pub struct Submit {
 pub enum Request {
     Status,
     Catalog,
-    Submit { job: Submit, actor: String },
-    Job { id: String },
+    Submit {
+        job: Submit,
+        actor: String,
+    },
+    Job {
+        id: String,
+    },
+    Cancel {
+        id: String,
+    },
+    SetDownloadConfig {
+        download_mirror: Option<String>,
+        release_proxy: Option<String>,
+    },
+}
+
+pub fn normalize_download_mirror(raw: Option<&str>) -> Result<Option<String>, &'static str> {
+    let Some(value) = raw.map(str::trim).filter(|v| !v.is_empty()) else {
+        return Ok(None);
+    };
+    if value.len() > 256
+        || value.chars().any(|c| c.is_whitespace() || c.is_control())
+        || value.contains('@')
+        || value.contains('?')
+        || value.contains('#')
+    {
+        return Err("download_mirror_invalid");
+    }
+    let Some(rest) = value.strip_prefix("https://") else {
+        return Err("download_mirror_invalid");
+    };
+    let host = rest.split('/').next().unwrap_or("");
+    if host.is_empty() {
+        return Err("download_mirror_invalid");
+    }
+    Ok(Some(value.trim_end_matches('/').to_owned()))
+}
+
+pub fn normalize_release_proxy(raw: Option<&str>) -> Result<Option<String>, &'static str> {
+    let Some(value) = raw.map(str::trim).filter(|v| !v.is_empty()) else {
+        return Ok(None);
+    };
+    if value.len() > 256
+        || value.chars().any(|c| c.is_whitespace() || c.is_control())
+        || value.contains('?')
+        || value.contains('#')
+    {
+        return Err("release_proxy_invalid");
+    }
+    let rest = value
+        .strip_prefix("http://")
+        .or_else(|| value.strip_prefix("https://"))
+        .ok_or("release_proxy_invalid")?;
+    let authority = rest.split('/').next().unwrap_or("");
+    let host = authority.rsplit('@').next().unwrap_or("");
+    if host.is_empty() {
+        return Err("release_proxy_invalid");
+    }
+    Ok(Some(value.trim_end_matches('/').to_owned()))
 }
 
 pub fn valid_repository(value: &str) -> bool {
@@ -156,6 +225,14 @@ pub struct Job {
     pub message: String,
     pub running_version: Option<String>,
     pub recovery_command: Option<String>,
+    #[serde(default)]
+    pub downloaded_bytes: Option<u64>,
+    #[serde(default)]
+    pub total_bytes: Option<u64>,
+    #[serde(default)]
+    pub speed_bytes_per_sec: Option<u64>,
+    #[serde(default)]
+    pub source_label: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -168,6 +245,10 @@ pub struct Inventory {
     pub job: Option<Job>,
     #[serde(default)]
     pub historical_switch: bool,
+    #[serde(default)]
+    pub download_mirror: Option<String>,
+    #[serde(default)]
+    pub release_proxy: Option<String>,
 }
 
 #[cfg(test)]

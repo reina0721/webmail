@@ -77,9 +77,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'pnpm'
-          cache-dependency-path: frontend/pnpm-lock.yaml
-      - run: corepack enable && corepack prepare pnpm@10.22.0 --activate
+      - id: pnpm-cache
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.22.0 --activate
+          echo "store=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.store }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-${{ runner.os }}-
       - run: pnpm install --frozen-lockfile
         working-directory: frontend
       - name: Check repository, boundaries, and frontend types

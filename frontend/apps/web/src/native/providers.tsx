@@ -1,5 +1,6 @@
 'use client';
 import {ServiceWorkerRegistration} from '@/components/service-worker-registration';
+import {FaviconBadge} from '@/components/favicon-badge';
 import {AppLockGate} from '@/components/app-lock/app-lock-gate';
 import {useEffect,type ReactNode} from 'react';
 import {configureAccountContext} from '@platform/lib/api';
@@ -35,4 +36,4 @@ function SessionContext(){
  useEffect(()=>{if(username&&isNativeServer(server))void useAuthStore.getState().checkAuth().catch(()=>{});},[username,server]);
  useEffect(()=>{let live=true;useNativeSession.getState().setOperator(false);if(!username||!isNativeServer(server))return;void nativeFetch('/api/v1/auth/session',{headers:{'X-Mail-Account':username}}).then(async r=>{if(!r.ok)throw new Error('Session unavailable');const session=await r.json();if(live)useNativeSession.getState().setOperator(session.operator===true);}).catch(()=>{});return()=>{live=false;};},[username,server]);return null;
 }
-export function NativeProviders({children}:{children:ReactNode}){return <PlatformProviders><IntlProvider locale="zh" messages={catalog}><ThemeProvider><AppLockGate><CalendarAlertProvider><RateLimitToastProvider><TourProvider><ProtocolLaunchHandlerProvider><SessionContext/><NativeWebHosts/>{children}<AccountTemplateSync/><AccessibilityQuickPanelHost/><QuickRuleHost/><PaneCycleHost/><FocusRescueHost/><ExternalRecipientConfirmHost/><DeferredMailTransferHost/><DeferredFileDropHost/><DeferredOfflineHost/><ServiceWorkerRegistration/></ProtocolLaunchHandlerProvider></TourProvider></RateLimitToastProvider></CalendarAlertProvider></AppLockGate></ThemeProvider></IntlProvider></PlatformProviders>;}
+export function NativeProviders({children}:{children:ReactNode}){return <PlatformProviders><IntlProvider locale="zh" messages={catalog}><ThemeProvider><AppLockGate><CalendarAlertProvider><RateLimitToastProvider><TourProvider><ProtocolLaunchHandlerProvider><SessionContext/><NativeWebHosts/>{children}<AccountTemplateSync/><AccessibilityQuickPanelHost/><QuickRuleHost/><PaneCycleHost/><FocusRescueHost/><ExternalRecipientConfirmHost/><DeferredMailTransferHost/><DeferredFileDropHost/><DeferredOfflineHost/><ServiceWorkerRegistration/><FaviconBadge/></ProtocolLaunchHandlerProvider></TourProvider></RateLimitToastProvider></CalendarAlertProvider></AppLockGate></ThemeProvider></IntlProvider></PlatformProviders>;}

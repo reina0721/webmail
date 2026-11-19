@@ -34,6 +34,7 @@ import {
   Typography,
   Box,
   Autocomplete,
+  Slider,
 } from "@mui/material";
 export {
   Box,
@@ -395,11 +396,13 @@ export function SwitchField({
 export function FileField({
   label,
   hint,
+  accept,
   disabled,
   onFile,
 }: {
   label: string;
   hint?: string;
+  accept?: string;
   disabled?: boolean;
   onFile: (file: File) => void;
 }) {
@@ -417,6 +420,7 @@ export function FileField({
           id={id}
           hidden
           type="file"
+          accept={accept}
           disabled={disabled}
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -428,9 +432,63 @@ export function FileField({
       {hint && (
         <Typography
           variant="caption"
-          sx={{ display: "block" }}
+          sx={{ display: "block", mt: 0.5 }}
           color="text.secondary"
         >
+          {hint}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+export function SliderField({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  unit = "",
+  hint,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  unit?: string;
+  hint?: string;
+  disabled?: boolean;
+  onChange: (value: number) => void;
+}) {
+  const id = useId();
+  return (
+    <Box sx={{ px: 0.5 }}>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
+        <Typography component="label" htmlFor={id} variant="body2" color="text.secondary">
+          {label}
+        </Typography>
+        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+          {value}
+          {unit}
+        </Typography>
+      </Box>
+      <Slider
+        id={id}
+        size="small"
+        value={value}
+        min={min}
+        max={max}
+        step={step}
+        disabled={disabled}
+        aria-label={label}
+        onChange={(_, v) => {
+          if (typeof v === "number") onChange(v);
+        }}
+      />
+      {hint && (
+        <Typography variant="caption" sx={{ display: "block" }} color="text.secondary">
           {hint}
         </Typography>
       )}

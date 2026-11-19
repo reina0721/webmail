@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Mail Web Backdrop">
+  <defs>
+    <linearGradient id="bg-base" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff4f8"/>
+      <stop offset="45%" stop-color="#fae2ee"/>
+      <stop offset="100%" stop-color="#ebd5f0"/>
+    </linearGradient>
+    <radialGradient id="glow-a" cx="22%" cy="18%" r="55%">
+      <stop offset="0%" stop-color="#f288ac" stop-opacity="0.52"/>
+      <stop offset="60%" stop-color="#f288ac" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#f288ac" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow-b" cx="82%" cy="76%" r="58%">
+      <stop offset="0%" stop-color="#c084cf" stop-opacity="0.46"/>
+      <stop offset="60%" stop-color="#c084cf" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#c084cf" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow-c" cx="62%" cy="22%" r="42%">
+      <stop offset="0%" stop-color="#ffd9c4" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ffd9c4" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="wave-1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#e36389" stop-opacity="0.14"/>
+    </linearGradient>
+    <linearGradient id="wave-2" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#d594e0" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.32"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="1000" fill="url(#bg-base)"/>
+  <rect width="1600" height="1000" fill="url(#glow-a)"/>
+  <rect width="1600" height="1000" fill="url(#glow-b)"/>
+  <rect width="1600" height="1000" fill="url(#glow-c)"/>
+  <path d="M-80 680 C 260 510, 580 790, 960 600 C 1280 440, 1450 560, 1680 430 L 1680 1060 L -80 1060 Z" fill="url(#wave-1)"/>
+  <path d="M-80 820 C 320 690, 680 910, 1080 740 C 1340 630, 1480 710, 1680 610 L 1680 1060 L -80 1060 Z" fill="url(#wave-2)"/>
+  <circle cx="1290" cy="240" r="190" fill="#ffffff" fill-opacity="0.24"/>
+  <circle cx="1290" cy="240" r="120" fill="#e36389" fill-opacity="0.08"/>
+  <circle cx="290" cy="790" r="150" fill="#ffffff" fill-opacity="0.18"/>
+</svg>

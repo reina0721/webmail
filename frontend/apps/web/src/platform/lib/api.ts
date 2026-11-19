@@ -59,6 +59,11 @@ export function errorCodeMessage(code:string,status?:number):string {
   turnstile_keys_changed:'Webmail 保存的 Site Key 已变更。请重新读取配置，再核对组件。',
   cloudflare_request_failed:'Cloudflare 拒绝了请求。请检查目标账号、Token 权限和组件可用的域名配额，再重试。',
   cloudflare_response_invalid:'Cloudflare 返回的组件资料不完整，暂时无法确认配置。请重新核对组件。',
+  site_url_invalid:'请填写以 / 开头或有效的 http://、https:// 链接（联系方式支持 mailto:），且不包含非法字符。',
+  site_asset_unsupported:'不支持的图片格式或存在不安全的 SVG 脚本内容，请改用 PNG、JPEG、WebP、ICO 或纯静态 SVG。',
+  site_asset_too_large:'上传图片超出体积限制（图标限 2 MiB，背景图与分享封面限 5 MiB）。',
+  site_asset_empty:'请选择非空图片文件后重试。',
+  site_asset_kind_invalid:'未知的站点媒体资源类型。',
  });
  return messages[code]??(status===429?'请求较频繁，请稍后重试':status===401?'登录已过期，请重新登录':status===403?'当前账号没有执行此操作的权限':'操作暂未完成，请稍后重试');
 }

@@ -4,6 +4,14 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+## [0.4.0-alpha.17] - 2026-11-19
+
+### Added
+
+- Add full runtime site branding, icon/logo uploads (stored in SQLite for read-only containers), dynamic `<head>` SEO/OpenGraph/Twitter/Canonical injection, `/favicon.ico`, `/manifest.webmanifest`, `/robots.txt`, and `/sitemap.xml`.
+- Add configurable login/registration/recovery background image, dim, blur, split/centered layout, titles, announcements, and footer/legal/support links with non-empty defaults and live preview in `/console/site/`.
+- Mount browser tab unread favicon badging in `NativeProviders`.
+
 ## [0.4.0-alpha.16] - 2026-11-18
 
 ### Changed

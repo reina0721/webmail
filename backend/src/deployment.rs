@@ -1,6 +1,8 @@
 use super::*;
+#[cfg(unix)]
+use mailweb_shared::deployment::MAX_RESPONSE;
 use mailweb_shared::deployment::{
-    GithubRelease, Inventory, Job, MAX_RESPONSE, PublishedVersion, Request, Submit, exact_version,
+    GithubRelease, Inventory, Job, PublishedVersion, Request, Submit, exact_version,
     release_catalog, valid_repository,
 };
 use serde::de::DeserializeOwned;
@@ -9,6 +11,7 @@ use std::{
     sync::LazyLock,
     time::{Duration, Instant},
 };
+#[cfg(unix)]
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[derive(Default)]
@@ -145,25 +148,33 @@ async fn operator(app: &App, headers: &HeaderMap, write: bool) -> Result<Identit
 async fn host<T: DeserializeOwned>(
     request: Request,
 ) -> std::result::Result<Reply<T>, ManagerIssue> {
-    tokio::time::timeout(Duration::from_secs(6), async move {
-        let mut stream =
-            tokio::net::UnixStream::connect("/run/mailweb-manager/control.sock").await?;
-        let mut bytes = serde_json::to_vec(&request).map_err(|_| ManagerIssue::Unavailable)?;
-        bytes.push(b'\n');
-        stream.write_all(&bytes).await?;
-        stream.shutdown().await?;
-        let mut result = Vec::new();
-        stream
-            .take(MAX_RESPONSE + 1)
-            .read_to_end(&mut result)
-            .await?;
-        if result.len() as u64 > MAX_RESPONSE {
-            return Err(ManagerIssue::Unavailable);
-        }
-        serde_json::from_slice(&result).map_err(|_| ManagerIssue::Unavailable)
-    })
-    .await
-    .unwrap_or(Err(ManagerIssue::Unavailable))
+    #[cfg(unix)]
+    {
+        tokio::time::timeout(Duration::from_secs(6), async move {
+            let mut stream =
+                tokio::net::UnixStream::connect("/run/mailweb-manager/control.sock").await?;
+            let mut bytes = serde_json::to_vec(&request).map_err(|_| ManagerIssue::Unavailable)?;
+            bytes.push(b'\n');
+            stream.write_all(&bytes).await?;
+            stream.shutdown().await?;
+            let mut result = Vec::new();
+            stream
+                .take(MAX_RESPONSE + 1)
+                .read_to_end(&mut result)
+                .await?;
+            if result.len() as u64 > MAX_RESPONSE {
+                return Err(ManagerIssue::Unavailable);
+            }
+            serde_json::from_slice(&result).map_err(|_| ManagerIssue::Unavailable)
+        })
+        .await
+        .unwrap_or(Err(ManagerIssue::Unavailable))
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = request;
+        Err(ManagerIssue::Unavailable)
+    }
 }
 
 async fn host_inventory() -> std::result::Result<Inventory, ManagerIssue> {

@@ -161,10 +161,11 @@ pub(super) async fn status(State(app): State<Arc<App>>) -> Result<Json<Installat
     let operators: i64 = db::scalar(db::Statement::InstallationOperatorCount)
         .fetch_one(&app.db)
         .await?;
+    let brand = site::resolved_brand(&app).await;
     Ok(Json(InstallationStatus {
         configured: configured(&app),
         needs_operator: operators == 0,
-        brand: app.services.brand.clone(),
+        brand,
         domain: app.services.domain.clone(),
         version: env!("CARGO_PKG_VERSION").into(),
         instance_id: INSTANCE_ID.clone(),
@@ -262,9 +263,10 @@ pub(super) async fn read_config(
 ) -> Result<Json<ConfigurationView>> {
     authorize(&app, &headers, false).await?;
     let s = &app.services;
+    let brand = site::resolved_brand(&app).await;
     Ok(Json(ConfigurationView {
         settings: ConfigurationInput {
-            brand: s.brand.clone(),
+            brand,
             domain: s.domain.clone(),
             public_origin: app.origin.clone(),
             stalwart_url: app.upstream.base.clone(),
@@ -368,8 +370,21 @@ pub(super) async fn update_site(
             })
         })
         .ok_or(Error(StatusCode::BAD_REQUEST, "setup_required"))?;
+    let synced_brand = input.brand.as_deref().map(str::trim).map(str::to_owned);
     apply_site_update(&mut saved, input)?;
+    if let Some(brand) = synced_brand {
+        site::sync_brand_override(&app, &brand).await?;
+    }
     save_runtime_and_reload(&app, &saved)
+}
+
+pub(crate) async fn quietly_update_brand(app: &App, brand: &str) -> Result<()> {
+    let _lock = CONFIG_LOCK.lock().await;
+    if let Ok(Some(mut saved)) = load(&app.vault) {
+        saved.services.brand = brand.to_owned();
+        persist(&app.vault, &saved)?;
+    }
+    Ok(())
 }
 
 fn apply_site_update(saved: &mut RuntimeConfig, input: SiteUpdate) -> Result<()> {

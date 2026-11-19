@@ -6,7 +6,7 @@
     "license": {
       "name": ""
     },
-    "version": "0.4.0-alpha.16"
+    "version": "0.4.0-alpha.17"
   },
   "paths": {
     "/api/push/action": {
@@ -625,6 +625,130 @@
           },
           "403": {
             "description": "Denied"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/site": {
+      "get": {
+        "tags": [
+          "site"
+        ],
+        "operationId": "admin_site",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteMetadata"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Operator required"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "site"
+        ],
+        "operationId": "save_admin_site",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteMetadataInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteMetadata"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid site configuration"
+          },
+          "401": {
+            "description": "Operator required"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/site/assets/{kind}": {
+      "post": {
+        "tags": [
+          "site"
+        ],
+        "operationId": "upload_asset",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteAssetUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid asset"
+          },
+          "401": {
+            "description": "Operator required"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "site"
+        ],
+        "operationId": "delete_asset",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteMetadata"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Operator required"
           }
         }
       }
@@ -2780,6 +2904,49 @@
         }
       }
     },
+    "/api/v1/site": {
+      "get": {
+        "tags": [
+          "site"
+        ],
+        "operationId": "public_site",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteMetadata"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/site/assets/{kind}": {
+      "get": {
+        "tags": [
+          "site"
+        ],
+        "operationId": "public_asset",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Site image asset"
+          }
+        }
+      }
+    },
     "/api/v1/submissions": {
       "post": {
         "tags": [
@@ -3766,6 +3933,379 @@
           },
           "operator": {
             "type": "boolean"
+          }
+        }
+      },
+      "SiteAssetUploadResponse": {
+        "type": "object",
+        "required": [
+          "kind",
+          "url",
+          "contentType"
+        ],
+        "properties": {
+          "contentType": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "SiteMetadata": {
+        "type": "object",
+        "required": [
+          "brand",
+          "shortName",
+          "tagline",
+          "organizationName",
+          "footerText",
+          "websiteUrl",
+          "faviconUrl",
+          "appleTouchIconUrl",
+          "appLogoLightUrl",
+          "appLogoDarkUrl",
+          "loginLogoLightUrl",
+          "loginLogoDarkUrl",
+          "authBackgroundUrl",
+          "authBackgroundDim",
+          "authBackgroundBlur",
+          "authLayout",
+          "authLoginTitle",
+          "authLoginSubtitle",
+          "authRegisterTitle",
+          "authRegisterSubtitle",
+          "authRecoveryTitle",
+          "authRecoverySubtitle",
+          "showAuthFooterLinks",
+          "seoTitle",
+          "seoDescription",
+          "seoKeywords",
+          "ogImageUrl",
+          "allowIndexing",
+          "themeColorLight",
+          "themeColorDark",
+          "pwaDisplay",
+          "helpUrl",
+          "supportUrl",
+          "privacyPolicyUrl",
+          "imprintUrl",
+          "sourceCodeUrl",
+          "accountManagementUrl",
+          "accountManagementLabel",
+          "announcementEnabled",
+          "announcementTone",
+          "announcementText"
+        ],
+        "properties": {
+          "accountManagementLabel": {
+            "type": "string"
+          },
+          "accountManagementUrl": {
+            "type": "string"
+          },
+          "allowIndexing": {
+            "type": "boolean"
+          },
+          "announcementEnabled": {
+            "type": "boolean"
+          },
+          "announcementText": {
+            "type": "string"
+          },
+          "announcementTone": {
+            "type": "string"
+          },
+          "appLogoDarkUrl": {
+            "type": "string"
+          },
+          "appLogoLightUrl": {
+            "type": "string"
+          },
+          "appleTouchIconUrl": {
+            "type": "string"
+          },
+          "authBackgroundBlur": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "authBackgroundDim": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "authBackgroundUrl": {
+            "type": "string"
+          },
+          "authLayout": {
+            "type": "string"
+          },
+          "authLoginSubtitle": {
+            "type": "string"
+          },
+          "authLoginTitle": {
+            "type": "string"
+          },
+          "authRecoverySubtitle": {
+            "type": "string"
+          },
+          "authRecoveryTitle": {
+            "type": "string"
+          },
+          "authRegisterSubtitle": {
+            "type": "string"
+          },
+          "authRegisterTitle": {
+            "type": "string"
+          },
+          "brand": {
+            "type": "string"
+          },
+          "faviconUrl": {
+            "type": "string"
+          },
+          "footerText": {
+            "type": "string"
+          },
+          "helpUrl": {
+            "type": "string"
+          },
+          "imprintUrl": {
+            "type": "string"
+          },
+          "loginLogoDarkUrl": {
+            "type": "string"
+          },
+          "loginLogoLightUrl": {
+            "type": "string"
+          },
+          "ogImageUrl": {
+            "type": "string"
+          },
+          "organizationName": {
+            "type": "string"
+          },
+          "privacyPolicyUrl": {
+            "type": "string"
+          },
+          "pwaDisplay": {
+            "type": "string"
+          },
+          "seoDescription": {
+            "type": "string"
+          },
+          "seoKeywords": {
+            "type": "string"
+          },
+          "seoTitle": {
+            "type": "string"
+          },
+          "shortName": {
+            "type": "string"
+          },
+          "showAuthFooterLinks": {
+            "type": "boolean"
+          },
+          "sourceCodeUrl": {
+            "type": "string"
+          },
+          "supportUrl": {
+            "type": "string"
+          },
+          "tagline": {
+            "type": "string"
+          },
+          "themeColorDark": {
+            "type": "string"
+          },
+          "themeColorLight": {
+            "type": "string"
+          },
+          "uploadedAssets": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "websiteUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "SiteMetadataInput": {
+        "type": "object",
+        "properties": {
+          "accountManagementLabel": {
+            "type": "string",
+            "default": ""
+          },
+          "accountManagementUrl": {
+            "type": "string",
+            "default": ""
+          },
+          "allowIndexing": {
+            "type": "boolean",
+            "default": false
+          },
+          "announcementEnabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "announcementText": {
+            "type": "string",
+            "default": ""
+          },
+          "announcementTone": {
+            "type": "string",
+            "default": ""
+          },
+          "appLogoDarkUrl": {
+            "type": "string",
+            "default": ""
+          },
+          "appLogoLightUrl": {
+            "type": "string",
+            "default": ""
+          },
+          "appleTouchIconUrl": {
+            "type": "string",
+            "default": ""
+          },
+          "authBackgroundBlur": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0,
+            "minimum": 0
+          },
+          "authBackgroundDim": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0,
+            "minimum": 0
+          },
+          "authBackgroundUrl": {
+            "type": "string",
+            "default": ""
+          },
+          "authLayout": {
+            "type": "string",
+            "default": ""
+          },
+          "authLoginSubtitle": {
+            "type": "string",
+            "default": ""
+          },
+          "authLoginTitle": {
+            "type": "string",
+            "default": ""
+          },
+          "authRecoverySubtitle": {
+            "type": "string",
+            "default": ""
+          },
+          "authRecoveryTitle": {
+            "type": "string",
+            "default": ""
+          },
+          "authRegisterSubtitle": {
+            "type": "string",
+            "default": ""
+          },
+          "authRegisterTitle": {
+            "type": "string",
+            "default": ""
+          },
+          "brand": {
+            "type": "string",
+            "default": ""
+          },
+          "faviconUrl": {
+            "type": "string",
+            "default": ""
+          },
+          "footerText": {
+            "type": "string",
+            "default": ""
+          },
+          "helpUrl": {
+            "type": "string",
+            "default": ""
+          },
+          "imprintUrl": {
+            "type": "string",
+            "default": ""
+          },
+          "loginLogoDarkUrl": {
+            "type": "string",
+            "default": ""
+          },
+          "loginLogoLightUrl": {
+            "type": "string",
+            "default": ""
+          },
+          "ogImageUrl": {
+            "type": "string",
+            "default": ""
+          },
+          "organizationName": {
+            "type": "string",
+            "default": ""
+          },
+          "privacyPolicyUrl": {
+            "type": "string",
+            "default": ""
+          },
+          "pwaDisplay": {
+            "type": "string",
+            "default": ""
+          },
+          "seoDescription": {
+            "type": "string",
+            "default": ""
+          },
+          "seoKeywords": {
+            "type": "string",
+            "default": ""
+          },
+          "seoTitle": {
+            "type": "string",
+            "default": ""
+          },
+          "shortName": {
+            "type": "string",
+            "default": ""
+          },
+          "showAuthFooterLinks": {
+            "type": "boolean",
+            "default": false
+          },
+          "sourceCodeUrl": {
+            "type": "string",
+            "default": ""
+          },
+          "supportUrl": {
+            "type": "string",
+            "default": ""
+          },
+          "tagline": {
+            "type": "string",
+            "default": ""
+          },
+          "themeColorDark": {
+            "type": "string",
+            "default": ""
+          },
+          "themeColorLight": {
+            "type": "string",
+            "default": ""
+          },
+          "websiteUrl": {
+            "type": "string",
+            "default": ""
           }
         }
       },

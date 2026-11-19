@@ -379,6 +379,12 @@ pub enum Statement {
     RegistrationRecoverSelectPlatformUsers,
     PolicyReserveSelectOutboundReservations3,
     MailSubmissionStatusSelectOperations,
+    SiteConfigGet,
+    SiteConfigPut,
+    SiteAssetGet,
+    SiteAssetUpsert,
+    SiteAssetDelete,
+    SiteAssetVersions,
 }
 impl Statement {
     fn sql(self) -> &'static str {
@@ -816,6 +822,22 @@ impl Statement {
             }
             Self::MailSubmissionStatusSelectOperations => {
                 "SELECT status,result FROM operations WHERE id=? AND user_id=? AND kind='send'"
+            }
+            Self::SiteConfigGet => {
+                "SELECT value FROM platform_settings WHERE key='site-metadata-v1'"
+            }
+            Self::SiteConfigPut => {
+                "INSERT INTO platform_settings(key,value) VALUES('site-metadata-v1',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value"
+            }
+            Self::SiteAssetGet => {
+                "SELECT content_type,sha256,data,updated_at FROM site_assets WHERE kind=?"
+            }
+            Self::SiteAssetUpsert => {
+                "INSERT INTO site_assets(kind,content_type,sha256,data,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(kind) DO UPDATE SET content_type=excluded.content_type,sha256=excluded.sha256,data=excluded.data,updated_at=excluded.updated_at"
+            }
+            Self::SiteAssetDelete => "DELETE FROM site_assets WHERE kind=?",
+            Self::SiteAssetVersions => {
+                "SELECT kind,content_type,sha256,updated_at FROM site_assets"
             }
         }
     }

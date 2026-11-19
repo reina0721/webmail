@@ -17,6 +17,7 @@ mod policy;
 mod push;
 mod readiness;
 mod registration;
+mod site;
 mod stalwart;
 #[cfg(test)]
 mod tests;
@@ -787,7 +788,13 @@ async fn health(State(app): State<Arc<App>>) -> Result<Json<Value>> {
         gateway::personal_records,
         gateway::admin_records,
         push::preview,
-        push::action
+        push::action,
+        site::public_site,
+        site::public_asset,
+        site::admin_site,
+        site::save_admin_site,
+        site::upload_asset,
+        site::delete_asset
     ),
     components(schemas(Login, SessionView))
 )]
@@ -1078,6 +1085,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         .merge(client_archive::routes())
         .merge(calendar_feed::routes())
         .merge(installation::routes())
+        .merge(site::routes())
         .route("/health/ready", get(health))
         .route("/auth/login", post(login))
         .route("/auth/session", get(session))
@@ -1085,11 +1093,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         .route("/mailboxes", get(mailboxes))
         .route("/messages", get(messages))
         .route("/messages/{id}", get(message).patch(update_message));
-    let routes = Router::new()
-        .merge(push::routes())
-        .route("/internal/mta-hook", post(policy::hook))
-        .route("/internal/mta-hook/{service}", post(policy::service_hook))
-        .nest("/api/v1", api)
+    let static_service = axum::Router::new()
         .fallback_service(
             ServeDir::new(
                 std::env::var("STATIC_DIR").unwrap_or_else(|_| "frontend/apps/web/out".into()),
@@ -1097,6 +1101,21 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             .append_index_html_on_directories(true)
             .fallback(get(native_spa)),
         )
+        .layer(axum::middleware::from_fn_with_state(
+            app.clone(),
+            site::inject_html_middleware,
+        ));
+    let routes = Router::new()
+        .merge(push::routes())
+        .route("/favicon.ico", get(site::favicon_ico))
+        .route("/apple-touch-icon.png", get(site::apple_touch_icon))
+        .route("/manifest.webmanifest", get(site::manifest_webmanifest))
+        .route("/robots.txt", get(site::robots_txt))
+        .route("/sitemap.xml", get(site::sitemap_xml))
+        .route("/internal/mta-hook", post(policy::hook))
+        .route("/internal/mta-hook/{service}", post(policy::service_hook))
+        .nest("/api/v1", api)
+        .fallback_service(static_service)
         .layer(axum::extract::DefaultBodyLimit::max(32 * 1024 * 1024))
         .layer(axum::middleware::from_fn(response_policy))
         .with_state(app.clone());

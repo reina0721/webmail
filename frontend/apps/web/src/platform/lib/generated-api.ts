@@ -244,6 +244,38 @@ export interface paths {
         patch: operations["put_settings"];
         trace?: never;
     };
+    "/api/v1/admin/site": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["admin_site"];
+        put: operations["save_admin_site"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/site/assets/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["upload_asset"];
+        delete: operations["delete_asset"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/tasks": {
         parameters: {
             query?: never;
@@ -1236,6 +1268,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/site": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["public_site"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/site/assets/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["public_asset"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/submissions": {
         parameters: {
             query?: never;
@@ -1493,6 +1557,147 @@ export interface components {
             /** Format: uuid */
             id: string;
             operator: boolean;
+        };
+        SiteAssetUploadResponse: {
+            contentType: string;
+            kind: string;
+            url: string;
+        };
+        SiteMetadata: {
+            accountManagementLabel: string;
+            accountManagementUrl: string;
+            allowIndexing: boolean;
+            announcementEnabled: boolean;
+            announcementText: string;
+            announcementTone: string;
+            appLogoDarkUrl: string;
+            appLogoLightUrl: string;
+            appleTouchIconUrl: string;
+            /** Format: int32 */
+            authBackgroundBlur: number;
+            /** Format: int32 */
+            authBackgroundDim: number;
+            authBackgroundUrl: string;
+            authLayout: string;
+            authLoginSubtitle: string;
+            authLoginTitle: string;
+            authRecoverySubtitle: string;
+            authRecoveryTitle: string;
+            authRegisterSubtitle: string;
+            authRegisterTitle: string;
+            brand: string;
+            faviconUrl: string;
+            footerText: string;
+            helpUrl: string;
+            imprintUrl: string;
+            loginLogoDarkUrl: string;
+            loginLogoLightUrl: string;
+            ogImageUrl: string;
+            organizationName: string;
+            privacyPolicyUrl: string;
+            pwaDisplay: string;
+            seoDescription: string;
+            seoKeywords: string;
+            seoTitle: string;
+            shortName: string;
+            showAuthFooterLinks: boolean;
+            sourceCodeUrl: string;
+            supportUrl: string;
+            tagline: string;
+            themeColorDark: string;
+            themeColorLight: string;
+            uploadedAssets?: string[];
+            websiteUrl: string;
+        };
+        SiteMetadataInput: {
+            /** @default  */
+            accountManagementLabel: string;
+            /** @default  */
+            accountManagementUrl: string;
+            /** @default false */
+            allowIndexing: boolean;
+            /** @default false */
+            announcementEnabled: boolean;
+            /** @default  */
+            announcementText: string;
+            /** @default  */
+            announcementTone: string;
+            /** @default  */
+            appLogoDarkUrl: string;
+            /** @default  */
+            appLogoLightUrl: string;
+            /** @default  */
+            appleTouchIconUrl: string;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            authBackgroundBlur: number;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            authBackgroundDim: number;
+            /** @default  */
+            authBackgroundUrl: string;
+            /** @default  */
+            authLayout: string;
+            /** @default  */
+            authLoginSubtitle: string;
+            /** @default  */
+            authLoginTitle: string;
+            /** @default  */
+            authRecoverySubtitle: string;
+            /** @default  */
+            authRecoveryTitle: string;
+            /** @default  */
+            authRegisterSubtitle: string;
+            /** @default  */
+            authRegisterTitle: string;
+            /** @default  */
+            brand: string;
+            /** @default  */
+            faviconUrl: string;
+            /** @default  */
+            footerText: string;
+            /** @default  */
+            helpUrl: string;
+            /** @default  */
+            imprintUrl: string;
+            /** @default  */
+            loginLogoDarkUrl: string;
+            /** @default  */
+            loginLogoLightUrl: string;
+            /** @default  */
+            ogImageUrl: string;
+            /** @default  */
+            organizationName: string;
+            /** @default  */
+            privacyPolicyUrl: string;
+            /** @default  */
+            pwaDisplay: string;
+            /** @default  */
+            seoDescription: string;
+            /** @default  */
+            seoKeywords: string;
+            /** @default  */
+            seoTitle: string;
+            /** @default  */
+            shortName: string;
+            /** @default false */
+            showAuthFooterLinks: boolean;
+            /** @default  */
+            sourceCodeUrl: string;
+            /** @default  */
+            supportUrl: string;
+            /** @default  */
+            tagline: string;
+            /** @default  */
+            themeColorDark: string;
+            /** @default  */
+            themeColorLight: string;
+            /** @default  */
+            websiteUrl: string;
         };
         SiteUpdate: {
             brand?: string | null;
@@ -2210,6 +2415,132 @@ export interface operations {
             };
             /** @description Denied */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    admin_site: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteMetadata"];
+                };
+            };
+            /** @description Operator required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    save_admin_site: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteMetadataInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteMetadata"];
+                };
+            };
+            /** @description Invalid site configuration */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Operator required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    upload_asset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteAssetUploadResponse"];
+                };
+            };
+            /** @description Invalid asset */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Operator required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_asset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteMetadata"];
+                };
+            };
+            /** @description Operator required */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4392,6 +4723,45 @@ export interface operations {
             };
             /** @description Denied */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    public_site: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteMetadata"];
+                };
+            };
+        };
+    };
+    public_asset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Site image asset */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -7,6 +7,7 @@ export function ConsoleVerification() {
   const c = useVerification();
   return (
     <main className="auth-shell">
+      <div aria-hidden="true" className="auth-backdrop" />
       <section className="auth-card">
         <h1 style={{ fontSize: 24, marginBlock: 20 }}>验证人机与收信服务</h1>
         <p className="muted">

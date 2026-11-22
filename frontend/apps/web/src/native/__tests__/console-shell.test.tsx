@@ -1,6 +1,10 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useConsoleDomain, useConsoleSidebar } from "@/stores/native-host-store";
+import {
+  useAppearanceStore,
+  useConsoleDomain,
+  useConsoleSidebar,
+} from "@/stores/native-host-store";
 import { DEFAULT_SITE_METADATA } from "../site-defaults";
 
 const request = vi.hoisted(() => vi.fn());
@@ -51,6 +55,7 @@ const sampleUsers = [
 ];
 
 beforeEach(() => {
+  useAppearanceStore.setState({ accent: "sakura" });
   useConsoleDomain.setState({ domain: "default" });
   useConsoleSidebar.setState({
     collapsed: null,
@@ -256,5 +261,17 @@ describe("console shell & hybrid sidebar", () => {
     fireEvent.click(screen.getByRole("button", { name: "管理" }));
     const dialog = await screen.findByRole("dialog", { name: "账号与配额" });
     expect(dialog).toHaveTextContent("locked@example.com");
+  });
+
+  it("lets operators switch KIRAKIRA accent presets from the sidebar footer picker", async () => {
+    history.replaceState({}, "", "/console/");
+    render(<Console section="overview" />);
+    await screen.findByRole("heading", { name: "注册开放策略" });
+
+    fireEvent.click(screen.getByRole("button", { name: "切换个性主题色" }));
+    const skyOption = await screen.findByRole("radio", { name: "晴空蓝" });
+    fireEvent.click(skyOption);
+
+    expect(useAppearanceStore.getState().accent).toBe("sky");
   });
 });

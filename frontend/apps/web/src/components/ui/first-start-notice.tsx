@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { NativeBannerSurface } from "@mail-web/ui/native-controls";
 import { Info, X } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -25,12 +26,12 @@ export function FirstStartNoticeBar({ hidden = false }: { hidden?: boolean }) {
   const welcomeDue = useWelcomeBannerDue();
   if (!notice || hidden || offline || welcomeDue) return null;
   return (
-    <div
+    <NativeBannerSurface
       role="status"
       data-first-start-notice={notice.id}
-      className="flex items-center gap-3 border-b border-border bg-accent/30 px-4 py-1.5 text-sm"
+      className="flex items-center gap-3 rounded-none border-b border-border bg-accent/30 px-4 py-1.5 text-sm"
     >
-      <Info className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+      <Info className="h-4 w-4 flex-shrink-0 text-primary" aria-hidden="true" />
       <p className="min-w-0 flex-1 truncate text-foreground" title={notice.text}>{notice.text}</p>
       {notice.action && (
         <Button
@@ -49,6 +50,6 @@ export function FirstStartNoticeBar({ hidden = false }: { hidden?: boolean }) {
       <IconButton label={tCommon("close")} onClick={() => closeFirstStartNotice(notice.id)} className="-my-1 flex-shrink-0 text-muted-foreground">
         <X />
       </IconButton>
-    </div>
+    </NativeBannerSurface>
   );
 }

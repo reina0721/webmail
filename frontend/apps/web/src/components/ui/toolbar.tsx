@@ -79,7 +79,7 @@ export const ToolbarSearch = React.forwardRef<HTMLInputElement, ToolbarSearchPro
     const endItems = (showKey || showClear ? 1 : 0) + (trailing ? 1 : 0);
     return (
       <div className={cn("relative group/search", className)}>
-        <Search className="absolute start-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" aria-hidden="true" />
+        <Search className="absolute start-2.5 top-1/2 -translate-y-1/2 z-[1] w-4 h-4 text-muted-foreground group-focus-within/search:text-primary transition-colors pointer-events-none" aria-hidden="true" />
         {/* type="search" keeps password managers out (Bitwarden skips search fields). */}
         <Input
           ref={ref}
@@ -94,11 +94,11 @@ export const ToolbarSearch = React.forwardRef<HTMLInputElement, ToolbarSearchPro
           {...props}
         />
         {endItems > 0 && (
-          <div className="absolute end-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+          <div className="absolute end-1 top-1/2 -translate-y-1/2 z-[1] flex items-center gap-0.5">
             {showKey && (
               <kbd
                 aria-hidden="true"
-                className="pointer-events-none mx-1 rounded border border-border px-1.5 font-sans text-[0.6875rem] leading-4 text-muted-foreground group-focus-within/search:invisible"
+                className="pointer-events-none mx-1 rounded border border-border bg-background/80 px-1.5 font-sans text-[0.6875rem] leading-4 text-muted-foreground group-focus-within/search:invisible"
               >
                 {shortcut}
               </kbd>

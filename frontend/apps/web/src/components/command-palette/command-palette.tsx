@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
+import { NativeCommandSurface } from "@mail-web/ui/native-controls";
+import { ACCENT_PRESETS } from "@mail-web/ui/theme";
 import {
   CalendarEvent,
   ListTodo,
@@ -11,6 +13,7 @@ import {
   LogOut,
   Mail,
   Moon,
+  Palette,
   PenSquare,
   Puzzle,
   Search,
@@ -29,6 +32,7 @@ import { useCalendarStore } from "@/stores/calendar-store";
 import { usePolicyStore } from "@/stores/policy-store";
 import { useThemeStore } from "@/stores/theme-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useAppearanceStore } from "@/stores/native-host-store";
 import { usePluginActions } from "@/components/plugins/plugin-actions";
 import { usePluginPages, pluginPageHref } from "@/hooks/use-plugin-pages";
 import { LazyKeyboardShortcutsModal } from "@/components/lazy-keyboard-shortcuts-modal";
@@ -250,6 +254,16 @@ function CommandPalette({ onClose, onShowShortcuts }: { onClose: () => void; onS
         label: resolvedTheme === "dark" ? t("theme_light") : t("theme_dark"),
         run: () => useThemeStore.getState().setTheme(resolvedTheme === "dark" ? "light" : "dark"),
       });
+      for (const preset of ACCENT_PRESETS) {
+        list.push({
+          id: `accent:${preset.id}`,
+          group: actions,
+          icon: Palette,
+          label: `主题色 · ${preset.label}`,
+          keywords: ["accent", "color", "主题色", preset.id],
+          run: () => useAppearanceStore.getState().setAccent(preset.id),
+        });
+      }
     }
     if (!touch) {
       list.push({ id: "shortcuts", group: actions, icon: Keyboard, label: t("shortcuts"), shortcut: "?", run: onShowShortcuts });
@@ -337,22 +351,22 @@ function CommandPalette({ onClose, onShowShortcuts }: { onClose: () => void; onS
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-start justify-center bg-black/50 p-4 pt-[12vh] max-sm:p-0 max-sm:pt-0"
+      className="mail-command-backdrop fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[12vh] max-sm:p-0 max-sm:pt-0"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div
+      <NativeCommandSurface
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={t("title")}
         className={cn(
-          "w-full max-w-xl overflow-hidden rounded-lg border border-border bg-background text-foreground shadow-xl",
+          "w-full max-w-xl overflow-hidden text-foreground",
           "max-sm:h-full max-sm:max-w-none max-sm:rounded-none max-sm:border-0 max-sm:pt-[var(--app-top-inset)]",
           "flex flex-col",
         )}
       >
-        <div className="flex items-center gap-2 border-b border-border px-3">
-          <Search className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+        <div className="flex items-center gap-2 border-b border-border px-3.5">
+          <Search className="h-4 w-4 flex-shrink-0 text-primary" />
           <input
             ref={inputRef}
             type="text"
@@ -381,7 +395,7 @@ function CommandPalette({ onClose, onShowShortcuts }: { onClose: () => void; onS
           id={listId}
           role="listbox"
           aria-label={t("title")}
-          className="max-h-[60vh] max-sm:max-h-none max-sm:flex-1 overflow-y-auto py-1"
+          className="max-h-[60vh] max-sm:max-h-none max-sm:flex-1 overflow-y-auto p-1.5"
         >
           {visible.length === 0 && (
             <li role="presentation" className="px-4 py-6 text-center text-sm text-muted-foreground">{t("no_results")}</li>
@@ -389,28 +403,30 @@ function CommandPalette({ onClose, onShowShortcuts }: { onClose: () => void; onS
           {visible.map((command, index) => {
             const Icon = command.icon;
             const showGroup = index === 0 || visible[index - 1].group !== command.group;
+            const isSelected = index === activeIndex;
             return (
               <li key={command.id} role="presentation">
                 {showGroup && (
-                  <div aria-hidden="true" className="px-3 pt-2 pb-1 text-[0.6875rem] font-semibold text-muted-foreground">
+                  <div aria-hidden="true" className="px-2.5 pt-2 pb-1 text-[0.6875rem] font-semibold text-muted-foreground">
                     {command.group}
                   </div>
                 )}
                 <div
                   id={optionId(index)}
                   role="option"
-                  aria-selected={index === activeIndex}
+                  aria-selected={isSelected}
                   data-index={index}
                   data-command-id={command.id}
                   onMouseMove={() => { if (index !== activeIndex) setActive(index); }}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => runCommand(command)}
                   className={cn(
-                    "mx-1 flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm max-sm:min-h-[44px]",
-                    index === activeIndex ? "bg-muted text-foreground" : "text-foreground/90",
+                    "relative flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors max-sm:min-h-[44px]",
+                    isSelected ? "bg-accent text-accent-foreground font-medium" : "text-foreground/90 hover:bg-muted/70",
                   )}
                 >
-                  <Icon className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                  {isSelected && <span className="nav-rail-indicator" aria-hidden="true" />}
+                  <Icon className={cn("h-4 w-4 flex-shrink-0", isSelected ? "text-primary" : "text-muted-foreground")} />
                   <span className="flex-1 min-w-0 truncate">{command.label}</span>
                   {command.source && (
                     <span className="flex-shrink-0 truncate max-w-[40%] text-xs text-muted-foreground">{command.source}</span>
@@ -419,7 +435,7 @@ function CommandPalette({ onClose, onShowShortcuts }: { onClose: () => void; onS
                     // Key hints only where there is a keyboard (R8).
                     <span className="flex-shrink-0 flex items-center gap-1 pointer-coarse:hidden" aria-hidden="true">
                       {hintKeys(command.shortcut).map((key) => (
-                        <kbd key={key} className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[0.625rem] text-muted-foreground">{key}</kbd>
+                        <kbd key={key} className="rounded border border-border bg-background/80 px-1.5 py-0.5 font-mono text-[0.625rem] text-muted-foreground">{key}</kbd>
                       ))}
                     </span>
                   )}
@@ -428,7 +444,7 @@ function CommandPalette({ onClose, onShowShortcuts }: { onClose: () => void; onS
             );
           })}
         </ul>
-      </div>
+      </NativeCommandSurface>
     </div>
   );
 }

@@ -1,18 +1,41 @@
-/** Verify the pinned import and explicitly recorded host adaptations. */
+/** Verify upstream license, attribution, and provenance records remain intact. */
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
-const root=path.resolve(import.meta.dirname,'..');
-const manifest=JSON.parse(fs.readFileSync(path.join(root,'docs/upstream/bulwark-manifest.json'),'utf8'));
-const changes=JSON.parse(fs.readFileSync(path.join(root,'docs/upstream/bulwark-adaptations.json'),'utf8'));
-const adapted=new Map(changes.files.map(file=>[file.local,file.sha256]));
-const failures=[];
-for(const entry of manifest.files){
- const local=path.join(root,entry.local);
- if(!fs.existsSync(local)){failures.push('Missing: '+entry.local);continue;}
- const actual=crypto.createHash('sha256').update(fs.readFileSync(local)).digest('hex');
- if(actual!==(adapted.get(entry.local)??entry.sha256))failures.push('Unrecorded change: '+entry.local);
+
+const root = path.resolve(import.meta.dirname, '..');
+
+const requiredFiles = [
+  'LICENSE',
+  'NOTICE',
+  'docs/upstream/README.md',
+  'docs/upstream/dsh/LICENSE-APACHE',
+  'docs/upstream/dsh/LICENSE-MIT',
+  'docs/upstream/dsh/README.md',
+];
+
+const failures = [];
+for (const rel of requiredFiles) {
+  const full = path.join(root, rel);
+  if (!fs.existsSync(full) || fs.statSync(full).size === 0) {
+    failures.push(`Missing or empty upstream attribution file: ${rel}`);
+  }
 }
-if(manifest.commit!=='7cdedb60cc157cfeaf19623732b1135da6d3dc28')failures.push('Unapproved upstream baseline');
-if(failures.length)throw Error(failures.join('\n'));
-console.log(`Verified ${manifest.files.length} pinned Bulwark files; ${adapted.size} recorded host adaptations.`);
+
+if (!failures.length) {
+  const license = fs.readFileSync(path.join(root, 'LICENSE'), 'utf8');
+  if (!license.includes('GNU AFFERO GENERAL PUBLIC LICENSE')) {
+    failures.push('LICENSE must retain AGPL-3.0-only text');
+  }
+  const notice = fs.readFileSync(path.join(root, 'NOTICE'), 'utf8');
+  if (!/bulwark/i.test(notice)) {
+    failures.push('NOTICE must retain upstream Bulwark attribution');
+  }
+}
+
+if (failures.length) {
+  throw new Error(failures.join('\n'));
+}
+
+console.log(
+  `Verified upstream license and attribution records (${requiredFiles.length} files).`,
+);

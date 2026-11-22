@@ -5,16 +5,20 @@ import {
   CheckboxField,
   ConfirmDialog,
   ConsoleAccordionSection,
+  ConsoleCopyAction,
+  ConsoleKeyValueGrid,
   ConsoleSectionCard,
   ConsoleStatusBanner,
   ConsoleStatusChip,
   DnsOutlined,
+  LinearProgress,
   PasswordField,
   SelectField,
   TextField,
   VerifiedUserOutlined,
 } from "@mail-web/ui";
 import { operationId } from "@platform/host/operation-id";
+import { copyText } from "./clipboard";
 import { useConnections } from "./connections-controller";
 import { ConsoleDirectory } from "./directory-policy";
 import { RegistrationReadiness } from "./readiness";
@@ -129,6 +133,10 @@ export function ConsoleServices(props: {
           <div className="console-service-summary">
             <strong>{c.current.name}</strong>
             <code>{c.current.origin}</code>
+            <ConsoleCopyAction
+              label="复制服务地址"
+              onCopy={() => copyText(c.current?.origin ?? "")}
+            />
             <ConsoleStatusChip
               label={c.current.configured ? "配置已保存" : "等待初始化"}
               tone={c.current.configured ? "success" : "warning"}
@@ -262,20 +270,26 @@ export function ConsoleServices(props: {
         {c.job && (
           <div className="console-task-progress" aria-live="polite">
             <h3>初始化任务 · {c.job.status}</h3>
+            {(c.job.status === "running" || c.job.status === "applying") && (
+              <LinearProgress aria-label="初始化任务进度" />
+            )}
             <p>当前步骤：{c.job.step}</p>
             {c.job.error && (
               <ConsoleStatusBanner severity="error">
                 {c.job.error}
               </ConsoleStatusBanner>
             )}
-            <dl>
-              {Object.entries(c.job.resources).map(([key, value]) => (
-                <div key={key}>
-                  <dt>{key}</dt>
-                  <dd>{value}</dd>
-                </div>
-              ))}
-            </dl>
+            {Object.keys(c.job.resources).length > 0 && (
+              <ConsoleKeyValueGrid
+                items={Object.entries(c.job.resources).map(([key, value]) => ({
+                  id: key,
+                  label: key,
+                  value,
+                  mono: true,
+                  onCopy: () => copyText(String(value)),
+                }))}
+              />
+            )}
           </div>
         )}
 

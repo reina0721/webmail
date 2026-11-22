@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Action,
+  ConsoleStatusBanner,
   FileField,
   SelectField,
   SliderField,
@@ -407,17 +408,17 @@ export function AuthBackgroundUpload({
             )}
           </div>
           {originalOversize && (
-            <p role="alert">
+            <ConsoleStatusBanner severity="warning" role="alert">
               原图超过上传上限（5 MiB）。
               {!originalOnly && "请选择一种压缩方式。"}
-            </p>
+            </ConsoleStatusBanner>
           )}
           {result && !result.fits && (
-            <p role="alert">
+            <ConsoleStatusBanner severity="warning" role="alert">
               {mode === "target"
                 ? "未达到目标体积，请提高目标体积或调整格式。"
                 : "压缩结果超过 5 MiB，请缩小最长边或调整压缩参数。"}
-            </p>
+            </ConsoleStatusBanner>
           )}
           <div className="console-actions">
             {mode !== "original" && (
@@ -450,7 +451,11 @@ export function AuthBackgroundUpload({
           </div>
         </>
       )}
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <ConsoleStatusBanner severity="error" role="alert">
+          {error}
+        </ConsoleStatusBanner>
+      )}
     </>
   );
 }

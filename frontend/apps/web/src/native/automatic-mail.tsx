@@ -3,8 +3,10 @@ import { useEffect, useState } from "react";
 import { api, errorMessage } from "@platform/lib/api";
 import {
   Action,
+  ConsoleEmptyState,
   ConsoleStatusBanner,
   ConsoleStatusChip,
+  ForwardToInboxOutlined,
 } from "@mail-web/ui";
 import { SettingsSection } from "@/components/settings/settings-section";
 
@@ -163,7 +165,11 @@ export function AutomaticMailRecords({ domainId }: { domainId?: string }) {
         </div>
       ) : (
         report?.configured && (
-          <p className="console-hint">暂无自动发送记录。</p>
+          <ConsoleEmptyState
+            icon={<ForwardToInboxOutlined fontSize="small" />}
+            title="暂无自动发送记录"
+            description="当自动回复或规则转发触发时，提交状态会显示在这里。"
+          />
         )
       )}
     </div>

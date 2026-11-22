@@ -233,7 +233,7 @@ export function SectionNav() {
   }, []);
 
   return (
-    <div ref={ref} hidden={sections.length < 2} data-testid="settings-section-nav" className="flex flex-wrap gap-1.5 mb-6">
+    <div ref={ref} hidden={sections.length < 2} data-testid="settings-section-nav" className="flex flex-wrap gap-1.5 mb-5">
       {sections.map((section) => (
         <Button
           key={section.id}
@@ -241,7 +241,7 @@ export function SectionNav() {
           variant="ghost"
           size="xs"
           onClick={() => { if (ref.current?.parentElement) scrollToSettingsSection(section.id, ref.current.parentElement); }}
-          className="px-3 text-xs font-normal bg-muted text-foreground"
+          className="rounded-full border border-border/80 px-3 text-xs font-medium bg-muted/70 text-foreground hover:border-primary/30 hover:bg-accent/60 hover:text-accent-foreground"
         >
           {section.title}
         </Button>
@@ -283,10 +283,10 @@ export function SettingsSection({ title, description, children, advanced, id, te
   const { visible, marker } = useAdvancedVisibility(advanced);
   if (!visible) return null;
   return (
-    <div data-search-label={title} data-settings-section={id} {...marker} className="space-y-4 scroll-mt-4">
+    <div data-search-label={title} data-settings-section={id} {...marker} className="mail-settings-card space-y-4 scroll-mt-4">
       <div>
         <div className="flex items-center gap-2">
-          <h3 className="text-lg font-medium text-foreground flex items-center gap-2">
+          <h3 className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
             {title}
             {advanced && <AdvancedBadge />}
           </h3>
@@ -294,10 +294,10 @@ export function SettingsSection({ title, description, children, advanced, id, te
           {term && <TermInfo id={term} />}
         </div>
         {description && (
-          <p className="text-sm text-muted-foreground mt-1">{description}</p>
+          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{description}</p>
         )}
       </div>
-      <div className="space-y-4">{children}</div>
+      <div className="space-y-1">{children}</div>
     </div>
   );
 }
@@ -394,7 +394,7 @@ export function ToggleSwitch({ checked, onChange, disabled, ariaLabel, testId }:
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(
-        'inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-150',
+        'mail-switch inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-150',
         // 44px to hit on a touch screen, drawn the same size (R1).
         TOUCH_HIT_AREA,
         // Off: an outlined track and a grey knob, 3:1 against the page in
@@ -406,7 +406,7 @@ export function ToggleSwitch({ checked, onChange, disabled, ariaLabel, testId }:
     >
       <span
         className={cn(
-          'inline-block h-4 w-4 transform rounded-full transition-transform duration-150',
+          'mail-switch-thumb inline-block h-4 w-4 transform rounded-full transition-transform duration-150',
           checked ? 'bg-background ltr:translate-x-6 rtl:-translate-x-6' : 'bg-muted-foreground ltr:translate-x-1 rtl:-translate-x-1'
         )}
       />
@@ -433,10 +433,10 @@ export function RadioGroup({ value, onChange, options }: RadioGroupProps) {
           data-option-value={option.value}
           onClick={() => onChange(option.value)}
           className={cn(
-            'px-3 py-1.5 text-xs rounded-md transition-colors duration-150',
+            'px-3 py-1.5 text-xs rounded-lg border transition-colors duration-150',
             value === option.value
-              ? 'bg-primary text-primary-foreground font-medium'
-              : 'bg-muted hover:bg-accent text-foreground'
+              ? 'border-primary bg-primary text-primary-foreground font-medium shadow-xs'
+              : 'border-border/70 bg-muted/80 hover:bg-accent/60 hover:border-primary/25 text-foreground'
           )}
         >
           {option.label}
@@ -466,7 +466,7 @@ export function Select({ value, onChange, options, disabled, className, ariaLabe
       aria-labelledby={ariaLabel ? undefined : labelledBy}
       dir="auto"
       className={cn(
-        "max-w-full px-3 py-1.5 text-sm rounded-md bg-muted border border-border text-foreground focus:outline-hidden transition-colors duration-150 pointer-coarse:min-h-11",
+        "max-w-full px-3 py-1.5 text-sm rounded-lg bg-muted border border-border text-foreground focus:outline-hidden focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 transition-colors duration-150 pointer-coarse:min-h-11",
         disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer hover:border-muted-foreground",
         className
       )}

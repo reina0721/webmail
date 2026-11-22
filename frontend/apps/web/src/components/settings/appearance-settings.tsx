@@ -1,7 +1,9 @@
 "use client";
 
 import { useTranslations } from 'next-intl';
+import { AccentPresetPicker } from '@mail-web/ui';
 import { useThemeStore } from '@/stores/theme-store';
+import { useAppearanceStore } from '@/stores/native-host-store';
 import { useSettingsStore, type Density } from '@/stores/settings-store';
 import { SettingsSection, SettingItem, RadioGroup } from './settings-section';
 import { Button } from '@/components/ui/button';
@@ -79,12 +81,14 @@ export function AppearanceSettings() {
   const t = useTranslations('settings.appearance');
   const tWords = useTranslations('ux_p3_words');
   const appName = productName(useConfig().appName);
-  const { theme, setTheme } = useThemeStore();
+  const { theme, setTheme, resolvedTheme } = useThemeStore();
+  const accent = useAppearanceStore((s) => s.accent);
+  const setAccent = useAppearanceStore((s) => s.setAccent);
   const { density, updateSetting } = useSettingsStore();
   const { isSettingLocked, isSettingHidden, getColorModePolicy, isFeatureEnabled } = usePolicyStore();
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* The product's name, not "your webmail" (desktop-p3-16). */}
       <SettingsSection id="theme" title={t('title')} description={tWords('appearance_description', { appName })}>
         <SettingItem label={t('theme.label')} description={t('theme.description')} locked={getColorModePolicy().locked}>
@@ -96,6 +100,18 @@ export function AppearanceSettings() {
               { value: 'dark', label: t('theme.dark') },
               { value: 'system', label: t('theme.system') },
             ]}
+          />
+        </SettingItem>
+        <SettingItem
+          label="个性主题色"
+          description="在邮件工作区与管理控制台同步切换强调色阶"
+          locked={getColorModePolicy().locked}
+        >
+          <AccentPresetPicker
+            mode="inline"
+            dark={resolvedTheme === 'dark'}
+            value={accent}
+            onChange={setAccent}
           />
         </SettingItem>
         {isFeatureEnabled('themesEnabled') && <ThemesSettings embedded />}

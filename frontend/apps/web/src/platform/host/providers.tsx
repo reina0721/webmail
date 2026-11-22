@@ -2,6 +2,7 @@
 import { useEffect, type ReactNode } from "react";
 import { MaterialTheme } from "@mail-web/ui/theme";
 import { useThemeStore } from "@/stores/theme-store";
+import { useAppearanceStore } from "@/stores/native-host-store";
 import { sanitizeCssUrl } from "@/native/site-defaults";
 import { InstallationGate } from "../features/installation";
 import { useSiteSettings } from "./site-settings";
@@ -31,6 +32,16 @@ export function Providers({ children }: { children: ReactNode }) {
   const setSite = useSiteSettings((s) => s.setSite);
   const metadata = useSiteSettings((s) => s.metadata);
   const dark = useThemeStore((s) => s.resolvedTheme === "dark");
+  const accent = useAppearanceStore((s) => s.accent);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (accent === "sakura") {
+      delete root.dataset.accent;
+    } else {
+      root.dataset.accent = accent;
+    }
+  }, [accent]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -58,7 +69,7 @@ export function Providers({ children }: { children: ReactNode }) {
   }, [metadata, dark]);
 
   return (
-    <MaterialTheme dark={dark}>
+    <MaterialTheme dark={dark} accent={accent}>
       <InstallationGate onSite={setSite}>{children}</InstallationGate>
     </MaterialTheme>
   );

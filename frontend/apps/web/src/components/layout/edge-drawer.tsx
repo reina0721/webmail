@@ -22,7 +22,7 @@ export function DrawerScrim({ onClose, contained, className, "data-testid": test
       aria-hidden="true"
       data-testid={testId}
       data-drawer-scrim=""
-      className={cn("inset-0 bg-black/50 z-40", contained ? "absolute" : "fixed", className)}
+      className={cn("mail-drawer-scrim inset-0 bg-black/50 z-40", contained ? "absolute" : "fixed", className)}
       onClick={() => onClose()}
     />
   );
@@ -61,7 +61,7 @@ export function EdgeDrawer({ open, onClose, contained, returnFocus, className, c
         data-window-drawer={contained ? undefined : ""}
         inert={!open}
         className={cn(
-          "z-50 w-72 max-w-[85%] flex flex-col",
+          "mail-edge-drawer z-50 w-72 max-w-[85%] flex flex-col",
           contained ? "absolute inset-y-0 start-0" : "fixed start-0 top-[var(--drawer-top)] bottom-0",
           "transform duration-300 ease-in-out",
           // Visible at once on opening, so the focus can go in straight away

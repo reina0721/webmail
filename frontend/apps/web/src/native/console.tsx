@@ -3,18 +3,23 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Action,
+  Avatar,
   Box,
   BuildOutlined,
   CheckboxField,
   Chip,
   ConfirmDialog,
+  ConsoleCopyAction,
+  ConsoleEmptyState,
   ConsolePageTabs,
   ConsoleSaveBar,
   ConsoleSectionCard,
   ConsoleShell,
+  ConsoleSkeleton,
   ConsoleStatCard,
   ConsoleStatusBanner,
   ConsoleStatusChip,
+  ContentSwapTransition,
   DnsOutlined,
   DrawerSurface,
   FactCheckOutlined,
@@ -49,12 +54,14 @@ import { useInstallationLeave } from "@platform/host/use-installation-leave";
 import { useSiteSettings } from "@platform/host/site-settings";
 import { useAuthStore } from "@/stores/auth-store";
 import {
+  useAppearanceStore,
   useConsoleDomain,
   useConsoleSidebar,
 } from "@/stores/native-host-store";
 import { useThemeStore } from "@/stores/theme-store";
 import { Auth, type Session } from "./auth";
 import { AutomaticMailRecords } from "./automatic-mail";
+import { copyText } from "./clipboard";
 import { ClientDefaults } from "./client-defaults";
 import {
   ACTIVITY_TABS,
@@ -199,6 +206,8 @@ export function Console({ section = "overview" }: { section?: ConsoleSection }) 
   const toggleGroup = useConsoleSidebar((s) => s.toggleGroup);
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
   const setTheme = useThemeStore((s) => s.setTheme);
+  const accent = useAppearanceStore((s) => s.accent);
+  const setAccent = useAppearanceStore((s) => s.setAccent);
   const siteMetadata = useSiteSettings((s) => s.metadata);
 
   const generation = useRef(0);
@@ -586,6 +595,8 @@ export function Console({ section = "overview" }: { section?: ConsoleSection }) 
         operatorEmail={session?.operator ? session.email : undefined}
         dark={isDark}
         onToggleDark={() => setTheme(isDark ? "light" : "dark")}
+        accent={accent}
+        onChangeAccent={setAccent}
         backHref="/"
         backLabel="返回邮箱"
         versionText={
@@ -598,9 +609,18 @@ export function Console({ section = "overview" }: { section?: ConsoleSection }) 
         {section === "setup" ? (
           <ConsoleSetup />
         ) : loading ? (
-          <ConsoleSectionCard title="正在加载" icon={<MonitorHeartOutlined fontSize="small" />}>
-            <p role="status">正在读取控制台…</p>
-          </ConsoleSectionCard>
+          <ConsoleSkeleton
+            variant={
+              section === "overview"
+                ? "overview"
+                : section === "users"
+                  ? "table"
+                  : section === "site"
+                    ? "form"
+                    : "panel"
+            }
+            label="正在读取控制台…"
+          />
         ) : error ? (
           <ConsoleStatusBanner
             severity="error"
@@ -661,6 +681,7 @@ export function Console({ section = "overview" }: { section?: ConsoleSection }) 
                     hint="当前绑定域名下账号总数"
                     icon={<GroupOutlined fontSize="small" />}
                     tone="primary"
+                    staggerIndex={0}
                   />
                   <ConsoleStatCard
                     label="已启用"
@@ -672,6 +693,7 @@ export function Console({ section = "overview" }: { section?: ConsoleSection }) 
                     }
                     icon={<MarkEmailReadOutlined fontSize="small" />}
                     tone="success"
+                    staggerIndex={1}
                   />
                   <ConsoleStatCard
                     label="邮件服务"
@@ -679,6 +701,7 @@ export function Console({ section = "overview" }: { section?: ConsoleSection }) 
                     hint={`${connections.domains.length} 个绑定域名`}
                     icon={<DnsOutlined fontSize="small" />}
                     tone="info"
+                    staggerIndex={2}
                   />
                   <ConsoleStatCard
                     label="待处理任务"
@@ -690,6 +713,7 @@ export function Console({ section = "overview" }: { section?: ConsoleSection }) 
                         ? "warning"
                         : "default"
                     }
+                    staggerIndex={3}
                   />
                 </div>
 
@@ -705,6 +729,24 @@ export function Console({ section = "overview" }: { section?: ConsoleSection }) 
                     <p className="console-large">
                       {policy?.enabled ? "公开注册已开启" : "公开注册已关闭"}
                     </p>
+                    {policy && (
+                      <div className="console-policy-summary">
+                        <div className="console-policy-metric">
+                          <span>名额上限</span>
+                          <strong>{policy.maximumAccounts}</strong>
+                        </div>
+                        <div className="console-policy-metric">
+                          <span>默认容量</span>
+                          <strong>{Math.round(policy.quotaBytes / 1048576)} MiB</strong>
+                        </div>
+                        <div className="console-policy-metric">
+                          <span>小时/日限额</span>
+                          <strong>
+                            {policy.hourlyRecipients}/{policy.dailyRecipients}
+                          </strong>
+                        </div>
+                      </div>
+                    )}
                     <p className="console-hint">
                       健康探测告警不会更改管理员设置的开放策略。
                     </p>
@@ -728,7 +770,15 @@ export function Console({ section = "overview" }: { section?: ConsoleSection }) 
                     }
                   >
                     <p className="console-large">{health?.version ?? "—"}</p>
-                    {health?.revision && <code>{health.revision}</code>}
+                    {health?.revision && (
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
+                        <code>{health.revision}</code>
+                        <ConsoleCopyAction
+                          label="复制提交哈希"
+                          onCopy={() => copyText(health.revision)}
+                        />
+                      </Box>
+                    )}
                     <div>
                       <Link className="console-link" href="/console/versions/">
                         查看与切换版本 →
@@ -831,6 +881,24 @@ export function Console({ section = "overview" }: { section?: ConsoleSection }) 
                                 flexWrap: "wrap",
                               }}
                             >
+                              <Avatar
+                                aria-hidden="true"
+                                sx={{
+                                  width: 26,
+                                  height: 26,
+                                  fontSize: 11.5,
+                                  fontWeight: 700,
+                                  bgcolor: u.operator
+                                    ? "var(--accent-15)"
+                                    : "var(--surface-inset)",
+                                  color: u.operator
+                                    ? "var(--accent-70)"
+                                    : "var(--ink)",
+                                  border: "1px solid var(--line)",
+                                }}
+                              >
+                                {(u.email[0] || "?").toUpperCase()}
+                              </Avatar>
                               <strong>{u.email}</strong>
                               <ConsoleStatusChip
                                 label={u.operator ? "管理员" : "普通邮箱"}
@@ -875,7 +943,11 @@ export function Console({ section = "overview" }: { section?: ConsoleSection }) 
                   </table>
                 </div>
                 {!filteredUsers.length && (
-                  <p className="console-hint">没有匹配的账号</p>
+                  <ConsoleEmptyState
+                    icon={<GroupOutlined fontSize="small" />}
+                    title="没有匹配的账号"
+                    description="尝试清空搜索关键词或切换到全部状态筛选。"
+                  />
                 )}
               </ConsoleSectionCard>
             )}
@@ -988,47 +1060,49 @@ export function Console({ section = "overview" }: { section?: ConsoleSection }) 
                   }))}
                 />
 
-                {siteTab === "general" && (
-                  <SiteSettings
-                    initial={settings}
-                    directAccessUrl={directAccessUrl}
-                    mode="general"
-                    onSave={async (value) => {
-                      await api("/installation/config", {
-                        method: "PATCH",
-                        body: JSON.stringify(value),
-                      });
-                      setSettings(
-                        (current) =>
-                          current && {
-                            ...current,
-                            brand: value.brand ?? current.brand,
-                            publicOrigin:
-                              value.publicOrigin ?? current.publicOrigin,
-                          },
-                      );
-                    }}
-                  />
-                )}
-
-                {siteTab === "turnstile" && (
-                  <>
-                    <TurnstileSetup publicOrigin={settings.publicOrigin} />
+                <ContentSwapTransition contentKey={siteTab}>
+                  {siteTab === "general" && (
                     <SiteSettings
                       initial={settings}
                       directAccessUrl={directAccessUrl}
-                      mode="turnstile-manual"
+                      mode="general"
                       onSave={async (value) => {
                         await api("/installation/config", {
                           method: "PATCH",
                           body: JSON.stringify(value),
                         });
+                        setSettings(
+                          (current) =>
+                            current && {
+                              ...current,
+                              brand: value.brand ?? current.brand,
+                              publicOrigin:
+                                value.publicOrigin ?? current.publicOrigin,
+                            },
+                        );
                       }}
                     />
-                  </>
-                )}
+                  )}
 
-                {siteTab === "defaults" && <ClientDefaults />}
+                  {siteTab === "turnstile" && (
+                    <>
+                      <TurnstileSetup publicOrigin={settings.publicOrigin} />
+                      <SiteSettings
+                        initial={settings}
+                        directAccessUrl={directAccessUrl}
+                        mode="turnstile-manual"
+                        onSave={async (value) => {
+                          await api("/installation/config", {
+                            method: "PATCH",
+                            body: JSON.stringify(value),
+                          });
+                        }}
+                      />
+                    </>
+                  )}
+
+                  {siteTab === "defaults" && <ClientDefaults />}
+                </ContentSwapTransition>
 
                 <SiteMetadataSettings
                   section={
@@ -1068,114 +1142,140 @@ export function Console({ section = "overview" }: { section?: ConsoleSection }) 
                   }))}
                 />
 
-                {activityTab === "tasks" && (
-                  <ConsoleSectionCard
-                    title="后台任务"
-                    description="监控账号权限同步、凭据撤销与开户核对队列，必要时重试失败任务。"
-                    icon={<TaskAltOutlined fontSize="small" />}
-                    badge={{
-                      label:
-                        pendingTasksCount && pendingTasksCount > 0
-                          ? `${pendingTasksCount} 项待处理`
-                          : "队列空闲",
-                      tone:
-                        pendingTasksCount && pendingTasksCount > 0
-                          ? "warning"
-                          : "success",
-                    }}
-                    headerAction={
-                      <Action
-                        loading={busy}
-                        onPress={() =>
-                          void run(async () => {
-                            await api("/admin/tasks/retry" + q, {
-                              method: "POST",
-                            });
-                            await load();
-                          })
-                        }
-                      >
-                        重试失败任务
-                      </Action>
-                    }
-                  >
-                    <div className="console-stats">
-                      {Object.entries(tasks ?? {}).map(([key, value]) => (
-                        <ConsoleStatCard
-                          key={key}
-                          label={
-                            {
-                              accountPolicyJobs: "账号权限同步",
-                              credentialRevocations: "会话凭据撤销",
-                              registrationReconciliation: "开户结果核对",
-                            }[key] ?? key
+                <ContentSwapTransition contentKey={activityTab}>
+                  {activityTab === "tasks" && (
+                    <ConsoleSectionCard
+                      title="后台任务"
+                      description="监控账号权限同步、凭据撤销与开户核对队列，必要时重试失败任务。"
+                      icon={<TaskAltOutlined fontSize="small" />}
+                      badge={{
+                        label:
+                          pendingTasksCount && pendingTasksCount > 0
+                            ? `${pendingTasksCount} 项待处理`
+                            : "队列空闲",
+                        tone:
+                          pendingTasksCount && pendingTasksCount > 0
+                            ? "warning"
+                            : "success",
+                      }}
+                      headerAction={
+                        <Action
+                          loading={busy}
+                          onPress={() =>
+                            void run(async () => {
+                              await api("/admin/tasks/retry" + q, {
+                                method: "POST",
+                              });
+                              await load();
+                            })
                           }
-                          value={value}
-                          tone={value > 0 ? "warning" : "success"}
-                        />
-                      ))}
-                    </div>
-                  </ConsoleSectionCard>
-                )}
-
-                {activityTab === "readiness" && (
-                  <RegistrationReadiness domainId={domain} embedded />
-                )}
-
-                {activityTab === "automatic-mail" && (
-                  <ConsoleSectionCard
-                    title="自动回复与规则发送"
-                    description="当前邮件服务的自动邮件队列、恢复情况与未知提交。"
-                    icon={<ForwardToInboxOutlined fontSize="small" />}
-                  >
-                    <AutomaticMailRecords key={domain} domainId={domain} />
-                  </ConsoleSectionCard>
-                )}
-
-                {activityTab === "audit" && (
-                  <>
-                    <ConsoleSectionCard
-                      title="审计记录"
-                      description="管理员对账号、策略与域名配置的关键变更记录。"
-                      icon={<HistoryOutlined fontSize="small" />}
-                    >
-                      <AuditRows items={audit} />
-                    </ConsoleSectionCard>
-                    <ConsoleSectionCard
-                      title="部署信息"
-                      description="当前运行版本信息与命令行原地更新指引。"
-                      icon={<BuildOutlined fontSize="small" />}
-                    >
-                      <p>
-                        {health?.version} · <code>{health?.revision}</code>
-                      </p>
-                      <p>
-                        在原安装目录执行 <code>./mailweb check-update</code>{" "}
-                        检查版本；
-                        <code>./mailweb update --version latest --yes</code>{" "}
-                        会校验发布包、备份并原地升级应用和管理工具。
-                      </p>
-                      <div className="console-actions">
-                        <a
-                          className="console-link"
-                          href="https://github.com/reina0721/webmail/blob/main/docs/cli.md#更新与恢复"
-                          target="_blank"
-                          rel="noopener noreferrer"
                         >
-                          升级与备份恢复说明 →
-                        </a>
-                        <a
-                          className="console-link"
-                          href="https://github.com/reina0721/webmail"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          对应源码与许可证 ↗
-                        </a>
+                          重试失败任务
+                        </Action>
+                      }
+                    >
+                      <div className="console-stats">
+                        {Object.entries(tasks ?? {}).map(([key, value], index) => (
+                          <ConsoleStatCard
+                            key={key}
+                            staggerIndex={index}
+                            label={
+                              {
+                                accountPolicyJobs: "账号权限同步",
+                                credentialRevocations: "会话凭据撤销",
+                                registrationReconciliation: "开户结果核对",
+                              }[key] ?? key
+                            }
+                            value={value}
+                            tone={value > 0 ? "warning" : "success"}
+                          />
+                        ))}
                       </div>
                     </ConsoleSectionCard>
-                  </>
-                )}
+                  )}
+
+                  {activityTab === "readiness" && (
+                    <RegistrationReadiness domainId={domain} embedded />
+                  )}
+
+                  {activityTab === "automatic-mail" && (
+                    <ConsoleSectionCard
+                      title="自动回复与规则发送"
+                      description="当前邮件服务的自动邮件队列、恢复情况与未知提交。"
+                      icon={<ForwardToInboxOutlined fontSize="small" />}
+                    >
+                      <AutomaticMailRecords key={domain} domainId={domain} />
+                    </ConsoleSectionCard>
+                  )}
+
+                  {activityTab === "audit" && (
+                    <>
+                      <ConsoleSectionCard
+                        title="审计记录"
+                        description="管理员对账号、策略与域名配置的关键变更记录。"
+                        icon={<HistoryOutlined fontSize="small" />}
+                      >
+                        <AuditRows items={audit} />
+                      </ConsoleSectionCard>
+                      <ConsoleSectionCard
+                        title="部署信息"
+                        description="当前运行版本信息与命令行原地更新指引。"
+                        icon={<BuildOutlined fontSize="small" />}
+                      >
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
+                          <span>{health?.version}</span>
+                          {health?.revision && (
+                            <>
+                              <code>{health.revision}</code>
+                              <ConsoleCopyAction
+                                label="复制提交哈希"
+                                onCopy={() => copyText(health.revision)}
+                              />
+                            </>
+                          )}
+                        </Box>
+                        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
+                            <span className="console-hint">检查版本：</span>
+                            <code>./mailweb check-update</code>
+                            <ConsoleCopyAction
+                              label="复制检查版本命令"
+                              onCopy={() => copyText("./mailweb check-update")}
+                            />
+                          </Box>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
+                            <span className="console-hint">原地升级：</span>
+                            <code>./mailweb update --version latest --yes</code>
+                            <ConsoleCopyAction
+                              label="复制原地升级命令"
+                              onCopy={() =>
+                                copyText("./mailweb update --version latest --yes")
+                              }
+                            />
+                          </Box>
+                        </Box>
+                        <div className="console-actions">
+                          <a
+                            className="console-link"
+                            href="https://github.com/reina0721/webmail/blob/main/docs/cli.md#更新与恢复"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            升级与备份恢复说明 →
+                          </a>
+                          <a
+                            className="console-link"
+                            href="https://github.com/reina0721/webmail"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            对应源码与许可证 ↗
+                          </a>
+                        </div>
+                      </ConsoleSectionCard>
+                    </>
+                  )}
+                </ContentSwapTransition>
               </>
             )}
           </>
@@ -1223,6 +1323,11 @@ export function Console({ section = "overview" }: { section?: ConsoleSection }) 
       >
         {editing && (
           <Box sx={{ display: "grid", gap: 2 }}>
+            {editorDirty && (
+              <Box sx={{ display: "flex", justifyContent: "flex-start" }}>
+                <ConsoleStatusChip label="存在未保存修改" tone="warning" />
+              </Box>
+            )}
             <TextField label="邮箱账号" value={editing.email} disabled />
             <CheckboxField
               checked={editing.status === "active"}
@@ -1322,7 +1427,11 @@ function AuditRows({ items }: { items: Audit[] }) {
           </div>
         ))
       ) : (
-        <p className="console-hint">暂无操作记录</p>
+        <ConsoleEmptyState
+          icon={<HistoryOutlined fontSize="small" />}
+          title="暂无操作记录"
+          description="管理员对当前域名的账号与策略操作会记录于此。"
+        />
       )}
     </div>
   );

@@ -2,22 +2,21 @@
 
 基线：[`bulwarkmail/webmail@7cdedb60cc157cfeaf19623732b1135da6d3dc28`](https://github.com/bulwarkmail/webmail/tree/7cdedb60cc157cfeaf19623732b1135da6d3dc28)。许可证为 AGPL-3.0-only；根目录 LICENSE、NOTICE 保留上游版权、MIT 血缘及第三方许可。
 
-本次导入包含 4,194 个有基线哈希的文件：完整邮件、日历、联系人和文件组件，JMAP 客户端，Zustand 状态，编辑器扩展，离线数据库/同步，导入导出、Sieve、日历和联系人协议工具、翻译、资源与相关测试。`bulwark-manifest.json` 逐文件记录来源、目标及上游 SHA-256。本站新增文件不冒充上游代码。
-
-`bulwark-adaptations.json` 记录经检查的适配文件当前哈希；`bulwark.patch` 给出相对于固定基线的完整文本差异。`node tooling/check-upstream.mjs` 校验未修改文件和已记录适配。修改后先审查差异，再执行 `python3 tooling/record-upstream.py` 更新记录；该工具要求本机 `.cache/bulwark-src` 内容确实匹配基线，不能把未知版本当作基线。
+本站前端初始导入了固定 Bulwark 基线的完整邮件、日历、联系人和文件能力（JMAP 客户端、Zustand 状态、TipTap 编辑器扩展、离线数据库/同步、导入导出、Sieve、日历和联系人协议工具、多语言翻译、资源与相关测试），并在此基础上演进为独立的 `kirakira.moe × Material Design` 前端体系。根目录 `LICENSE`、`NOTICE` 与 `docs/upstream/dsh/` 持续由 `node tooling/check-upstream.mjs` 校验，确保上游开源许可与署名始终完整保留；原逐文件 SHA-256 锁定已解除，以支持 `src/components/ui/*`、导航壳层、个人设置壳层及全站视觉/动效体系的自由演进。`bulwark-manifest.json` 仍作为历史导入基线与架构边界参考保留。
 
 适配范围：
 
-| 入口 | 本站修改 |
+| 入口 | 本站演进 |
 | --- | --- |
 | `src/lib/jmap/client.ts` | 本站会话传输，账号选择、CSRF、上传、SSE、发送幂等；保留上游协议实现。清理服务身份显示名；解释 Stalwart 1.0 的目录共享边界。 |
 | `src/stores/auth-store.ts` | 逐个验证本站登记账号；HTTPOnly 多会话；不在浏览器持久保存邮箱密码；恢复账号时重新校验 cookie。保留上游隔离的客户端、缓存和离线状态。 |
 | `src/lib/browser-navigation.ts` | 偏好、个人账号管理、运营策略转接 Rust。非本站传输保留上游行为，便于上游测试及差异维护。 |
-| `src/components/ui` | 上游业务接口保持；按钮、输入、对话框和菜单底座替换为独立 MUI 包。业务组件、完整操作和状态沿用上游。 |
+| `src/components/ui/*` | 全面替换为 `@mail-web/ui/native-controls`（MUI v9 二次封装）底座，保留全部业务接口与无障碍/测试契约。 |
+| `src/components/layout/*` & `src/components/settings/*` & `src/components/command-palette/*` | 导航栏、顶栏、侧栏壳、个人设置壳与命令面板升级为 `kirakira.moe × Material Design` 磨砂层级、弹性激活指示与 6 套个性色联动；保留全部核心业务大页面与协议逻辑。 |
 | `src/components/settings/account-settings.tsx` | 加入本站的设备撤销、统一用量和未知提交核对。个人设置与控制台分离。 |
-| `src/native` | 新建本站登录/注册、安装、统一控制台与壳；不使用被弃用页面的 DOM。 |
-| `packages/material-ui` | 独立颜色、字号、间距、控件尺寸、浮层、动效；MUI 层在工具类之前，修复定位/尺寸被底层覆盖。 |
-| 测试及 worker 构建脚本 | 路径迁移；MUI 的模态、焦点和样式断言适配。两项桌面独立窗口测试不属于本次 Web 交付范围，明确从客户端测试排除。 |
+| `src/native` | 本站登录/注册/验证、安装向导、统一控制台 8 大分区与宿主壳，遵循专业控制台紧凑布局与信息密度。 |
+| `packages/material-ui` | 全站唯一 MUI v9 二次封装网关：动态 `oklab` 6 套个性色、L0–L5 色阶、紧凑密度、5 类 `kirakira` 动效曲线与全量基础控件。 |
+| 测试及 worker 构建脚本 | 路径迁移；MUI 模态、焦点和样式断言适配。两项桌面独立窗口测试不属于本次 Web 交付范围，明确从客户端测试排除。 |
 
 原平台 UI、HeroUI、旧 Tailwind 全局入口及 `workspace-*` 页面均已移除。上游自己的 Tailwind 工具类属于本次导入的客户端，只有一套主题入口；它不读取旧平台样式。
 

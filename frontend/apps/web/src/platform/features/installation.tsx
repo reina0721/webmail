@@ -1,7 +1,7 @@
 "use client";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { Action } from "@mail-web/ui/action";
+import { Action, Box, ConsoleStatusBanner, LinearProgress } from "@mail-web/ui";
 import { api, errorMessage } from "../lib/api";
 import type { components } from "../lib/generated-api";
 import { fetchPublicSiteMetadata } from "@/lib/platform-site-config";
@@ -60,15 +60,28 @@ export function InstallationGate({
   if (error)
     return (
       <main className="installation-shell" role="alert">
-        <h1>无法读取站点配置</h1>
-        <p>{error}</p>
-        <Action onPress={() => setRevision((n) => n + 1)}>重新连接</Action>
+        <div className="native-loading-card">
+          <span className="native-mark" aria-hidden="true">
+            ✦
+          </span>
+          <h1 className="auth-title">无法读取站点配置</h1>
+          <ConsoleStatusBanner severity="error">{error}</ConsoleStatusBanner>
+          <Action onPress={() => setRevision((n) => n + 1)}>重新连接</Action>
+        </div>
       </main>
     );
   if (!status)
     return (
-      <main className="installation-shell" role="status">
-        正在读取站点配置…
+      <main className="installation-shell" role="status" aria-busy="true">
+        <div className="native-loading-card">
+          <span className="native-mark" aria-hidden="true">
+            ✦
+          </span>
+          <p className="muted">正在读取站点配置…</p>
+          <Box sx={{ width: "100%" }}>
+            <LinearProgress />
+          </Box>
+        </div>
       </main>
     );
   if (!status.configured || status.needsOperator)
@@ -81,5 +94,17 @@ function SetupRedirect() {
   useEffect(() => {
     router.replace("/console/setup/");
   }, [router]);
-  return <main className="native-loading">正在进入自动安装…</main>;
+  return (
+    <main className="native-loading" role="status" aria-busy="true">
+      <div className="native-loading-card">
+        <span className="native-mark" aria-hidden="true">
+          ✦
+        </span>
+        <p className="muted">正在进入自动安装…</p>
+        <Box sx={{ width: "100%" }}>
+          <LinearProgress />
+        </Box>
+      </div>
+    </main>
+  );
 }

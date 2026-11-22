@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { NativeMenuPanel } from "@mail-web/ui/native-controls";
 import {
   CalendarEvent,
   ListTodo,
@@ -210,7 +211,7 @@ export function MvTopBar({
 
   return (
     <header
-      className="mv-topbar flex items-center h-16 gap-2 ps-1 pe-4 shrink-0 bg-[var(--mv-canvas)]"
+      className="mv-topbar mail-mv-topbar flex items-center h-16 gap-2 ps-1 pe-4 shrink-0 bg-[var(--mv-canvas)]"
       data-mv-topbar=""
       data-plugin-list-avoid=""
     >
@@ -323,7 +324,7 @@ export function MvTopBar({
         <Link
           href="/settings"
           onClick={(e) => { interceptLeave(e); }}
-          className="grid place-items-center w-12 h-12 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          className="nav-rail-gear grid place-items-center w-12 h-12 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           title={t("settings")}
           aria-label={t("settings")}
         >
@@ -338,7 +339,7 @@ export function MvTopBar({
             className={cn(
               "grid place-items-center w-12 h-12 rounded-full transition-colors",
               appsOpen
-                ? "bg-muted text-foreground"
+                ? "bg-accent text-accent-foreground"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground"
             )}
             title={t("add_app")}
@@ -349,7 +350,7 @@ export function MvTopBar({
             <Grid3x3 className="w-5 h-5" />
           </button>
           {appsOpen && (
-            <div
+            <NativeMenuPanel
               ref={appsMenuRef}
               onKeyDown={onAppsKeyDown}
               role="menu"
@@ -359,6 +360,7 @@ export function MvTopBar({
               <div className="grid grid-cols-3 gap-1">
                 {apps.map((app) => {
                   const Icon = app.icon;
+                  const active = isActive(app.href);
                   return (
                     <Link
                       key={app.id}
@@ -372,11 +374,11 @@ export function MvTopBar({
                         setAppsOpen(false);
                       }}
                       className={cn(
-                        "flex flex-col items-center gap-1.5 rounded-lg py-3 px-1 text-center transition-colors hover:bg-muted",
-                        isActive(app.href) && "bg-muted"
+                        "flex flex-col items-center gap-1.5 rounded-xl py-3 px-1 text-center transition-colors hover:bg-accent/50",
+                        active && "bg-accent text-accent-foreground font-medium"
                       )}
                     >
-                      <Icon className="w-6 h-6 text-muted-foreground" />
+                      <Icon className={cn("w-6 h-6", active ? "text-primary" : "text-muted-foreground")} />
                       <span className="text-xs truncate max-w-full">{app.label}</span>
                     </Link>
                   );
@@ -396,8 +398,8 @@ export function MvTopBar({
                         setAppsOpen(false);
                       }}
                       className={cn(
-                        "flex flex-col items-center gap-1.5 rounded-lg py-3 px-1 text-center transition-colors hover:bg-muted",
-                        !activeAppId && isPluginPageActive(pathname, page) && "bg-muted"
+                        "flex flex-col items-center gap-1.5 rounded-xl py-3 px-1 text-center transition-colors hover:bg-accent/50",
+                        !activeAppId && isPluginPageActive(pathname, page) && "bg-accent text-accent-foreground"
                       )}
                     >
                       <PageIcon className="w-6 h-6 text-muted-foreground" />
@@ -422,8 +424,8 @@ export function MvTopBar({
                         }
                       }}
                       className={cn(
-                        "flex flex-col items-center gap-1.5 rounded-lg py-3 px-1 text-center transition-colors hover:bg-muted",
-                        activeAppId === app.id && "bg-muted"
+                        "flex flex-col items-center gap-1.5 rounded-xl py-3 px-1 text-center transition-colors hover:bg-accent/50",
+                        activeAppId === app.id && "bg-accent text-accent-foreground"
                       )}
                     >
                       <SidebarAppIcon app={app} className="w-6 h-6 text-muted-foreground" />
@@ -445,7 +447,7 @@ export function MvTopBar({
                   {t("add_app")}
                 </button>
               )}
-            </div>
+            </NativeMenuPanel>
           )}
         </div>
 

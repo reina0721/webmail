@@ -3,6 +3,9 @@ import { useEffect } from "react";
 import Script from "next/script";
 import {
   Action,
+  ConsoleStatusBanner,
+  ConsoleStepBar,
+  ContentSwapTransition,
   TextField,
   PasswordField,
   SelectField,
@@ -48,20 +51,23 @@ export function Auth({ onLogin }: { onLogin: (session: Session) => void }) {
         : site.authRecoverySubtitle;
 
   return (
-    <AuthShell>
-      <a href={site.websiteUrl || "/"} className="auth-brand">
-        <img
-          src={site.loginLogoLightUrl}
-          alt=""
-          className="auth-brand-logo dark:hidden"
-        />
-        <img
-          src={site.loginLogoDarkUrl}
-          alt=""
-          className="auth-brand-logo hidden dark:block"
-        />
-        <span>{c.brand}</span>
-      </a>
+    <AuthShell
+      brand={
+        <a href={site.websiteUrl || "/"} className="auth-brand">
+          <img
+            src={site.loginLogoLightUrl}
+            alt=""
+            className="auth-brand-logo dark:hidden"
+          />
+          <img
+            src={site.loginLogoDarkUrl}
+            alt=""
+            className="auth-brand-logo hidden dark:block"
+          />
+          <span>{c.brand}</span>
+        </a>
+      }
+    >
       <h1 className="auth-title">{heading}</h1>
       <p className="muted">{subtitle}</p>
       {c.policy.primaryOrigin ? (
@@ -83,156 +89,154 @@ export function Auth({ onLogin }: { onLogin: (session: Session) => void }) {
           <Tab value="recovery" label="找回密码" />
         </Tabs>
       )}
-      {c.mode === "registration" && (
-        <SelectField
-          label="邮箱域名"
-          value={c.domain}
-          disabled={c.pending}
-          options={c.domains.map((d) => ({
-            value: d.id,
-            label: d.domain + (d.enabled ? "" : " · 暂未开放"),
-          }))}
-          onValueChange={c.changeDomain}
-        />
-      )}
-      {c.policyError && c.mode !== "login" && (
-        <p role="alert">{c.policyError}</p>
-      )}
-      {c.mode === "registration" && !c.policy.enabled ? (
-        <div className="auth-status">
-          <h2>暂未开放公开注册</h2>
-          <p>请稍后重试，或联系站点管理员。</p>
-          <a className="console-link" href="/console/registration/">
-            管理员控制台 →
-          </a>
-        </div>
-      ) : (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void c.run(c.mode === "login" ? signIn : c.submit);
-          }}
-        >
-          {c.mode !== "login" && (
-            <ol className="auth-steps" aria-label="验证进度">
-              {["验证邮箱", "核对验证码", "设置密码"].map((label, index) => (
-                <li
-                  key={label}
-                  aria-current={
-                    index === (!c.challenge ? 0 : !c.claim ? 1 : 2)
-                      ? "step"
-                      : undefined
-                  }
-                >
-                  <span>{index + 1}</span>
-                  {label}
-                </li>
-              ))}
-            </ol>
-          )}
-          {c.mode === "login" ? (
-            <>
-              <TextField
-                label="邮箱地址"
-                type="email"
-                autoComplete="username"
-                required
-                disabled={c.pending}
-                value={c.email}
-                onChange={(e) => c.setEmail(e.target.value)}
+      <ContentSwapTransition contentKey={c.mode}>
+        {c.mode === "registration" && (
+          <SelectField
+            label="邮箱域名"
+            value={c.domain}
+            disabled={c.pending}
+            options={c.domains.map((d) => ({
+              value: d.id,
+              label: d.domain + (d.enabled ? "" : " · 暂未开放"),
+            }))}
+            onValueChange={c.changeDomain}
+          />
+        )}
+        {c.policyError && c.mode !== "login" && (
+          <ConsoleStatusBanner severity="error" role="alert">
+            {c.policyError}
+          </ConsoleStatusBanner>
+        )}
+        {c.mode === "registration" && !c.policy.enabled ? (
+          <div className="auth-status">
+            <h2>暂未开放公开注册</h2>
+            <p className="muted">请稍后重试，或联系站点管理员。</p>
+            <a className="console-link" href="/console/registration/">
+              管理员控制台 →
+            </a>
+          </div>
+        ) : (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void c.run(c.mode === "login" ? signIn : c.submit);
+            }}
+          >
+            {c.mode !== "login" && (
+              <ConsoleStepBar
+                ariaLabel="验证进度"
+                activeIndex={!c.challenge ? 0 : !c.claim ? 1 : 2}
+                steps={[
+                  { label: "验证邮箱" },
+                  { label: "核对验证码" },
+                  { label: "设置密码" },
+                ]}
               />
-              <PasswordField
-                label="密码"
-                purpose="current"
-                required
-                disabled={c.pending}
-                value={c.password}
-                onChange={(e) => c.setPassword(e.target.value)}
-              />
-            </>
-          ) : (
-            <>
-              {!c.claim && (
+            )}
+            {c.mode === "login" ? (
+              <>
                 <TextField
-                  label="接收验证码的外部邮箱"
+                  label="邮箱地址"
                   type="email"
-                  autoComplete="email"
+                  autoComplete="username"
                   required
-                  disabled={c.pending || !!c.challenge}
+                  disabled={c.pending}
                   value={c.email}
                   onChange={(e) => c.setEmail(e.target.value)}
                 />
-              )}
-              {c.challenge && !c.claim && (
-                <TextField
-                  label="邮件中的六位验证码"
-                  hint="十分钟内有效"
+                <PasswordField
+                  label="密码"
+                  purpose="current"
                   required
-                  value={c.code}
-                  onChange={(e) => c.setCode(e.target.value)}
+                  disabled={c.pending}
+                  value={c.password}
+                  onChange={(e) => c.setPassword(e.target.value)}
                 />
-              )}
-              {c.claim && (
-                <>
-                  {c.mode === "registration" && (
-                    <TextField
-                      label={"邮箱名称 · @" + c.policy.domain}
-                      required
-                      value={c.name}
-                      onChange={(e) => c.setName(e.target.value.toLowerCase())}
-                    />
-                  )}
-                  <PasswordField
-                    label="设置新密码"
-                    purpose="new"
-                    hint="12–128 个字符"
+              </>
+            ) : (
+              <>
+                {!c.claim && (
+                  <TextField
+                    label="接收验证码的外部邮箱"
+                    type="email"
+                    autoComplete="email"
                     required
-                    value={c.password}
-                    onChange={(e) => c.setPassword(e.target.value)}
+                    disabled={c.pending || !!c.challenge}
+                    value={c.email}
+                    onChange={(e) => c.setEmail(e.target.value)}
                   />
-                </>
-              )}
-              {!c.challenge && (
-                <>
-                  <Script
-                    src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
-                    onReady={() => c.setReady(true)}
+                )}
+                {c.challenge && !c.claim && (
+                  <TextField
+                    label="邮件中的六位验证码"
+                    hint="十分钟内有效"
+                    required
+                    value={c.code}
+                    onChange={(e) => c.setCode(e.target.value)}
                   />
-                  <div ref={c.target} />
-                </>
-              )}
-            </>
-          )}
-          <Action
-            type="submit"
-            loading={c.pending}
-            disabled={c.mode !== "login" && !c.challenge && !c.captcha}
-          >
-            {c.mode === "login"
-              ? "打开邮箱"
-              : !c.challenge
-                ? "发送验证码"
-                : !c.claim
-                  ? "核对验证码"
-                  : c.mode === "registration"
-                    ? "创建邮箱"
-                    : "重置密码"}
-          </Action>
-          {c.challenge && (
+                )}
+                {c.claim && (
+                  <>
+                    {c.mode === "registration" && (
+                      <TextField
+                        label={"邮箱名称 · @" + c.policy.domain}
+                        required
+                        value={c.name}
+                        onChange={(e) => c.setName(e.target.value.toLowerCase())}
+                      />
+                    )}
+                    <PasswordField
+                      label="设置新密码"
+                      purpose="new"
+                      hint="12–128 个字符"
+                      required
+                      value={c.password}
+                      onChange={(e) => c.setPassword(e.target.value)}
+                    />
+                  </>
+                )}
+                {!c.challenge && (
+                  <>
+                    <Script
+                      src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+                      onReady={() => c.setReady(true)}
+                    />
+                    <div ref={c.target} />
+                  </>
+                )}
+              </>
+            )}
             <Action
-              variant="quiet"
-              disabled={c.pending}
-              onPress={() => c.change(c.mode)}
+              type="submit"
+              loading={c.pending}
+              disabled={c.mode !== "login" && !c.challenge && !c.captcha}
             >
-              重新验证
+              {c.mode === "login"
+                ? "打开邮箱"
+                : !c.challenge
+                  ? "发送验证码"
+                  : !c.claim
+                    ? "核对验证码"
+                    : c.mode === "registration"
+                      ? "创建邮箱"
+                      : "重置密码"}
             </Action>
-          )}
-        </form>
-      )}
+            {c.challenge && (
+              <Action
+                variant="quiet"
+                disabled={c.pending}
+                onPress={() => c.change(c.mode)}
+              >
+                重新验证
+              </Action>
+            )}
+          </form>
+        )}
+      </ContentSwapTransition>
       {c.notice && (
-        <p className="auth-notice" role="status" aria-live="polite">
+        <div className="auth-notice" role="status" aria-live="polite">
           {c.notice}
-        </p>
+        </div>
       )}
       <footer className="auth-footer">
         <div className="auth-footer-row">

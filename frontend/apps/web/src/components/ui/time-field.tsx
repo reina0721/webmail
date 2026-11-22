@@ -4,6 +4,7 @@ import * as React from "react";
 import { useSettingsStore } from "@/stores/settings-store";
 import { cn } from "@/lib/cn";
 import { formatTimeOfDay, isFinishedTimeOfDay, parseTimeOfDay, stepTimeOfDay } from "@/lib/time-of-day";
+import { Input } from "@/components/ui/input";
 
 export interface TimeFieldProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type" | "step"> {
@@ -49,7 +50,7 @@ export const TimeField = React.forwardRef<HTMLInputElement, TimeFieldProps>(
     const invalid = draft !== null && draft.trim() !== "" && parseTimeOfDay(draft) === null;
 
     return (
-      <input
+      <Input
         ref={ref}
         type="text"
         autoComplete="off"

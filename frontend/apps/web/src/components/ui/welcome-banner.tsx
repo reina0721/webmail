@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { NativeBannerSurface } from "@mail-web/ui/native-controls";
 import { X, Lightbulb, Settings, PlayCircle } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -110,11 +111,11 @@ export function WelcomeBanner({ variant = "list" }: { variant?: "list" | "pane" 
   if (!visible) return null;
 
   return (
-    <div
+    <NativeBannerSurface
       role="complementary"
       aria-label={t("title")}
       data-welcome={variant}
-      className={`${variant === "pane" ? "mt-8 mx-auto max-w-md text-start rounded-lg border bg-background shadow-sm" : "border-b bg-accent/30"} border-border transition-all duration-300 ease-out ${
+      className={`${variant === "pane" ? "mt-8 mx-auto max-w-md text-start rounded-xl border bg-background shadow-sm" : "border-b rounded-none bg-accent/30"} border-border transition-all duration-300 ease-out ${
         dismissed ? "opacity-0 scale-y-0 max-h-0 pointer-events-none" : "opacity-100 scale-y-100 max-h-[min(24rem,40dvh)] [@media(max-height:480px)]:max-h-[30dvh] overflow-y-auto"
       }`}
       onTransitionEnd={() => {
@@ -180,6 +181,6 @@ export function WelcomeBanner({ variant = "list" }: { variant?: "list" | "pane" 
           </Button>
         </div>
       </div>
-    </div>
+    </NativeBannerSurface>
   );
 }

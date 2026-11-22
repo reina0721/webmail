@@ -8,9 +8,13 @@ import {
   CheckboxField,
   ConfirmDialog,
   ConsoleAccordionSection,
+  ConsoleKeyValueGrid,
   ConsoleSectionCard,
+  ConsoleSkeleton,
   ConsoleStatusBanner,
+  ConsoleStepBar,
   DnsOutlined,
+  LinearProgress,
   OpenInNewOutlined,
   PasswordField,
   PublicOutlined,
@@ -18,6 +22,7 @@ import {
   ShieldOutlined,
   TextField,
 } from "@mail-web/ui";
+import { copyText } from "./clipboard";
 import {
   setupResourceNames,
   setupSteps,
@@ -58,9 +63,30 @@ export function ConsoleSetup() {
     label: account.name,
   }));
 
+  const setupStepIndex = running
+    ? 2
+    : authorized && c.preview
+      ? 2
+      : authorized
+        ? 1
+        : 0;
+
   return (
     <div className="console-setup">
-      {c.pending && !c.status && <p role="status">正在读取安装状态…</p>}
+      {c.pending && !c.status && (
+        <ConsoleSkeleton variant="form" label="正在读取安装状态…" />
+      )}
+      {(!installed || repair || running) && c.status && (
+        <ConsoleStepBar
+          ariaLabel="安装配置步骤"
+          activeIndex={setupStepIndex}
+          steps={[
+            { label: "授权邮件服务" },
+            { label: "配置站点与运营邮箱" },
+            { label: "确认并应用" },
+          ]}
+        />
+      )}
       {installed && !repair && !running && (
         <ConsoleSectionCard
           title="邮件服务已连接"
@@ -159,11 +185,14 @@ export function ConsoleSetup() {
             }}
           >
             {running && (
-              <p role="status">
-                {c.job.step
-                  ? `当前步骤：${setupSteps[c.job.step] ?? c.job.step}`
-                  : "正在准备配置…"}
-              </p>
+              <>
+                <LinearProgress aria-label="安装配置进度" />
+                <p role="status">
+                  {c.job.step
+                    ? `当前步骤：${setupSteps[c.job.step] ?? c.job.step}`
+                    : "正在准备配置…"}
+                </p>
+              </>
             )}
             {c.job.error && (
               <ConsoleStatusBanner severity="error" role="alert">
@@ -474,21 +503,29 @@ export function ConsoleSetup() {
           description="以下标识来自本次或上次安装任务。站点设置显示当前使用的组件与绑定域名。"
           icon={<DnsOutlined fontSize="small" />}
         >
-          <dl className="console-form-grid">
-            {resources.map(([kind, value]) => (
-              <div key={kind}>
-                <dt className="console-hint">{setupResourceNames[kind]}</dt>
-                <dd>
-                  <code>{value}</code>
-                </dd>
-              </div>
-            ))}
-          </dl>
-          {c.job?.spec?.cloudflareAccount && (
-            <p>
-              Cloudflare Account ID <code>{c.job.spec.cloudflareAccount}</code>
-            </p>
-          )}
+          <ConsoleKeyValueGrid
+            items={[
+              ...resources.map(([kind, value]) => ({
+                id: kind,
+                label: setupResourceNames[kind],
+                value,
+                mono: true,
+                onCopy: () => copyText(value),
+              })),
+              ...(c.job?.spec?.cloudflareAccount
+                ? [
+                    {
+                      id: "cloudflareAccount",
+                      label: "Cloudflare Account ID",
+                      value: c.job.spec.cloudflareAccount,
+                      mono: true,
+                      onCopy: () =>
+                        copyText(c.job?.spec?.cloudflareAccount ?? ""),
+                    },
+                  ]
+                : []),
+            ]}
+          />
         </ConsoleSectionCard>
       )}
       <ConfirmDialog

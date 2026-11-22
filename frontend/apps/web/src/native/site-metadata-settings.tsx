@@ -8,6 +8,7 @@ import {
   ConsoleAccordionSection,
   ConsoleSaveBar,
   ConsoleSectionCard,
+  ConsoleSkeleton,
   ConsoleStatusBanner,
   PaletteOutlined,
   PublicOutlined,
@@ -237,12 +238,10 @@ export function SiteMetadataSettings({
 
   if (loading) {
     return (
-      <ConsoleSectionCard
-        title="站点信息、品牌与扩展配置"
-        icon={<PublicOutlined fontSize="small" />}
-      >
-        <p role="status">正在读取站点品牌、图标与 SEO 配置…</p>
-      </ConsoleSectionCard>
+      <ConsoleSkeleton
+        variant="form"
+        label="正在读取站点品牌、图标与 SEO 配置…"
+      />
     );
   }
 
@@ -688,20 +687,34 @@ export function SiteMetadataSettings({
                 )
               }
             />
-            <TextField
-              label="浅色主题色（Theme Color Light）"
-              hint={`7 位十六进制颜色，例如 ${DEFAULT_SITE_METADATA.themeColorLight}。`}
-              value={draft.themeColorLight}
-              disabled={busy}
-              onChange={(e) => updateField("themeColorLight", e.target.value)}
-            />
-            <TextField
-              label="深色主题色（Theme Color Dark）"
-              hint={`7 位十六进制颜色，例如 ${DEFAULT_SITE_METADATA.themeColorDark}。`}
-              value={draft.themeColorDark}
-              disabled={busy}
-              onChange={(e) => updateField("themeColorDark", e.target.value)}
-            />
+            <div className="console-swatch-row">
+              <span
+                className="console-swatch-dot"
+                style={{ backgroundColor: draft.themeColorLight }}
+                aria-hidden="true"
+              />
+              <TextField
+                label="浅色主题色（Theme Color Light）"
+                hint={`7 位十六进制颜色，例如 ${DEFAULT_SITE_METADATA.themeColorLight}。`}
+                value={draft.themeColorLight}
+                disabled={busy}
+                onChange={(e) => updateField("themeColorLight", e.target.value)}
+              />
+            </div>
+            <div className="console-swatch-row">
+              <span
+                className="console-swatch-dot"
+                style={{ backgroundColor: draft.themeColorDark }}
+                aria-hidden="true"
+              />
+              <TextField
+                label="深色主题色（Theme Color Dark）"
+                hint={`7 位十六进制颜色，例如 ${DEFAULT_SITE_METADATA.themeColorDark}。`}
+                value={draft.themeColorDark}
+                disabled={busy}
+                onChange={(e) => updateField("themeColorDark", e.target.value)}
+              />
+            </div>
           </div>
 
           <ConsoleAccordionSection

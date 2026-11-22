@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Action, FileField, TextField } from "@mail-web/ui";
+import { Action, ConsoleStatusBanner, FileField, TextField } from "@mail-web/ui";
 import { api, errorMessage } from "@platform/lib/api";
 import { AuthBackgroundUpload } from "./auth-background-upload";
 
@@ -136,7 +136,11 @@ export function SiteAssetField({
           {reset}
         </div>
       )}
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <ConsoleStatusBanner severity="error" role="alert">
+          {error}
+        </ConsoleStatusBanner>
+      )}
     </div>
   );
 }

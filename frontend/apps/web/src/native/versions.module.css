@@ -2,22 +2,29 @@
   gap: 12px;
 }
 
-.header,
 .summary {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 0;
 }
 
 .header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
+  gap: 8px 16px;
 }
 
 .summary > div {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--surface-inset);
 }
 
 .summary dt,
@@ -29,6 +36,8 @@
 
 .summary dd {
   margin: 0;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
 }
 
 .build summary {

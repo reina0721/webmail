@@ -210,7 +210,7 @@ const SIDEBAR_HEAD_BUTTON = "text-muted-foreground hover:bg-muted hover:text-for
 
 // Compose in the folder sidebar: pill corners for the main action, in a tint
 // of the primary colour so it doesn't outshine the folders.
-const SIDEBAR_COMPOSE = "min-w-0 h-9 justify-start gap-2 px-3 rounded-full bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary";
+const SIDEBAR_COMPOSE = "min-w-0 h-9 justify-start gap-2 px-3 rounded-full border border-primary/20 bg-primary/10 text-primary shadow-xs hover:bg-primary/20 hover:text-primary hover:shadow-sm";
 
 /** Keeps Tab and Shift+Tab inside `root`, wrapping at either end. */
 function trapTab(e: React.KeyboardEvent, root: HTMLElement | null) {

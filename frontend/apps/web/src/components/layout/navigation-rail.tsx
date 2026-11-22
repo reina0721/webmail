@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { NativeMenuPanel } from "@mail-web/ui/native-controls";
 import {useNativeSession} from '@/stores/native-host-store';
 import { Mail, CalendarEvent, ListTodo, Users, Folder, Settings, Keyboard, Plus, Shield, LogOut, Check, Search, Puzzle, Accessibility, PenSquare } from "@/components/icons";
 import { openAccessibilityPanel } from "@/components/accessibility/accessibility-quick-panel";
@@ -195,7 +196,7 @@ function StorageQuotaCircle({ quota, usagePercent }: { quota: StorageQuota; usag
       </button>
 
       {open && createPortal(
-        <div ref={popoverRef} style={popoverStyle} className="w-52 rounded-lg border border-border bg-background text-foreground shadow-lg p-3 z-50">
+        <NativeMenuPanel ref={popoverRef} style={popoverStyle} className="w-52 p-3 z-50 text-foreground">
           <p className="text-xs font-semibold mb-2">{t("storage")}</p>
           <div className="space-y-1.5 text-xs">
             <div className="flex justify-between">
@@ -227,7 +228,7 @@ function StorageQuotaCircle({ quota, usagePercent }: { quota: StorageQuota; usag
           <p className="text-[0.625rem] text-muted-foreground mt-1 tabular-nums">
             {Math.round(usagePercent)}% {t("storage_used").toLowerCase()}
           </p>
-        </div>,
+        </NativeMenuPanel>,
         document.body
       )}
     </div>
@@ -468,7 +469,7 @@ export function NavigationRail({
                   </span>
                 ))}
                 {isActive && !mountainView && (
-                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-primary" />
+                  <span className="nav-rail-indicator-horiz" aria-hidden="true" />
                 )}
               </div>
               <span className="text-[0.625rem] font-medium leading-tight truncate max-w-full">{t(item.labelKey)}</span>
@@ -489,7 +490,7 @@ export function NavigationRail({
               data-plugin-page-link={`${page.pluginId}/${page.id}`}
               title={page.pluginName}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 py-2 px-0.5 min-h-[44px] grow shrink-0 basis-[var(--tab-item-width,52px)]",
+                "nav-rail-item flex flex-col items-center justify-center gap-1 py-2 px-0.5 min-h-[44px] grow shrink-0 basis-[var(--tab-item-width,52px)]",
                 "transition-colors duration-150",
                 isActive
                   ? "text-primary"
@@ -503,7 +504,7 @@ export function NavigationRail({
               )}>
                 <PageIcon className="w-5 h-5" />
                 {isActive && !mountainView && (
-                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-primary" />
+                  <span className="nav-rail-indicator-horiz" aria-hidden="true" />
                 )}
               </div>
               <span className="text-[0.625rem] font-medium leading-tight truncate max-w-full">{page.title}</span>
@@ -527,7 +528,7 @@ export function NavigationRail({
                 }
               }}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 py-2 px-0.5 min-h-[44px] grow shrink-0 basis-[var(--tab-item-width,52px)]",
+                "nav-rail-item flex flex-col items-center justify-center gap-1 py-2 px-0.5 min-h-[44px] grow shrink-0 basis-[var(--tab-item-width,52px)]",
                 "transition-colors duration-150",
                 isActive
                   ? "text-primary"
@@ -537,7 +538,7 @@ export function NavigationRail({
               <div className="relative">
                 <SidebarAppIcon app={app} className="w-5 h-5" />
                 {isActive && (
-                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-primary" />
+                  <span className="nav-rail-indicator-horiz" aria-hidden="true" />
                 )}
               </div>
               <span className="text-[0.625rem] font-medium leading-tight truncate max-w-full">{app.name}</span>
@@ -550,7 +551,7 @@ export function NavigationRail({
           <a
             href={`${getPathPrefix()}/console/`}
             className={cn(
-              "flex flex-col items-center justify-center gap-1 py-2 px-0.5 min-h-[44px] grow shrink-0 basis-[var(--tab-item-width,52px)]",
+              "nav-rail-item flex flex-col items-center justify-center gap-1 py-2 px-0.5 min-h-[44px] grow shrink-0 basis-[var(--tab-item-width,52px)]",
               "transition-colors duration-150",
               adminActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
             )}
@@ -559,7 +560,7 @@ export function NavigationRail({
             <span className="relative">
               <Shield className="w-5 h-5" />
               {adminActive && !mountainView && (
-                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-primary" />
+                <span className="nav-rail-indicator-horiz" aria-hidden="true" />
               )}
               {hasUpdate && (
                 <span
@@ -585,7 +586,7 @@ export function NavigationRail({
           onClick={handleNavClick('settings')}
           data-tour="nav-settings"
           className={cn(
-            "flex flex-col items-center justify-center gap-1 py-2 px-0.5 min-h-[44px] grow shrink-0 basis-[52px]",
+            "nav-rail-item nav-rail-gear flex flex-col items-center justify-center gap-1 py-2 px-0.5 min-h-[44px] grow shrink-0 basis-[52px]",
             "transition-colors duration-150",
             isSettingsActive
               ? "text-primary"
@@ -596,7 +597,7 @@ export function NavigationRail({
           <div className="relative">
             <Settings className="w-5 h-5" />
             {isSettingsActive && (
-              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-primary" />
+              <span className="nav-rail-indicator-horiz" aria-hidden="true" />
             )}
           </div>
           <span className="text-[0.625rem] font-medium leading-tight truncate max-w-full">{t("settings")}</span>
@@ -615,7 +616,7 @@ export function NavigationRail({
       className={cn(
         // On a short window (a phone on its side) the whole rail scrolls: the
         // pinned group at the bottom left the apps room for two icons.
-        "flex flex-col h-full scroll-hidden [@media(max-height:32rem)]:overflow-y-auto",
+        "mail-nav-rail flex flex-col h-full scroll-hidden [@media(max-height:32rem)]:overflow-y-auto",
         collapsed ? "items-center" : "",
         className
       )}
@@ -695,7 +696,7 @@ export function NavigationRail({
               onClick={handleNavClick(item.id as RailItemId)}
               data-tour={`nav-${item.id}`}
               className={cn(
-                "relative flex items-center gap-2.5 rounded-md transition-colors duration-150",
+                "nav-rail-item relative flex items-center gap-2.5 rounded-lg transition-colors duration-150",
                 collapsed
                   ? "justify-center w-10 h-10"
                   : "px-2.5 text-sm",
@@ -709,6 +710,7 @@ export function NavigationRail({
               title={collapsed ? t(item.labelKey) : undefined}
               style={collapsed ? undefined : { paddingBlock: 'var(--density-sidebar-py)' }}
             >
+              {isActive && <span className="nav-rail-indicator" aria-hidden="true" />}
               <Icon className={cn("w-[18px] h-[18px] flex-shrink-0", isActive && "text-primary")} />
               {!collapsed && <span className="truncate">{t(item.labelKey)}</span>}
               {badgeShown(item) && (unreadCountStyle === 'dot' ? (
@@ -832,13 +834,14 @@ export function NavigationRail({
           <a
             href={`${getPathPrefix()}/console/`}
             className={cn(
-              "flex items-center justify-center w-10 h-10 rounded-md transition-colors relative",
+              "nav-rail-item flex items-center justify-center w-10 h-10 rounded-lg transition-colors relative",
               adminActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted",
             )}
             title={t("admin") || "Admin"}
             aria-label={updateLabel ? `${t("admin") || "Admin"}, ${updateLabel}` : undefined}
             aria-current={adminActive ? "page" : undefined}
           >
+            {adminActive && <span className="nav-rail-indicator" aria-hidden="true" />}
             <Shield className="w-[18px] h-[18px]" />
             {hasUpdate && (
               <span
@@ -852,14 +855,14 @@ export function NavigationRail({
           </a>
         )}
 
-        <NotificationBell placement="side" className="w-10 h-10 rounded-md" />
+        <NotificationBell placement="side" className="w-10 h-10 rounded-lg" />
 
         {showAccessibilityButton && (
           <button
             type="button"
             onClick={openAccessibilityPanel}
             data-testid="rail-accessibility"
-            className="flex items-center justify-center w-10 h-10 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="nav-rail-item flex items-center justify-center w-10 h-10 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             title={t("accessibility")}
             aria-label={t("accessibility")}
             aria-keyshortcuts="Alt+Shift+A"
@@ -875,7 +878,7 @@ export function NavigationRail({
           onClick={handleNavClick('settings')}
           data-tour="nav-settings"
           className={cn(
-            "flex items-center justify-center w-10 h-10 rounded-md transition-colors",
+            "nav-rail-item nav-rail-gear relative flex items-center justify-center w-10 h-10 rounded-lg transition-colors",
             isSettingsActive
               ? "bg-primary/10 text-primary"
               : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -883,10 +886,11 @@ export function NavigationRail({
           title={t("settings")}
           aria-current={isSettingsActive ? "page" : undefined}
         >
+          {isSettingsActive && <span className="nav-rail-indicator" aria-hidden="true" />}
           <Settings className="w-[18px] h-[18px]" />
         </Link>
 
-        <div className="w-8 border-t" style={{ borderColor: 'rgba(128, 128, 128, 0.3)' }} />
+        <div className="kirakira-rail-stripes my-0.5" aria-hidden="true" />
 
         {onShowShortcuts && (
           <button

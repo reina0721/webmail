@@ -9,5 +9,229 @@
   }
 }
 
-@keyframes mail-dialog-enter { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: no-preference) { .MuiDialog-paper { animation: mail-dialog-enter 140ms cubic-bezier(.2,.8,.2,1); } }
+@keyframes tab-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mail-dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes menu-pop-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.965);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes save-bar-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes nav-indicator-in {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) scaleY(0.35);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) scaleY(1);
+  }
+}
+
+@keyframes nav-indicator-horiz-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scaleX(0.35);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scaleX(1);
+  }
+}
+
+@keyframes auth-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes stat-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.72;
+    transform: scale(0.88);
+  }
+}
+
+@keyframes check-pop {
+  0% {
+    opacity: 0.4;
+    transform: scale(0.65);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@keyframes mark-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .MuiDialog-paper {
+    animation: mail-dialog-enter var(--motion-fast, 140ms) var(--ease-expo-out, cubic-bezier(0.19, 1, 0.22, 1));
+  }
+
+  .content-transition {
+    animation: tab-panel-enter var(--motion-base, 180ms) var(--ease-expo-out, cubic-bezier(0.19, 1, 0.22, 1));
+  }
+
+  .menu-pop-surface,
+  .MuiPopover-paper {
+    animation: menu-pop-enter var(--motion-fast, 140ms) var(--ease-expo-out, cubic-bezier(0.19, 1, 0.22, 1));
+  }
+
+  .console-save-bar {
+    animation: save-bar-enter var(--motion-emphasis, 260ms) var(--ease-spring, cubic-bezier(0.175, 0.885, 0.32, 1.275));
+  }
+
+  .console-save-dot {
+    animation: status-pulse 2.2s ease-in-out infinite;
+  }
+
+  .console-nav-indicator,
+  .nav-rail-indicator {
+    animation: nav-indicator-in var(--motion-panel, 220ms) var(--ease-spring, cubic-bezier(0.175, 0.885, 0.32, 1.275));
+  }
+
+  .nav-rail-indicator-horiz {
+    animation: nav-indicator-horiz-in var(--motion-panel, 220ms) var(--ease-spring, cubic-bezier(0.175, 0.885, 0.32, 1.275));
+  }
+
+  .auth-card {
+    animation: auth-card-enter var(--motion-emphasis, 260ms) var(--ease-expo-out, cubic-bezier(0.19, 1, 0.22, 1));
+  }
+
+  .console-stat-card {
+    animation: stat-card-enter var(--motion-base, 180ms) var(--ease-expo-out, cubic-bezier(0.19, 1, 0.22, 1)) backwards;
+    animation-delay: calc(var(--stagger-index, 0) * 24ms);
+  }
+
+  .console-copy-check {
+    animation: check-pop var(--motion-panel, 220ms) var(--ease-spring, cubic-bezier(0.175, 0.885, 0.32, 1.275));
+  }
+
+  .console-skeleton-bar {
+    animation: skeleton-shimmer 1.5s var(--ease-fluent, cubic-bezier(0.1, 0.9, 0.2, 1)) infinite;
+  }
+
+  .native-mark {
+    animation: mark-float 2.6s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .MuiDialog-paper,
+  .MuiPopover-paper,
+  .content-transition,
+  .menu-pop-surface,
+  .console-save-bar,
+  .console-save-dot,
+  .console-nav-indicator,
+  .nav-rail-indicator,
+  .nav-rail-indicator-horiz,
+  .auth-card,
+  .console-stat-card,
+  .console-copy-check,
+  .console-skeleton-bar,
+  .native-mark,
+  .native-workspace {
+    animation: none;
+    transition: none;
+  }
+}
+
+:root[data-motion="reduced"] .MuiDialog-paper,
+:root[data-motion="reduced"] .MuiPopover-paper,
+:root[data-motion="reduced"] .content-transition,
+:root[data-motion="reduced"] .menu-pop-surface,
+:root[data-motion="reduced"] .console-save-bar,
+:root[data-motion="reduced"] .console-save-dot,
+:root[data-motion="reduced"] .console-nav-indicator,
+:root[data-motion="reduced"] .nav-rail-indicator,
+:root[data-motion="reduced"] .nav-rail-indicator-horiz,
+:root[data-motion="reduced"] .auth-card,
+:root[data-motion="reduced"] .console-stat-card,
+:root[data-motion="reduced"] .console-copy-check,
+:root[data-motion="reduced"] .console-skeleton-bar,
+:root[data-motion="reduced"] .native-mark,
+:root[data-motion="reduced"] .native-workspace {
+  animation: none;
+  transition: none;
+}

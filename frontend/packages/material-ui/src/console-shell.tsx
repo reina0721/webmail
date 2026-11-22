@@ -3,6 +3,7 @@ import {
   useEffect,
   useId,
   useState,
+  type CSSProperties,
   type MouseEvent,
   type ReactNode,
 } from "react";
@@ -45,6 +46,8 @@ import MenuOpenOutlined from "@mui/icons-material/MenuOpenOutlined";
 import MenuOutlined from "@mui/icons-material/MenuOutlined";
 import RestartAltOutlined from "@mui/icons-material/RestartAltOutlined";
 import SaveOutlined from "@mui/icons-material/SaveOutlined";
+import { AccentPresetPicker } from "./primitives";
+import type { AccentPresetId } from "./theme";
 
 export type ConsoleTone =
   | "default"
@@ -173,8 +176,8 @@ export function ConsoleStatusChip({
         color: s.fg,
         border: "1px solid",
         borderColor: s.border,
-        height: size === "small" ? 24 : 28,
-        fontSize: size === "small" ? 12 : 13,
+        height: size === "small" ? 22 : 26,
+        fontSize: size === "small" ? 11.5 : 12.5,
       }}
     />
   );
@@ -197,6 +200,8 @@ export function ConsoleShell({
   operatorEmail,
   dark = false,
   onToggleDark,
+  accent = "sakura",
+  onChangeAccent,
   backHref = "/",
   backLabel = "返回邮箱",
   versionText,
@@ -219,6 +224,8 @@ export function ConsoleShell({
   operatorEmail?: string;
   dark?: boolean;
   onToggleDark?: () => void;
+  accent?: AccentPresetId;
+  onChangeAccent?: (next: AccentPresetId) => void;
   backHref?: string;
   backLabel?: string;
   versionText?: string;
@@ -261,7 +268,7 @@ export function ConsoleShell({
     setFlyout(null);
   }, [pageTitle]);
 
-  const drawerWidth = effectiveCollapsed ? 74 : 268;
+  const drawerWidth = effectiveCollapsed ? 68 : 248;
   const flyoutId = useId();
 
   const renderNavContent = (mini: boolean, closeDrawer?: () => void) => (
@@ -275,16 +282,16 @@ export function ConsoleShell({
         color: "var(--ink)",
       }}
     >
-      {/* Brand header */}
+      {/* Compact brand header */}
       <Box
         sx={{
           display: "flex",
           alignItems: "center",
           justifyContent: mini ? "center" : "space-between",
           gap: 1,
-          px: mini ? 1 : 2,
-          pt: 2,
-          pb: 1.5,
+          px: mini ? 1 : 1.75,
+          pt: 1.5,
+          pb: 1.25,
         }}
       >
         {renderLink({
@@ -297,34 +304,34 @@ export function ConsoleShell({
               sx={{
                 display: "inline-flex",
                 alignItems: "center",
-                gap: 1.25,
+                gap: 1,
                 minWidth: 0,
               }}
             >
               <Box
+                className="console-brand-badge"
                 sx={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: "10px",
+                  width: 32,
+                  height: 32,
+                  borderRadius: "9px",
                   display: "grid",
                   placeItems: "center",
                   bgcolor: "var(--accent-10)",
                   border: "1px solid var(--accent-20)",
                   color: "var(--accent-50)",
                   flexShrink: 0,
-                  overflow: "hidden",
                 }}
               >
                 {logoUrl ? (
                   <img
                     src={logoUrl}
                     alt=""
-                    style={{ width: 22, height: 22, objectFit: "contain" }}
+                    style={{ width: 20, height: 20, objectFit: "contain" }}
                   />
                 ) : (
                   <Typography
                     component="span"
-                    sx={{ fontWeight: 800, fontSize: 16 }}
+                    sx={{ fontWeight: 800, fontSize: 15 }}
                   >
                     ✦
                   </Typography>
@@ -333,13 +340,14 @@ export function ConsoleShell({
               {!mini && (
                 <Box sx={{ minWidth: 0 }}>
                   <Typography
-                    variant="subtitle1"
+                    variant="subtitle2"
                     noWrap
                     sx={{
                       fontWeight: 750,
                       letterSpacing: "-0.02em",
                       lineHeight: 1.2,
                       color: "var(--ink)",
+                      fontSize: 14,
                     }}
                   >
                     {brand}
@@ -349,7 +357,7 @@ export function ConsoleShell({
                     noWrap
                     sx={{
                       display: "block",
-                      fontSize: 11,
+                      fontSize: 10.5,
                       letterSpacing: "0.08em",
                       color: "var(--muted)",
                       fontWeight: 600,
@@ -385,7 +393,7 @@ export function ConsoleShell({
       </Box>
 
       {mini && !isMobile && (
-        <Box sx={{ display: "flex", justifyContent: "center", pb: 1 }}>
+        <Box sx={{ display: "flex", justifyContent: "center", pb: 0.75 }}>
           <Tooltip title="展开侧边栏" placement="right">
             <IconButton
               size="small"
@@ -398,7 +406,7 @@ export function ConsoleShell({
         </Box>
       )}
 
-      <Divider sx={{ mx: mini ? 1.5 : 2, mb: 1 }} />
+      <Divider sx={{ mx: mini ? 1.25 : 1.75, mb: 0.75 }} />
 
       {/* Navigation groups */}
       <Box
@@ -409,20 +417,20 @@ export function ConsoleShell({
           minHeight: 0,
           overflowY: "auto",
           overflowX: "hidden",
-          px: mini ? 1 : 1.5,
-          py: 0.5,
+          px: mini ? 0.85 : 1.25,
+          py: 0.25,
         }}
       >
         {groups.map((group, groupIndex) => (
-          <Box key={group.id} sx={{ mb: 1.75 }}>
+          <Box key={group.id} sx={{ mb: 1.25 }}>
             {!mini ? (
               <Typography
                 variant="caption"
                 sx={{
                   display: "block",
-                  px: 1.5,
-                  py: 0.75,
-                  fontSize: 11,
+                  px: 1.25,
+                  py: 0.5,
+                  fontSize: 10.5,
                   fontWeight: 700,
                   letterSpacing: "0.08em",
                   color: "var(--muted)",
@@ -431,7 +439,7 @@ export function ConsoleShell({
                 {group.label}
               </Typography>
             ) : (
-              groupIndex > 0 && <Divider sx={{ my: 1, mx: 1 }} />
+              groupIndex > 0 && <Divider sx={{ my: 0.75, mx: 1 }} />
             )}
 
             <List disablePadding dense>
@@ -447,7 +455,9 @@ export function ConsoleShell({
                     <ListItemButton
                       selected={isSelected}
                       aria-label={item.label}
-                      aria-current={item.active && !childActive ? "page" : undefined}
+                      aria-current={
+                        item.active && !childActive ? "page" : undefined
+                      }
                       aria-haspopup={hasChildren ? "menu" : undefined}
                       aria-expanded={
                         hasChildren ? flyout?.item.id === item.id : undefined
@@ -464,8 +474,8 @@ export function ConsoleShell({
                       }}
                       sx={{
                         justifyContent: "center",
-                        px: 1,
-                        py: 1.15,
+                        px: 0.75,
+                        py: 1,
                         position: "relative",
                       }}
                     >
@@ -493,7 +503,9 @@ export function ConsoleShell({
                                 ? "warning"
                                 : "primary"
                           }
-                          invisible={item.badge === undefined || item.badge === 0}
+                          invisible={
+                            item.badge === undefined || item.badge === 0
+                          }
                         >
                           {item.icon}
                         </Badge>
@@ -534,7 +546,7 @@ export function ConsoleShell({
                       sx={{
                         display: "flex",
                         alignItems: "center",
-                        gap: 0.5,
+                        gap: 0.25,
                       }}
                     >
                       {renderLink({
@@ -548,7 +560,7 @@ export function ConsoleShell({
                             selected={item.active && !childActive}
                             sx={{
                               position: "relative",
-                              pr: hasChildren ? 1 : 1.5,
+                              pr: hasChildren ? 0.75 : 1.25,
                               bgcolor:
                                 childActive && !item.active
                                   ? "var(--accent-5)"
@@ -563,7 +575,7 @@ export function ConsoleShell({
                             )}
                             <ListItemIcon
                               sx={{
-                                minWidth: 34,
+                                minWidth: 30,
                                 color: isSelected
                                   ? "var(--accent-50)"
                                   : "var(--icon-muted)",
@@ -577,7 +589,7 @@ export function ConsoleShell({
                                 primary: {
                                   noWrap: true,
                                   sx: {
-                                    fontSize: 13.5,
+                                    fontSize: 13,
                                     fontWeight: isSelected ? 650 : 500,
                                   },
                                 },
@@ -588,11 +600,12 @@ export function ConsoleShell({
                                 size="small"
                                 label={item.badge}
                                 sx={{
-                                  height: 20,
+                                  height: 19,
                                   fontSize: 11,
                                   ml: 0.5,
-                                  bgcolor: toneStyles(item.badgeTone ?? "primary")
-                                    .bg,
+                                  bgcolor: toneStyles(
+                                    item.badgeTone ?? "primary",
+                                  ).bg,
                                   color: toneStyles(item.badgeTone ?? "primary")
                                     .fg,
                                 }}
@@ -612,7 +625,8 @@ export function ConsoleShell({
                             transform: isExpanded
                               ? "rotate(180deg)"
                               : "rotate(0deg)",
-                            transition: "transform 160ms ease",
+                            transition:
+                              "transform var(--motion-panel) var(--ease-fluent)",
                           }}
                         >
                           <ExpandMoreOutlined fontSize="small" />
@@ -626,9 +640,9 @@ export function ConsoleShell({
                           disablePadding
                           dense
                           sx={{
-                            pl: 2.5,
-                            ml: 1.75,
-                            my: 0.25,
+                            pl: 2,
+                            ml: 1.5,
+                            my: 0.2,
                             borderLeft: "1px solid var(--line)",
                           }}
                         >
@@ -643,8 +657,8 @@ export function ConsoleShell({
                                   <ListItemButton
                                     selected={!!sub.active}
                                     sx={{
-                                      py: 0.7,
-                                      px: 1.25,
+                                      py: 0.55,
+                                      px: 1,
                                       position: "relative",
                                     }}
                                   >
@@ -657,7 +671,7 @@ export function ConsoleShell({
                                     {sub.icon && (
                                       <ListItemIcon
                                         sx={{
-                                          minWidth: 28,
+                                          minWidth: 26,
                                           color: sub.active
                                             ? "var(--accent-50)"
                                             : "var(--icon-muted)",
@@ -672,7 +686,7 @@ export function ConsoleShell({
                                         primary: {
                                           noWrap: true,
                                           sx: {
-                                            fontSize: 13,
+                                            fontSize: 12.5,
                                             fontWeight: sub.active ? 650 : 480,
                                           },
                                         },
@@ -694,30 +708,44 @@ export function ConsoleShell({
         ))}
       </Box>
 
-      {/* Footer */}
-      <Divider sx={{ mx: mini ? 1.5 : 2 }} />
+      {/* Subtle KIRAKIRA twin diagonal motif divider */}
+      <Box
+        aria-hidden="true"
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+          px: mini ? 1.25 : 1.75,
+        }}
+      >
+        <Divider sx={{ flex: 1 }} />
+        <span className="kirakira-rail-stripes" />
+        <Divider sx={{ flex: 1 }} />
+      </Box>
+
+      {/* Compact Footer */}
       <Box
         component="footer"
         sx={{
-          p: mini ? 1 : 1.75,
+          p: mini ? 0.85 : 1.5,
           display: "flex",
           flexDirection: "column",
-          gap: 1,
+          gap: 0.85,
         }}
       >
         {!mini && operatorEmail && (
           <Box
             sx={{
-              px: 1.25,
-              py: 0.75,
-              borderRadius: "10px",
+              px: 1.15,
+              py: 0.65,
+              borderRadius: "9px",
               bgcolor: "var(--surface-inset)",
               border: "1px solid var(--line)",
             }}
           >
             <Typography
               variant="caption"
-              sx={{ display: "block", color: "var(--muted)", fontSize: 10.5 }}
+              sx={{ display: "block", color: "var(--muted)", fontSize: 10 }}
             >
               当前管理员
             </Typography>
@@ -742,13 +770,10 @@ export function ConsoleShell({
             flexDirection: mini ? "column" : "row",
             alignItems: "center",
             justifyContent: mini ? "center" : "space-between",
-            gap: 0.75,
+            gap: 0.5,
           }}
         >
-          <Tooltip
-            title={backLabel}
-            placement={mini ? "right" : "top"}
-          >
+          <Tooltip title={backLabel} placement={mini ? "right" : "top"}>
             <span>
               {renderLink({
                 href: backHref,
@@ -764,7 +789,7 @@ export function ConsoleShell({
                     size="small"
                     variant="text"
                     startIcon={<ChevronLeft fontSize="small" />}
-                    sx={{ color: "var(--muted)", px: 1 }}
+                    sx={{ color: "var(--muted)", px: 0.75, minHeight: 30 }}
                   >
                     {backLabel}
                   </Button>
@@ -773,31 +798,54 @@ export function ConsoleShell({
             </span>
           </Tooltip>
 
-          {onToggleDark && (
-            <Tooltip
-              title={dark ? "切换浅色主题" : "切换深色主题"}
-              placement={mini ? "right" : "top"}
-            >
-              <IconButton
-                size="small"
-                aria-label={dark ? "切换浅色主题" : "切换深色主题"}
-                onClick={onToggleDark}
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: mini ? "column" : "row",
+              alignItems: "center",
+              gap: 0.25,
+            }}
+          >
+            {onChangeAccent && (
+              <AccentPresetPicker
+                value={accent}
+                onChange={onChangeAccent}
+                dark={dark}
+                mode="popover"
+                placement={mini ? "right" : "top"}
+              />
+            )}
+            {onToggleDark && (
+              <Tooltip
+                title={dark ? "切换浅色主题" : "切换深色主题"}
+                placement={mini ? "right" : "top"}
               >
-                {dark ? (
-                  <LightModeOutlined fontSize="small" />
-                ) : (
-                  <DarkModeOutlined fontSize="small" />
-                )}
-              </IconButton>
-            </Tooltip>
-          )}
+                <IconButton
+                  size="small"
+                  aria-label={dark ? "切换浅色主题" : "切换深色主题"}
+                  onClick={onToggleDark}
+                >
+                  {dark ? (
+                    <LightModeOutlined fontSize="small" />
+                  ) : (
+                    <DarkModeOutlined fontSize="small" />
+                  )}
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
         </Box>
 
         {!mini && versionText && (
           <Typography
             variant="caption"
             noWrap
-            sx={{ px: 1, color: "var(--muted)", fontSize: 11 }}
+            sx={{
+              px: 0.75,
+              color: "var(--muted)",
+              fontSize: 10.5,
+              fontVariantNumeric: "tabular-nums",
+            }}
           >
             {versionText}
           </Typography>
@@ -817,7 +865,7 @@ export function ConsoleShell({
         color: "var(--ink)",
       }}
     >
-      {/* Desktop persistent sidebar (expanded or mini) */}
+      {/* Desktop persistent sidebar */}
       {!isMobile && (
         <Drawer
           variant="permanent"
@@ -825,13 +873,14 @@ export function ConsoleShell({
           sx={{
             width: drawerWidth,
             flexShrink: 0,
-            transition: "width 180ms cubic-bezier(.2,.8,.2,1)",
+            transition: "width var(--motion-panel) var(--ease-fluent)",
             "& .MuiDrawer-paper": {
               width: drawerWidth,
               boxSizing: "border-box",
               borderRight: "1px solid var(--line)",
               bgcolor: "var(--surface-sidebar)",
-              transition: "width 180ms cubic-bezier(.2,.8,.2,1)",
+              boxShadow: "var(--shadow-rail)",
+              transition: "width var(--motion-panel) var(--ease-fluent)",
               overflowX: "hidden",
             },
           }}
@@ -840,7 +889,7 @@ export function ConsoleShell({
         </Drawer>
       )}
 
-      {/* Mobile slide-out temporary drawer */}
+      {/* Mobile slide-out drawer */}
       {isMobile && (
         <Drawer
           variant="temporary"
@@ -849,7 +898,7 @@ export function ConsoleShell({
           ModalProps={{ keepMounted: true }}
           sx={{
             "& .MuiDrawer-paper": {
-              width: 280,
+              width: 272,
               maxWidth: "86vw",
               boxSizing: "border-box",
               bgcolor: "var(--surface-sidebar)",
@@ -861,7 +910,7 @@ export function ConsoleShell({
         </Drawer>
       )}
 
-      {/* Mini sidebar Popover flyout for multi-child sections */}
+      {/* Mini sidebar Popover flyout */}
       <Popover
         id={flyoutId}
         open={!!flyout}
@@ -873,18 +922,18 @@ export function ConsoleShell({
           paper: {
             sx: {
               ml: 1,
-              minWidth: 224,
-              p: 1,
+              minWidth: 216,
+              p: 0.75,
             },
           },
         }}
       >
         {flyout && (
           <Box>
-            <Box sx={{ px: 1.25, py: 0.75 }}>
+            <Box sx={{ px: 1, py: 0.5 }}>
               <Typography
                 variant="subtitle2"
-                sx={{ fontWeight: 700, color: "var(--ink)" }}
+                sx={{ fontWeight: 700, fontSize: 12.5, color: "var(--ink)" }}
               >
                 {flyout.item.label}
               </Typography>
@@ -903,7 +952,7 @@ export function ConsoleShell({
                         {sub.icon && (
                           <ListItemIcon
                             sx={{
-                              minWidth: 30,
+                              minWidth: 28,
                               color: sub.active
                                 ? "var(--accent-50)"
                                 : "var(--icon-muted)",
@@ -917,7 +966,7 @@ export function ConsoleShell({
                           slotProps={{
                             primary: {
                               sx: {
-                                fontSize: 13,
+                                fontSize: 12.5,
                                 fontWeight: sub.active ? 650 : 500,
                               },
                             },
@@ -955,17 +1004,25 @@ export function ConsoleShell({
             alignItems: { xs: "stretch", md: "center" },
             justifyContent: "space-between",
             flexDirection: { xs: "column", md: "row" },
-            gap: 2,
-            px: { xs: 2, sm: 3, md: 4.5 },
-            py: { xs: 1.75, md: 2.25 },
+            gap: { xs: 2, md: 1.5 },
+            px: { xs: 2, sm: 2.5, md: 3.5 },
+            py: { xs: 1.25, md: 1.5 },
             borderBottom: "1px solid var(--line)",
             bgcolor: "var(--surface-topbar)",
-            backdropFilter: "blur(14px)",
+            backdropFilter: "blur(var(--surface-acrylic-blur, 16px))",
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, minWidth: 0 }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1.25,
+              minWidth: 0,
+            }}
+          >
             {isMobile && (
               <IconButton
+                size="small"
                 aria-label="打开导航菜单"
                 onClick={() => setMobileOpen(true)}
                 sx={{
@@ -981,8 +1038,8 @@ export function ConsoleShell({
                 <Breadcrumbs
                   aria-label="面包屑导航"
                   sx={{
-                    mb: 0.25,
-                    "& .MuiBreadcrumbs-ol": { fontSize: 12 },
+                    mb: 0.15,
+                    "& .MuiBreadcrumbs-ol": { fontSize: 11.5 },
                     color: "var(--muted)",
                   }}
                 >
@@ -999,7 +1056,11 @@ export function ConsoleShell({
                       <Typography
                         key={crumb.label}
                         variant="caption"
-                        sx={{ color: "var(--muted)", fontWeight: 600 }}
+                        sx={{
+                          color: "var(--muted)",
+                          fontWeight: 600,
+                          fontSize: 11.5,
+                        }}
                       >
                         {crumb.label}
                       </Typography>
@@ -1010,10 +1071,12 @@ export function ConsoleShell({
               {pageTitle && (
                 <Typography
                   component="h1"
-                  variant="h5"
+                  variant="h6"
                   sx={{
+                    fontSize: { xs: 18, md: 20 },
                     fontWeight: 750,
                     letterSpacing: "-0.025em",
+                    lineHeight: 1.25,
                     color: "var(--ink)",
                   }}
                 >
@@ -1022,8 +1085,13 @@ export function ConsoleShell({
               )}
               {pageSubtitle && (
                 <Typography
-                  variant="body2"
-                  sx={{ color: "var(--muted)", mt: 0.25 }}
+                  variant="caption"
+                  sx={{
+                    display: "block",
+                    color: "var(--muted)",
+                    mt: 0.15,
+                    fontSize: 12.5,
+                  }}
                 >
                   {pageSubtitle}
                 </Typography>
@@ -1036,9 +1104,9 @@ export function ConsoleShell({
               sx={{
                 display: "flex",
                 alignItems: "center",
-                gap: 1.5,
+                gap: 1.25,
                 flexWrap: "wrap",
-                "& .mail-field": { minWidth: { xs: "100%", sm: 260 } },
+                "& .mail-field": { minWidth: { xs: "100%", sm: 240 } },
               }}
             >
               {headerActions}
@@ -1053,11 +1121,11 @@ export function ConsoleShell({
             flex: 1,
             minHeight: 0,
             overflowY: "auto",
-            px: { xs: 2, sm: 3, md: 4.5 },
-            py: { xs: 2.25, md: 3.5 },
+            px: { xs: 2, sm: 2.5, md: 3.5 },
+            py: { xs: 2, md: 2.5 },
             display: "flex",
             flexDirection: "column",
-            gap: 2.5,
+            gap: 2,
           }}
         >
           {children}
@@ -1087,11 +1155,11 @@ export function ConsolePageTabs({
     <Paper
       elevation={0}
       sx={{
-        borderRadius: "14px",
+        borderRadius: "11px",
         border: "1px solid var(--line)",
         bgcolor: "var(--surface-card)",
-        px: 1.5,
-        boxShadow: "var(--shadow-card)",
+        px: 1,
+        boxShadow: "var(--shadow-xs)",
       }}
     >
       <Tabs
@@ -1108,14 +1176,16 @@ export function ConsolePageTabs({
             icon={item.icon ? <span>{item.icon}</span> : undefined}
             iconPosition="start"
             label={
-              <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
+              <Box
+                sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}
+              >
                 <span>{item.label}</span>
                 {item.badge !== undefined && item.badge !== 0 && (
                   <Chip
                     size="small"
                     label={item.badge}
                     sx={{
-                      height: 20,
+                      height: 18,
                       fontSize: 11,
                       bgcolor: "var(--accent-10)",
                       color: "var(--accent-70)",
@@ -1151,10 +1221,7 @@ export function ConsoleSectionCard({
   className?: string;
 }) {
   return (
-    <section
-      id={id}
-      className={`console-panel ${className}`.trim()}
-    >
+    <section id={id} className={`console-panel ${className}`.trim()}>
       <Box
         component="header"
         sx={{
@@ -1162,23 +1229,30 @@ export function ConsoleSectionCard({
           alignItems: { xs: "flex-start", sm: "center" },
           justifyContent: "space-between",
           flexDirection: { xs: "column", sm: "row" },
-          gap: 1.5,
+          gap: 1.25,
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, minWidth: 0 }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 1.25,
+            minWidth: 0,
+          }}
+        >
           {icon && (
             <Box
               aria-hidden="true"
               sx={{
-                width: 38,
-                height: 38,
-                borderRadius: "10px",
+                width: 34,
+                height: 34,
+                borderRadius: "9px",
                 bgcolor: "var(--accent-10)",
+                border: "1px solid var(--accent-20)",
                 color: "var(--accent-50)",
                 display: "grid",
                 placeItems: "center",
                 flexShrink: 0,
-                mt: 0.25,
               }}
             >
               {icon}
@@ -1189,14 +1263,14 @@ export function ConsoleSectionCard({
               sx={{
                 display: "flex",
                 alignItems: "center",
-                gap: 1,
+                gap: 0.85,
                 flexWrap: "wrap",
               }}
             >
               <Typography
                 component="h2"
                 variant="subtitle1"
-                sx={{ fontWeight: 700, color: "var(--ink)" }}
+                sx={{ fontWeight: 700, fontSize: 15, color: "var(--ink)" }}
               >
                 {title}
               </Typography>
@@ -1210,7 +1284,12 @@ export function ConsoleSectionCard({
             {description && (
               <Typography
                 variant="body2"
-                sx={{ color: "var(--muted)", mt: 0.5, lineHeight: 1.65 }}
+                sx={{
+                  color: "var(--muted)",
+                  mt: 0.25,
+                  fontSize: 12.5,
+                  lineHeight: 1.55,
+                }}
               >
                 {description}
               </Typography>
@@ -1218,7 +1297,14 @@ export function ConsoleSectionCard({
           </Box>
         </Box>
         {headerAction && (
-          <Box sx={{ flexShrink: 0, display: "flex", gap: 1, flexWrap: "wrap" }}>
+          <Box
+            sx={{
+              flexShrink: 0,
+              display: "flex",
+              gap: 0.85,
+              flexWrap: "wrap",
+            }}
+          >
             {headerAction}
           </Box>
         )}
@@ -1256,10 +1342,10 @@ export function ConsoleAccordionSection({
       expanded={expanded}
       onChange={(_, next) => onExpandedChange?.(next)}
       sx={{
-        boxShadow: "var(--shadow-card)",
+        boxShadow: "var(--shadow-xs)",
       }}
     >
-      <AccordionSummary expandIcon={<ExpandMoreOutlined />}>
+      <AccordionSummary expandIcon={<ExpandMoreOutlined fontSize="small" />}>
         <Box
           sx={{
             display: "flex",
@@ -1267,17 +1353,19 @@ export function ConsoleAccordionSection({
             justifyContent: "space-between",
             width: "100%",
             pr: 1,
-            gap: 1.5,
+            gap: 1.25,
             flexWrap: "wrap",
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, minWidth: 0 }}>
+          <Box
+            sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}
+          >
             {icon && (
               <Box
                 aria-hidden="true"
                 sx={{
-                  width: 32,
-                  height: 32,
+                  width: 30,
+                  height: 30,
                   borderRadius: "8px",
                   bgcolor: "var(--surface-inset)",
                   color: "var(--accent-50)",
@@ -1292,14 +1380,14 @@ export function ConsoleAccordionSection({
             <Box sx={{ minWidth: 0 }}>
               <Typography
                 variant="subtitle2"
-                sx={{ fontWeight: 700, color: "var(--ink)" }}
+                sx={{ fontWeight: 700, fontSize: 13.5, color: "var(--ink)" }}
               >
                 {title}
               </Typography>
               {description && (
                 <Typography
                   variant="caption"
-                  sx={{ display: "block", color: "var(--muted)" }}
+                  sx={{ display: "block", color: "var(--muted)", fontSize: 12 }}
                 >
                   {description}
                 </Typography>
@@ -1315,7 +1403,7 @@ export function ConsoleAccordionSection({
         </Box>
       </AccordionSummary>
       <AccordionDetails>
-        <Stack spacing={2}>{children}</Stack>
+        <Stack spacing={1.5}>{children}</Stack>
       </AccordionDetails>
     </Accordion>
   );
@@ -1349,39 +1437,50 @@ export function ConsoleSaveBar({
       className="console-save-bar"
       sx={{
         position: "sticky",
-        bottom: 12,
+        bottom: 10,
         zIndex: 12,
-        mt: 1,
-        px: 2.5,
-        py: 1.5,
-        borderRadius: "14px",
+        mt: 0.5,
+        px: 2,
+        py: 1.25,
+        borderRadius: "12px",
         border: "1px solid var(--accent-30)",
         bgcolor: "var(--surface-overlay)",
-        backdropFilter: "blur(16px)",
+        backdropFilter: "blur(var(--surface-acrylic-blur, 16px))",
         boxShadow: "var(--shadow-flyout)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         flexWrap: "wrap",
-        gap: 1.5,
+        gap: 1.25,
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.15 }}>
         <Box
           aria-hidden="true"
+          className="console-save-dot"
           sx={{
-            width: 9,
-            height: 9,
+            width: 8,
+            height: 8,
             borderRadius: "50%",
             bgcolor: "var(--accent-50)",
             boxShadow: "0 0 0 4px var(--accent-10)",
           }}
         />
-        <Typography variant="body2" sx={{ fontWeight: 600, color: "var(--ink)" }}>
+        <Typography
+          variant="body2"
+          sx={{ fontWeight: 620, fontSize: 13, color: "var(--ink)" }}
+        >
           {saving ? "正在保存配置…" : summary}
         </Typography>
       </Box>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 0.85,
+          flexWrap: "wrap",
+        }}
+      >
         {onReset && dirty && (
           <Button
             variant="text"
@@ -1399,7 +1498,7 @@ export function ConsoleSaveBar({
           disabled={!dirty || saving || disabled}
           startIcon={
             saving ? (
-              <CircularProgress size={15} color="inherit" />
+              <CircularProgress size={14} color="inherit" />
             ) : (
               <SaveOutlined fontSize="small" />
             )
@@ -1429,7 +1528,10 @@ export function ConsoleStatusBanner({
   return (
     <Alert
       severity={severity}
-      role={role ?? (severity === "error" || severity === "warning" ? "alert" : "status")}
+      role={
+        role ??
+        (severity === "error" || severity === "warning" ? "alert" : "status")
+      }
       action={action}
       sx={{
         bgcolor:
@@ -1451,7 +1553,9 @@ export function ConsoleStatusBanner({
                 : "color-mix(in oklab, var(--info), transparent 70%)",
       }}
     >
-      {title && <AlertTitle sx={{ fontWeight: 700 }}>{title}</AlertTitle>}
+      {title && (
+        <AlertTitle sx={{ fontWeight: 700, fontSize: 13 }}>{title}</AlertTitle>
+      )}
       {children}
     </Alert>
   );
@@ -1464,6 +1568,7 @@ export function ConsoleStatCard({
   icon,
   tone = "primary",
   action,
+  staggerIndex = 0,
 }: {
   label: string;
   value: ReactNode;
@@ -1471,20 +1576,23 @@ export function ConsoleStatCard({
   icon?: ReactNode;
   tone?: ConsoleTone;
   action?: ReactNode;
+  staggerIndex?: number;
 }) {
   const s = toneStyles(tone);
   return (
     <Paper
       elevation={0}
+      className="console-stat-card"
+      style={{ "--stagger-index": staggerIndex } as CSSProperties}
       sx={{
-        p: 2.25,
-        borderRadius: "14px",
+        p: 1.75,
+        borderRadius: "12px",
         border: "1px solid var(--line)",
         bgcolor: "var(--surface-card)",
         boxShadow: "var(--shadow-card)",
         display: "flex",
         flexDirection: "column",
-        gap: 1.25,
+        gap: 0.85,
         minWidth: 0,
       }}
     >
@@ -1496,15 +1604,18 @@ export function ConsoleStatCard({
           gap: 1,
         }}
       >
-        <Typography variant="caption" sx={{ color: "var(--muted)", fontWeight: 600 }}>
+        <Typography
+          variant="caption"
+          sx={{ color: "var(--muted)", fontWeight: 650, fontSize: 12 }}
+        >
           {label}
         </Typography>
         {icon && (
           <Box
             aria-hidden="true"
             sx={{
-              width: 30,
-              height: 30,
+              width: 28,
+              height: 28,
               borderRadius: "8px",
               bgcolor: s.bg,
               color: s.fg,
@@ -1520,10 +1631,10 @@ export function ConsoleStatCard({
       <Typography
         component="strong"
         sx={{
-          fontSize: 28,
+          fontSize: 24,
           fontWeight: 750,
-          lineHeight: 1.1,
-          letterSpacing: "-0.02em",
+          lineHeight: 1.12,
+          letterSpacing: "-0.025em",
           fontVariantNumeric: "tabular-nums",
           color: "var(--ink)",
         }}
@@ -1541,7 +1652,10 @@ export function ConsoleStatCard({
           }}
         >
           {hint && (
-            <Typography variant="caption" sx={{ color: "var(--muted)" }}>
+            <Typography
+              variant="caption"
+              sx={{ color: "var(--muted)", fontSize: 11.5 }}
+            >
               {hint}
             </Typography>
           )}

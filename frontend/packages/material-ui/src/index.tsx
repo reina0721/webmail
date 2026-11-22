@@ -7,8 +7,14 @@ import {
   type ComponentProps,
   type Ref,
 } from "react";
+import CloseOutlined from "@mui/icons-material/CloseOutlined";
+import ExpandMoreOutlined from "@mui/icons-material/ExpandMoreOutlined";
+import InfoOutlined from "@mui/icons-material/InfoOutlined";
+import SearchOutlined from "@mui/icons-material/SearchOutlined";
+import UploadFileOutlined from "@mui/icons-material/UploadFileOutlined";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
+import WarningAmberOutlined from "@mui/icons-material/WarningAmberOutlined";
 import {
   Button,
   IconButton,
@@ -36,6 +42,7 @@ import {
   Autocomplete,
   Slider,
 } from "@mui/material";
+
 export {
   Box,
   Stack,
@@ -83,7 +90,16 @@ export {
   Tooltip,
   CircularProgress,
 } from "@mui/material";
+
 export * from "./console-shell";
+export * from "./primitives";
+export {
+  ACCENT_PRESETS,
+  getAccentPreset,
+  type AccentPreset,
+  type AccentPresetId,
+} from "./theme";
+
 export { default as MailOutlined } from "@mui/icons-material/MailOutlined";
 export { default as CalendarMonthOutlined } from "@mui/icons-material/CalendarMonthOutlined";
 export { default as PeopleOutlined } from "@mui/icons-material/PeopleOutlined";
@@ -138,6 +154,12 @@ export { default as RestartAltOutlined } from "@mui/icons-material/RestartAltOut
 export { default as DarkModeOutlined } from "@mui/icons-material/DarkModeOutlined";
 export { default as LightModeOutlined } from "@mui/icons-material/LightModeOutlined";
 export { default as ExpandMoreOutlined } from "@mui/icons-material/ExpandMoreOutlined";
+export { default as CloseOutlined } from "@mui/icons-material/CloseOutlined";
+export { default as CheckOutlined } from "@mui/icons-material/CheckOutlined";
+export { default as SearchOutlined } from "@mui/icons-material/SearchOutlined";
+export { default as ColorLensOutlined } from "@mui/icons-material/ColorLensOutlined";
+export { default as UploadFileOutlined } from "@mui/icons-material/UploadFileOutlined";
+
 type ActionProps = {
   children: ReactNode;
   leadingIcon?: ReactNode;
@@ -150,6 +172,7 @@ type ActionProps = {
   type?: "button" | "submit" | "reset";
   onPress?: () => void;
 };
+
 export function Action({
   children,
   leadingIcon,
@@ -176,7 +199,7 @@ export function Action({
       disabled={disabled || loading}
       onClick={onPress}
       startIcon={
-        loading ? <CircularProgress size={16} color="inherit" /> : leadingIcon
+        loading ? <CircularProgress size={15} color="inherit" /> : leadingIcon
       }
       endIcon={trailingIcon}
     >
@@ -184,6 +207,7 @@ export function Action({
     </Button>
   );
 }
+
 export function IconAction({
   label,
   children,
@@ -225,12 +249,13 @@ export function IconAction({
           color={active ? "primary" : "default"}
           onClick={onPress}
         >
-          {loading ? <CircularProgress size={18} /> : children}
+          {loading ? <CircularProgress size={16} /> : children}
         </IconButton>
       </span>
     </Tooltip>
   );
 }
+
 type FieldProps = Omit<
   ComponentProps<typeof Field>,
   "error" | "ref" | "size"
@@ -240,6 +265,7 @@ type FieldProps = Omit<
   purpose?: string;
   ref?: Ref<HTMLInputElement>;
 };
+
 export function TextField({ hint, error, purpose, ref, ...props }: FieldProps) {
   return (
     <Field
@@ -253,9 +279,11 @@ export function TextField({ hint, error, purpose, ref, ...props }: FieldProps) {
     />
   );
 }
+
 export function TextAreaField(props: FieldProps) {
   return <TextField multiline minRows={props.rows ?? 4} {...props} />;
 }
+
 export function PasswordField({
   showLabel = "显示密码",
   hideLabel = "隐藏密码",
@@ -288,6 +316,7 @@ export function PasswordField({
     />
   );
 }
+
 export function SelectField({
   label,
   value,
@@ -342,6 +371,7 @@ export function SelectField({
     </Field>
   );
 }
+
 export function CheckboxField({
   label,
   checked,
@@ -373,24 +403,26 @@ export function CheckboxField({
     control
   ) : (
     <FormControlLabel
+      sx={{ m: 0, alignItems: "flex-start", gap: 0.5 }}
       control={control}
       label={
-        <span>
+        <Box component="span" sx={{ pt: 0.35, display: "block", fontSize: 13 }}>
           {label}
           {description && (
             <Typography
               component="small"
-              sx={{ display: "block" }}
+              sx={{ display: "block", fontSize: 11.5 }}
               color="text.secondary"
             >
               {description}
             </Typography>
           )}
-        </span>
+        </Box>
       }
     />
   );
 }
+
 export function SwitchField({
   label,
   description,
@@ -407,6 +439,18 @@ export function SwitchField({
 }) {
   return (
     <FormControlLabel
+      sx={{
+        m: 0,
+        py: 0.75,
+        px: 1.25,
+        borderRadius: "10px",
+        border: "1px solid var(--line)",
+        bgcolor: "var(--surface-inset)",
+        width: "100%",
+        justifyContent: "space-between",
+        gap: 1.5,
+      }}
+      labelPlacement="start"
       control={
         <Switch
           checked={checked}
@@ -415,20 +459,23 @@ export function SwitchField({
         />
       }
       label={
-        <span>
-          {label}
+        <Box component="span" sx={{ display: "block", minWidth: 0 }}>
+          <Typography component="span" sx={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
+            {label}
+          </Typography>
           <Typography
             component="small"
-            sx={{ display: "block" }}
+            sx={{ display: "block", fontSize: 11.5, mt: 0.2 }}
             color="text.secondary"
           >
             {description}
           </Typography>
-        </span>
+        </Box>
       }
     />
   );
 }
+
 export function FileField({
   label,
   hint,
@@ -449,7 +496,9 @@ export function FileField({
         component="label"
         htmlFor={id}
         variant="outlined"
+        size="small"
         disabled={disabled}
+        startIcon={<UploadFileOutlined fontSize="small" />}
       >
         {label}
         <input
@@ -477,6 +526,7 @@ export function FileField({
     </Box>
   );
 }
+
 export function SliderField({
   label,
   value,
@@ -501,11 +551,36 @@ export function SliderField({
   const id = useId();
   return (
     <Box sx={{ px: 0.5 }}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
-        <Typography component="label" htmlFor={id} variant="body2" color="text.secondary">
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 0.25,
+        }}
+      >
+        <Typography
+          component="label"
+          htmlFor={id}
+          variant="body2"
+          color="text.secondary"
+          sx={{ fontSize: 12.5 }}
+        >
           {label}
         </Typography>
-        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+        <Typography
+          variant="body2"
+          sx={{
+            fontWeight: 650,
+            fontSize: 12.5,
+            fontVariantNumeric: "tabular-nums",
+            color: "var(--accent-70)",
+            bgcolor: "var(--accent-10)",
+            px: 0.85,
+            py: 0.15,
+            borderRadius: "6px",
+          }}
+        >
           {value}
           {unit}
         </Typography>
@@ -524,13 +599,18 @@ export function SliderField({
         }}
       />
       {hint && (
-        <Typography variant="caption" sx={{ display: "block" }} color="text.secondary">
+        <Typography
+          variant="caption"
+          sx={{ display: "block", fontSize: 11.5 }}
+          color="text.secondary"
+        >
           {hint}
         </Typography>
       )}
     </Box>
   );
 }
+
 export function SearchBox({
   label,
   placeholder,
@@ -544,19 +624,42 @@ export function SearchBox({
   onValueChange?: (v: string) => void;
   disabled?: boolean;
 }) {
+  const current = value ?? "";
   return (
     <Field
       fullWidth
       size="small"
       type="search"
       placeholder={placeholder}
-      value={value ?? ""}
+      value={current}
       disabled={disabled}
       onChange={(e) => onValueChange?.(e.target.value)}
-      slotProps={{ htmlInput: { "aria-label": label } }}
+      slotProps={{
+        htmlInput: { "aria-label": label },
+        input: {
+          startAdornment: (
+            <SearchOutlined
+              fontSize="small"
+              aria-hidden="true"
+              sx={{ color: "var(--icon-muted)", mr: 0.75, fontSize: 17 }}
+            />
+          ),
+          endAdornment: current ? (
+            <IconButton
+              size="small"
+              aria-label={`清除${label}`}
+              onClick={() => onValueChange?.("")}
+              sx={{ width: 24, height: 24 }}
+            >
+              <CloseOutlined sx={{ fontSize: 14 }} />
+            </IconButton>
+          ) : undefined,
+        },
+      }}
     />
   );
 }
+
 type MenuAction = {
   id: string;
   label: string;
@@ -565,11 +668,13 @@ type MenuAction = {
   disabled?: boolean;
   tone?: string;
 };
+
 type MenuChoice = MenuAction & {
   value: string;
   selectedId: string;
   options: readonly MenuAction[];
 };
+
 export function MenuButton({
   label,
   ariaLabel,
@@ -623,6 +728,7 @@ export function MenuButton({
         aria-haspopup="menu"
         aria-expanded={!!anchor}
         variant={variant === "quiet" ? "text" : "outlined"}
+        size="small"
         onClick={(e) => setAnchor(e.currentTarget)}
       >
         {label}
@@ -655,6 +761,7 @@ export function MenuButton({
     </>
   );
 }
+
 type OverlayProps = {
   triggerLabel: string;
   title: string;
@@ -664,12 +771,14 @@ type OverlayProps = {
   isOpen?: boolean;
   onOpenChange?: (v: boolean) => void;
 };
+
 export function DrawerSurface({
   triggerLabel,
   title,
   description,
   children,
   footer,
+  badge,
   defaultOpen = false,
   isOpen,
   onOpenChange,
@@ -680,6 +789,7 @@ export function DrawerSurface({
   placement?: "left" | "right";
   composition?: string;
   footer?: ReactNode;
+  badge?: ReactNode;
 }) {
   const [internal, setInternal] = useState(defaultOpen);
   const open = isOpen ?? internal;
@@ -698,7 +808,7 @@ export function DrawerSurface({
       <Drawer anchor={placement} open={open} onClose={() => set(false)}>
         <Box
           sx={{
-            width: "min(480px, 92vw)",
+            width: "min(440px, 92vw)",
             height: "100%",
             display: "flex",
             flexDirection: "column",
@@ -709,38 +819,50 @@ export function DrawerSurface({
         >
           <Box
             sx={{
-              px: 3,
-              pt: 2.5,
-              pb: 2,
+              px: 2.5,
+              py: 2,
               borderBottom: "1px solid var(--line)",
+              bgcolor: "var(--surface-sidebar)",
               display: "flex",
               alignItems: "flex-start",
               justifyContent: "space-between",
               gap: 1.5,
             }}
           >
-            <Box>
-              <Typography id={titleId} variant="h6">
-                {title}
-              </Typography>
+            <Box sx={{ minWidth: 0 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                <Typography id={titleId} variant="h6" sx={{ fontSize: 16 }}>
+                  {title}
+                </Typography>
+                {badge}
+              </Box>
               {description && (
-                <Typography color="text.secondary" variant="body2" sx={{ mt: 0.5 }}>
+                <Typography
+                  color="text.secondary"
+                  variant="body2"
+                  noWrap
+                  sx={{ mt: 0.35, fontSize: 12.5 }}
+                >
                   {description}
                 </Typography>
               )}
             </Box>
-            <IconButton aria-label={closeLabel} onClick={() => set(false)}>
-              ×
+            <IconButton
+              size="small"
+              aria-label={closeLabel}
+              onClick={() => set(false)}
+            >
+              <CloseOutlined fontSize="small" />
             </IconButton>
           </Box>
-          <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", p: 3 }}>
+          <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", p: 2.5 }}>
             {children}
           </Box>
           {footer && (
             <Box
               sx={{
-                px: 3,
-                py: 2,
+                px: 2.5,
+                py: 1.5,
                 borderTop: "1px solid var(--line)",
                 bgcolor: "var(--surface-sidebar)",
                 display: "flex",
@@ -756,6 +878,7 @@ export function DrawerSurface({
     </>
   );
 }
+
 export function ConfirmDialog({
   triggerLabel,
   title,
@@ -780,9 +903,9 @@ export function ConfirmDialog({
   confirmDisabled?: boolean;
   tone?: string;
 }) {
-  const [internal, setInternal] = useState(defaultOpen),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState(false);
+  const [internal, setInternal] = useState(defaultOpen);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
   const lock = useRef(false);
   const open = isOpen ?? internal;
   const set = (v: boolean) => {
@@ -792,11 +915,12 @@ export function ConfirmDialog({
     }
   };
   const id = useId();
+  const isDanger = tone === "danger";
   return (
     <>
       {isOpen === undefined && (
         <Action
-          variant={tone === "danger" ? "danger" : "secondary"}
+          variant={isDanger ? "danger" : "secondary"}
           onPress={() => set(true)}
         >
           {triggerLabel}
@@ -806,28 +930,58 @@ export function ConfirmDialog({
         open={open}
         onClose={() => set(false)}
         aria-labelledby={id}
-        maxWidth="sm"
+        maxWidth="xs"
         fullWidth
       >
-        <DialogTitle id={id}>{title}</DialogTitle>
+        <DialogTitle
+          id={id}
+          sx={{ display: "flex", alignItems: "center", gap: 1.25 }}
+        >
+          <Box
+            aria-hidden="true"
+            sx={{
+              width: 30,
+              height: 30,
+              borderRadius: "8px",
+              display: "grid",
+              placeItems: "center",
+              flexShrink: 0,
+              bgcolor: isDanger ? "var(--danger-soft)" : "var(--accent-10)",
+              color: isDanger ? "var(--danger)" : "var(--accent-50)",
+            }}
+          >
+            {isDanger ? (
+              <WarningAmberOutlined sx={{ fontSize: 18 }} />
+            ) : (
+              <InfoOutlined sx={{ fontSize: 18 }} />
+            )}
+          </Box>
+          <span>{title}</span>
+        </DialogTitle>
         <DialogContent>
-          <Typography sx={{ mb: 2 }}>{description}</Typography>
+          <Typography
+            variant="body2"
+            sx={{ mb: impact || children || error ? 1.5 : 0, color: "var(--muted)", lineHeight: 1.6 }}
+          >
+            {description}
+          </Typography>
           {impact}
           {children}
           {error && (
-            <Alert severity="error">
+            <Alert severity="error" sx={{ mt: 1.5 }}>
               {failureMessage ?? "操作失败，请重试"}
             </Alert>
           )}
         </DialogContent>
         <DialogActions>
-          <Button disabled={busy} onClick={() => set(false)}>
+          <Button size="small" disabled={busy} onClick={() => set(false)}>
             {cancelLabel}
           </Button>
           <Button
+            size="small"
             disabled={busy || confirmDisabled}
             variant="contained"
-            color={tone === "danger" ? "error" : "primary"}
+            color={isDanger ? "error" : "primary"}
             onClick={async () => {
               if (lock.current) return;
               lock.current = true;
@@ -852,7 +1006,9 @@ export function ConfirmDialog({
     </>
   );
 }
+
 export const DialogSurface = ConfirmDialog;
+
 export function DisclosurePanel({
   title,
   description,
@@ -868,29 +1024,23 @@ export function DisclosurePanel({
 }) {
   return (
     <Accordion defaultExpanded={defaultExpanded} disabled={disabled}>
-      <AccordionSummary expandIcon={<span>⌄</span>}>
-        <span>
-          {title}
+      <AccordionSummary expandIcon={<ExpandMoreOutlined fontSize="small" />}>
+        <Box>
+          <Typography variant="subtitle2" sx={{ fontWeight: 650 }}>
+            {title}
+          </Typography>
           {description && (
-            <Typography color="text.secondary" variant="body2">
+            <Typography color="text.secondary" variant="caption">
               {description}
             </Typography>
           )}
-        </span>
+        </Box>
       </AccordionSummary>
       <AccordionDetails>{children}</AccordionDetails>
     </Accordion>
   );
 }
-export function ContentSwapTransition({
-  children,
-}: {
-  children: ReactNode;
-  contentKey: string;
-  initialChange?: boolean;
-}) {
-  return <div className="content-transition">{children}</div>;
-}
+
 // Recipient entry keeps free-form mail addresses and address-book suggestions together.
 export function RecipientField({
   label,
@@ -917,7 +1067,7 @@ export function RecipientField({
           v.flatMap((s) =>
             s
               .split(/[,;，；]/)
-              .map((v) => v.trim())
+              .map((entry) => entry.trim())
               .filter(Boolean),
           ),
         )

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, useId, type ReactNode } from "react";
-import { Check, ChevronDown, Search } from '@/components/icons';
+import { NativeMenuPanel, NativeSelectTrigger } from "@mail-web/ui/native-controls";
+import { Check, Search } from '@/components/icons';
 import { cn } from '@/lib/utils';
 
 export interface SearchableOption {
@@ -193,11 +194,11 @@ export function SearchableSelect({
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>
-      <button
-        type="button"
+      <NativeSelectTrigger
         ref={buttonRef}
+        open={open}
         onClick={toggle}
-        className={cn("flex items-center gap-2 px-3 py-1.5 text-sm rounded-md bg-muted border border-border text-foreground hover:border-muted-foreground focus:outline-hidden transition-colors duration-150 cursor-pointer w-full", buttonClassName)}
+        className={buttonClassName}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={ariaLabel}
@@ -208,11 +209,10 @@ export function SearchableSelect({
             <span className="flex-1 truncate text-start">{current?.label ?? value}</span>
           </>
         )}
-        <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-150", open && "rotate-180")} />
-      </button>
+      </NativeSelectTrigger>
 
       {open && (
-        <div className={cn("absolute end-0 z-50 mt-1 w-64 max-w-[80vw] rounded-md border border-border bg-background shadow-lg", menuClassName)}>
+        <NativeMenuPanel className={cn("absolute end-0 z-50 mt-1 w-64 max-w-[80vw] overflow-hidden", menuClassName)}>
           <div className="flex items-center gap-2 border-b border-border px-3">
             <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
             <input
@@ -236,12 +236,12 @@ export function SearchableSelect({
               spellCheck={false}
             />
           </div>
-          <ul ref={listRef} id={listId} role="listbox" aria-label={ariaLabel} className="max-h-72 overflow-auto py-1">
+          <ul ref={listRef} id={listId} role="listbox" aria-label={ariaLabel} className="max-h-72 overflow-auto p-1">
             {results.map((option, index) => {
               const heading = showGroups && option.group && option.group !== results[index - 1]?.group ? option.group : null;
               return [
                 heading && (
-                  <li key={`group-${heading}`} role="presentation" className="px-3 pt-2 pb-1 text-xs font-medium text-muted-foreground">
+                  <li key={`group-${heading}`} role="presentation" className="px-2.5 pt-2 pb-1 text-xs font-medium text-muted-foreground">
                     {heading}
                   </li>
                 ),
@@ -255,14 +255,14 @@ export function SearchableSelect({
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => pick(option.value)}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer",
-                    index === active ? "bg-accent text-accent-foreground" : "text-foreground"
+                    "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm cursor-pointer transition-colors",
+                    index === active ? "bg-accent text-accent-foreground font-medium" : "text-foreground hover:bg-accent/50"
                   )}
                 >
                   {option.icon}
                   <span className="truncate" dir="auto">{option.label}</span>
                   {option.hint && <span className="truncate text-xs text-muted-foreground">{option.hint}</span>}
-                  {option.value === value && <Check className="ms-auto h-4 w-4 shrink-0" />}
+                  {option.value === value && <Check className="ms-auto h-4 w-4 shrink-0 text-primary" />}
                 </li>,
               ];
             })}
@@ -270,7 +270,7 @@ export function SearchableSelect({
               <li className="px-3 py-2 text-sm text-muted-foreground">{noMatchLabel}</li>
             )}
           </ul>
-        </div>
+        </NativeMenuPanel>
       )}
     </div>
   );

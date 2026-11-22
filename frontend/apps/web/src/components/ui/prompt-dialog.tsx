@@ -145,7 +145,7 @@ export function PromptDialog({
           className={cn("min-w-0 flex-1", error && "border-destructive focus-visible:border-destructive")}
         />
         {suffix && (
-          <span className="max-w-[50%] shrink-0 truncate text-sm text-muted-foreground" dir="auto" data-testid="prompt-suffix">
+          <span className="max-w-[50%] shrink-0 truncate rounded-md border border-border bg-muted px-2 py-1 text-xs font-medium text-muted-foreground" dir="auto" data-testid="prompt-suffix">
             {suffix}
           </span>
         )}

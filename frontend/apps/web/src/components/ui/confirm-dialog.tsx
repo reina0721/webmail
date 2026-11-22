@@ -140,7 +140,7 @@ export function ConfirmDialog({
       showClose={false}
       icon={
         variant === "destructive" ? (
-          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+          <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-destructive/10 border border-destructive/20 flex items-center justify-center">
             <AlertTriangle className="w-5 h-5 text-destructive" />
           </div>
         ) : undefined

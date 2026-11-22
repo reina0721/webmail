@@ -1187,7 +1187,7 @@ export function SettingsApp({ linkSegments: routeSegments }: SettingsAppProps = 
   // Desktop layout
   const settingsMain = (
       <AppMain key={effectiveActiveTab} ref={attachContentScroll as (el: HTMLElement | null) => void} embedded={isEmbedded} label={activeTabLabel} className="relative flex-1 overflow-y-auto">
-        <div className={effectiveActiveTab.startsWith(PLUGIN_PAGE_PREFIX) ? "px-6 py-6" : "max-w-3xl mx-auto px-6 py-6"}>
+        <div className={cn("content-enter-surface", effectiveActiveTab.startsWith(PLUGIN_PAGE_PREFIX) ? "px-6 py-5" : "max-w-3xl mx-auto px-6 py-5")}>
           {/* The page's heading for screen readers; the sidebar shows which
               page is open (the phone header has a visible one). */}
           <h1 className="sr-only">{activeTabLabel}</h1>
@@ -1296,16 +1296,19 @@ export function SettingsApp({ linkSegments: routeSegments }: SettingsAppProps = 
                         aria-current={effectiveActiveTab === tab.id ? 'page' : undefined}
                         onClick={() => handleTabSelect(tab.id)}
                         className={cn(
-                          'w-full text-start py-2 pe-3 rounded-md text-sm transition-colors duration-150 flex items-center gap-2.5',
+                          'nav-rail-item relative w-full text-start py-2 pe-3 rounded-lg text-sm transition-colors duration-150 flex items-center gap-2.5',
                           tab.sub ? 'ps-9' : 'ps-3',
                           effectiveActiveTab === tab.id
                             ? 'bg-accent text-accent-foreground font-medium'
                             : 'hover:bg-muted text-foreground'
                         )}
                       >
+                        {effectiveActiveTab === tab.id && (
+                          <span className="nav-rail-indicator" aria-hidden="true" />
+                        )}
                         <Icon className={cn(
                           'w-4 h-4 shrink-0',
-                          effectiveActiveTab === tab.id ? 'text-accent-foreground' : 'text-muted-foreground'
+                          effectiveActiveTab === tab.id ? 'text-primary' : 'text-muted-foreground'
                         )} />
                         <span className="truncate" dir="auto" title={tab.label}>{tab.label}</span>
                       </button>

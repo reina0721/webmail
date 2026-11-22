@@ -85,7 +85,7 @@ export function MobileHeader({
         "flex items-center justify-between h-14 shrink-0",
         mountainView
           ? "mx-2 mt-2 mb-1 rounded-full border-0 bg-muted px-2 shadow-sm"
-          : "border-b border-border bg-background px-4",
+          : "mail-mobile-header border-b border-border bg-background px-4",
         className
       )}
     >

@@ -99,7 +99,7 @@ export function PullToRefreshIndicator({ store, threshold, labels }: PullToRefre
       aria-live="polite"
       aria-hidden={settling || undefined}
       className={cn(
-        "pointer-events-none fixed left-1/2 z-[70] flex items-center gap-2 rounded-full",
+        "mail-menu-panel pointer-events-none fixed left-1/2 z-[70] flex items-center gap-2 rounded-full",
         "border border-border bg-background/95 px-3 py-1.5 shadow-lg backdrop-blur-sm",
         // The pull follows the finger, so only the snap-back and the park at
         // the threshold are animated.

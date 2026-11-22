@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useState, useCallback, useRef, useId } from "react";
+import { NativeToastSurface } from "@mail-web/ui/native-controls";
 import { shortcutKey } from "@/lib/keyboard";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
@@ -239,11 +240,11 @@ export function ToastItem({ toast, onClose, held = false, stackHovered = false, 
   );
 
   return (
-    <div
+    <NativeToastSurface
+      toastType={toast.type}
       className={cn(
-        "toast-item group relative flex items-start gap-2.5 w-[360px] max-w-[calc(100vw-2.5rem)] rounded-md",
+        "toast-item group relative flex items-start gap-2.5 w-[360px] max-w-[calc(100vw-2.5rem)] rounded-lg",
         "bg-popover text-popover-foreground border border-border",
-        "shadow-[0_6px_16px_rgb(0,0,0,0.1)] dark:shadow-[0_6px_16px_rgb(0,0,0,0.4)]",
         "overflow-hidden pt-3 pe-2.5 pb-3.5 ps-3.5",
         // Phone: as wide as the screen allows (the container keeps 12px).
         "max-sm:w-full max-sm:max-w-none touch-pan-y rtl:[--toast-slide:-1]",
@@ -378,7 +379,7 @@ export function ToastItem({ toast, onClose, held = false, stackHovered = false, 
           />
         </div>
       )}
-    </div>
+    </NativeToastSurface>
   );
 }
 

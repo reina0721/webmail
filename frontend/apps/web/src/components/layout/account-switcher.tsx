@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo, useId } from "react";
 import { createPortal } from "react-dom";
+import { NativeMenuPanel } from "@mail-web/ui/native-controls";
 import { Check, Plus, LogOut, Mails, Star, ChevronDown, AlertCircle, GripVertical, X, Settings, Cloud } from "@/components/icons";
 import { useTranslations } from "next-intl";
 import type { Mailbox } from "@/lib/jmap/types";
@@ -360,7 +361,7 @@ export function AccountSwitcher({
       </button>
 
       {open && createPortal(
-        <div
+        <NativeMenuPanel
           ref={popoverRef}
           style={popoverStyle}
           className={cn(
@@ -368,7 +369,7 @@ export function AccountSwitcher({
             // Width and radius come from the layout's own tokens, keyed on the
             // attribute below. Under Mountain View it is Gmail's tinted card
             // holding a white one, with a close button in the corner.
-            mvPopover ? "shadow-xl bg-[var(--mv-search-bg)] p-3 max-h-[calc(100dvh-5rem)] overflow-y-auto" : "w-72 rounded-lg border border-border bg-background"
+            mvPopover ? "shadow-xl bg-[var(--mv-search-bg)] p-3 max-h-[calc(100dvh-5rem)] overflow-y-auto" : "w-72 rounded-xl border border-border bg-background"
           )}
           data-mv-account-popover={mvPopover ? "" : undefined}
           role="menu"
@@ -681,7 +682,7 @@ export function AccountSwitcher({
               </button>
             )}
           </div>
-        </div>,
+        </NativeMenuPanel>,
         document.body
       )}
     </>

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Action,
   ConfirmDialog,
+  ConsoleKeyValueGrid,
   ConsoleSectionCard,
   ConsoleStatusBanner,
   OpenInNewOutlined,
@@ -15,6 +16,7 @@ import { api, ApiError, errorMessage } from "@platform/lib/api";
 import { useInstallationLeave } from "@platform/host/use-installation-leave";
 import type { components } from "@platform/lib/generated-api";
 
+import { copyText } from "./clipboard";
 import { turnstileKeyValid } from "./turnstile-key";
 
 type Account = { id: string; name: string };
@@ -210,46 +212,58 @@ export function TurnstileSetup({
             请先在上方保存 Webmail 的 HTTPS 域名。当前 IP 可用于直接使用邮箱。
           </ConsoleStatusBanner>
         )}
-        <dl className="console-form-grid">
-          <div>
-            <dt className="console-hint">当前 Webmail 主机名</dt>
-            <dd>{hostname || "请先设置主地址"}</dd>
-          </div>
-          <div>
-            <dt className="console-hint">Cloudflare 账号 ID</dt>
-            <dd>{binding ? <code>{binding.accountId}</code> : "尚无确认记录"}</dd>
-          </div>
-          <div>
-            <dt className="console-hint">Cloudflare 组件名称</dt>
-            <dd>
-              {binding ? <code>{binding.widgetName}</code> : "尚无确认记录"}
-            </dd>
-          </div>
-          <div>
-            <dt className="console-hint">Cloudflare 上次确认的域名</dt>
-            <dd>{binding?.hostnames.join("、") || "尚无确认记录"}</dd>
-          </div>
-          <div>
-            <dt className="console-hint">Site Key · 浏览器使用的公开标识</dt>
-            <dd>
-              {turnstileKeyValid(siteKey) ? (
-                <code>{siteKey}</code>
-              ) : siteKey ? (
-                "保存的值格式无效"
-              ) : configuration ? (
-                "未保存"
-              ) : (
-                "尚未读取"
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt className="console-hint">Secret · 服务端校验密钥</dt>
-            <dd>
-              {secretSet ? "已加密保存" : configuration ? "未保存" : "尚未读取"}
-            </dd>
-          </div>
-        </dl>
+        <ConsoleKeyValueGrid
+          items={[
+            {
+              id: "hostname",
+              label: "当前 Webmail 主机名",
+              value: hostname || "请先设置主地址",
+            },
+            {
+              id: "accountId",
+              label: "Cloudflare 账号 ID",
+              value: binding ? binding.accountId : "尚无确认记录",
+              mono: !!binding,
+              onCopy: binding ? () => copyText(binding.accountId) : undefined,
+            },
+            {
+              id: "widgetName",
+              label: "Cloudflare 组件名称",
+              value: binding ? binding.widgetName : "尚无确认记录",
+              mono: !!binding,
+              onCopy: binding ? () => copyText(binding.widgetName) : undefined,
+            },
+            {
+              id: "hostnames",
+              label: "Cloudflare 上次确认的域名",
+              value: binding?.hostnames.join("、") || "尚无确认记录",
+            },
+            {
+              id: "siteKey",
+              label: "Site Key · 浏览器使用的公开标识",
+              value: turnstileKeyValid(siteKey)
+                ? siteKey
+                : siteKey
+                  ? "保存的值格式无效"
+                  : configuration
+                    ? "未保存"
+                    : "尚未读取",
+              mono: turnstileKeyValid(siteKey),
+              onCopy: turnstileKeyValid(siteKey)
+                ? () => copyText(siteKey)
+                : undefined,
+            },
+            {
+              id: "secret",
+              label: "Secret · 服务端校验密钥",
+              value: secretSet
+                ? "已加密保存"
+                : configuration
+                  ? "未保存"
+                  : "尚未读取",
+            },
+          ]}
+        />
         {binding && hostname && (
           <ConsoleStatusBanner
             severity={hostnameAllowed ? "success" : "warning"}

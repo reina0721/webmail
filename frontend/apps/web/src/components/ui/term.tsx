@@ -114,8 +114,8 @@ export function TermInfo({ id, className }: TermInfoProps) {
         hidden={!open}
         style={shift ? { transform: `translateX(${shift}px)` } : undefined}
         className={cn(
-          'absolute start-0 top-full z-50 mt-1 block w-72 max-w-[calc(100vw-1rem)]',
-          'rounded-md border border-border bg-popover p-3 text-start text-xs font-normal normal-case leading-relaxed tracking-normal text-popover-foreground shadow-md whitespace-normal',
+          'mail-menu-panel absolute start-0 top-full z-50 mt-1 block w-72 max-w-[calc(100vw-1rem)]',
+          'rounded-lg border border-border bg-popover p-3 text-start text-xs font-normal normal-case leading-relaxed tracking-normal text-popover-foreground shadow-md whitespace-normal',
         )}
       >
         <span className="block font-medium text-foreground">{term}</span>

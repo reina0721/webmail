@@ -100,22 +100,24 @@ export function PopoutShell({ kind, accountId, children }: {
 
 export function PopoutSkeleton({ label }: { label: string }) {
   return (
-    <div role="status" aria-label={label} className="flex flex-1 flex-col gap-4 p-6" data-popout-skeleton="">
-      <div className="h-6 w-2/3 rounded bg-muted" />
-      <div className="h-4 w-1/3 rounded bg-muted" />
-      <div className="mt-4 h-4 w-full rounded bg-muted" />
-      <div className="h-4 w-5/6 rounded bg-muted" />
-      <div className="h-4 w-4/6 rounded bg-muted" />
+    <div role="status" aria-label={label} className="flex flex-1 flex-col gap-3.5 p-6" data-popout-skeleton="">
+      <div className="console-skeleton-bar h-6 w-2/3" />
+      <div className="console-skeleton-bar h-4 w-1/3" />
+      <div className="console-skeleton-bar mt-4 h-4 w-full" />
+      <div className="console-skeleton-bar h-4 w-5/6" />
+      <div className="console-skeleton-bar h-4 w-4/6" />
     </div>
   );
 }
 
 export function PopoutNotice({ title, body, children }: { title: string; body?: string; children?: React.ReactNode }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center" data-popout-notice="">
-      <h1 className="text-lg font-semibold text-foreground">{title}</h1>
-      {body && <p className="max-w-md text-sm text-muted-foreground">{body}</p>}
-      {children && <div className="mt-2 flex items-center gap-2">{children}</div>}
+    <div className="flex flex-1 items-center justify-center p-6" data-popout-notice="">
+      <div className="native-loading-card">
+        <h1 className="text-lg font-semibold text-foreground">{title}</h1>
+        {body && <p className="max-w-md text-sm text-muted-foreground">{body}</p>}
+        {children && <div className="mt-2 flex items-center gap-2">{children}</div>}
+      </div>
     </div>
   );
 }

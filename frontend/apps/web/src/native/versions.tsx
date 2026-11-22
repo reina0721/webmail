@@ -4,9 +4,12 @@ import { useEffect, useState } from "react";
 import {
   Action,
   Autocomplete,
+  Box,
   ConfirmDialog,
   ConsoleAccordionSection,
+  ConsoleCopyAction,
   ConsoleSectionCard,
+  ConsoleSkeleton,
   ConsoleStatusBanner,
   ConsoleStatusChip,
   LinearProgress,
@@ -16,6 +19,7 @@ import {
 } from "@mail-web/ui";
 import { api, ApiError, errorMessage } from "@platform/lib/api";
 import type { components } from "@platform/lib/generated-api";
+import { copyText } from "./clipboard";
 import styles from "./versions.module.css";
 
 type View = components["schemas"]["DeploymentView"];
@@ -335,9 +339,14 @@ export function Versions() {
               title="构建信息"
               description="查看当前运行构建的 Git 源码提交哈希。"
             >
-              <p>
-                源码提交 <code>{view.revision}</code>
-              </p>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
+                <span>源码提交</span>
+                <code>{view.revision}</code>
+                <ConsoleCopyAction
+                  label="复制提交哈希"
+                  onCopy={() => copyText(view.revision)}
+                />
+              </Box>
             </ConsoleAccordionSection>
             <div className={styles.controls}>
               <div className={styles.row}>
@@ -550,7 +559,7 @@ export function Versions() {
             </div>
           </>
         ) : (
-          <p role="status">正在读取运行版本…</p>
+          <ConsoleSkeleton variant="panel" label="正在读取运行版本…" />
         )}
       </ConsoleSectionCard>
       {job && (
@@ -627,21 +636,39 @@ export function Versions() {
             )}
             {job.runningVersion && <p>实际运行版本 {job.runningVersion}</p>}
             {job.recoveryCommand && (
-              <p>
-                宿主机恢复命令 <code>{job.recoveryCommand}</code>
-              </p>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
+                <span>宿主机恢复命令</span>
+                <code>{job.recoveryCommand}</code>
+                <ConsoleCopyAction
+                  label="复制宿主机恢复命令"
+                  onCopy={() => copyText(job.recoveryCommand ?? "")}
+                />
+              </Box>
             )}
             {!view?.managerOnline && (
-              <p>
-                宿主机任务详情{" "}
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
+                <span>宿主机任务详情</span>
                 <code>
                   sudo ./bin/mailweb-version-manager version-manager job {job.id}
                 </code>
-              </p>
+                <ConsoleCopyAction
+                  label="复制宿主机任务命令"
+                  onCopy={() =>
+                    copyText(
+                      `sudo ./bin/mailweb-version-manager version-manager job ${job.id}`,
+                    )
+                  }
+                />
+              </Box>
             )}
-            <p>
-              任务 ID <code>{job.id}</code>
-            </p>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
+              <span>任务 ID</span>
+              <code>{job.id}</code>
+              <ConsoleCopyAction
+                label="复制任务 ID"
+                onCopy={() => copyText(job.id)}
+              />
+            </Box>
           </div>
         </ConsoleSectionCard>
       )}

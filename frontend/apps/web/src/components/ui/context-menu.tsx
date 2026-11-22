@@ -643,7 +643,7 @@ export const ContextMenu = forwardRef<HTMLDivElement, ContextMenuProps>(
         >
           {/* Taller than the window: scroll inside the menu. */}
           <div
-            className="py-1 overflow-y-auto"
+            className="p-1 overflow-y-auto"
             data-menu-scroll=""
             style={{ maxHeight: listMaxHeight(adjustedPosition?.maxHeight) }}
           >
@@ -666,12 +666,12 @@ ContextMenu.displayName = "ContextMenu";
  * (R7); the desktop keeps its density.
  */
 export const CONTEXT_MENU_ITEM_CLASS =
-  "w-full px-3 py-1.5 text-sm text-start flex items-center gap-2 pointer-coarse:min-h-11 " +
-  "transition-colors duration-150 focus:outline-none focus-visible:bg-muted hover:bg-muted cursor-pointer " +
+  "w-full px-3 py-1.5 text-sm text-start flex items-center gap-2 pointer-coarse:min-h-11 rounded-md " +
+  "transition-colors duration-150 focus:outline-none focus-visible:bg-accent/60 hover:bg-accent/60 cursor-pointer " +
   "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent";
 
 /** The menu's panel look, for a host that draws its own panel (a sheet on the phone). */
-export const CONTEXT_MENU_PANEL_CLASS = "bg-background rounded-md shadow-lg border border-border";
+export const CONTEXT_MENU_PANEL_CLASS = "mail-menu-panel bg-popover rounded-lg shadow-lg border border-border";
 
 interface ContextMenuItemProps {
   icon?: React.ComponentType<{ className?: string }>;
@@ -713,11 +713,11 @@ export function ContextMenuItem({
       title={title}
       className={cn(
         // 44px rows on a touch screen (R7); the desktop keeps its density.
-        "w-full px-3 py-1.5 text-sm text-start flex items-center gap-2 pointer-coarse:min-h-11",
+        "w-full px-3 py-1.5 text-sm text-start flex items-center gap-2 pointer-coarse:min-h-11 rounded-md",
         "transition-colors duration-150",
-        "focus:outline-none focus-visible:bg-muted",
+        "focus:outline-none focus-visible:bg-accent/60",
         disabled && "opacity-50 cursor-not-allowed",
-        !disabled && "hover:bg-muted cursor-pointer",
+        !disabled && "hover:bg-accent/60 cursor-pointer",
         destructive && !disabled && "hover:bg-destructive/10 hover:text-destructive focus-visible:bg-destructive/10 focus-visible:text-destructive"
       )}
       // Hovering another entry closes an open submenu of this level, after
@@ -942,10 +942,10 @@ export function ContextMenuSubMenu({
         ref={triggerRef}
         data-submenu-trigger=""
         className={cn(
-          "w-full px-3 py-1.5 text-sm flex items-center gap-2 outline-none pointer-coarse:min-h-11",
+          "w-full px-3 py-1.5 text-sm flex items-center gap-2 outline-none pointer-coarse:min-h-11 rounded-md",
           "transition-colors duration-150",
-          disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-muted focus-visible:bg-muted",
-          isOpen && !disabled && "bg-muted"
+          disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-accent/60 focus-visible:bg-accent/60",
+          isOpen && !disabled && "bg-accent/60"
         )}
         role="menuitem"
         tabIndex={-1}
@@ -1094,7 +1094,7 @@ export const SubMenuPanel = forwardRef<HTMLDivElement, SubMenuPanelProps>(functi
   // moving it to the window's edge doesn't wrap them onto more lines and make
   // it taller than it was measured.
   return (
-    <div
+    <NativeMenuPanel
       {...rest}
       ref={setRefs}
       className={cn("fixed z-50 w-max", className)}
@@ -1107,10 +1107,10 @@ export const SubMenuPanel = forwardRef<HTMLDivElement, SubMenuPanelProps>(functi
       }}
     >
       {/* Taller than the window: it scrolls inside, as a long menu does. */}
-      <div className="py-1 overflow-y-auto" data-menu-scroll="" style={{ maxHeight: listMaxHeight(pos?.maxHeight) }}>
+      <div className="p-1 overflow-y-auto" data-menu-scroll="" style={{ maxHeight: listMaxHeight(pos?.maxHeight) }}>
         {children}
       </div>
-    </div>
+    </NativeMenuPanel>
   );
 });
 

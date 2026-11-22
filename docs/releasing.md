@@ -4,7 +4,7 @@
 
 ## 版本与权限准备
 
-本次候选版本为 `v0.4.0-alpha.21`。每次发布前先检查 [Releases](https://github.com/reina0721/webmail/releases) 和远端标签，使用尚未绑定其他提交的新版本。
+本次候选版本为 `v0.4.0-alpha.22`。每次发布前先检查 [Releases](https://github.com/reina0721/webmail/releases) 和远端标签，使用尚未绑定其他提交的新版本。
 
 每次准备版本时，同步以下值并提交：
 
@@ -91,6 +91,8 @@ python3 tooling/release_metadata.py assemble "$(cat release-version.txt)" \
 
 ## 第二阶段：发布后完整验证
 
+在 main 的 `[release-preview]` 提交消息中加上 `[skip-full-validation]`，可跳过该预发布的自动完整验证。快速发布流程仍构建和校验两个架构，Release 说明将完整验证标为 skipped。需要补跑时，可在 Actions 手动指定已发布版本。
+
 `full-validation.yml`（Full validation）在快速流程完成后通过 `workflow_run` 读取其发布记录，校验仓库、版本、源码提交、公开状态及标签归属。它检出记录中的确切提交，下载并校验实际公开附件，在两种原生 runner 上并行执行公开附件安装／历史升级／恢复及原有的全部质量、客户端测试、全部真实 Stalwart 业务测试、旧数据及独立备份恢复，以及至少 30 分钟持续注册检查。普通提交和 PR 仍执行完整检查，保持只读权限。
 
 完整验证开始和结束时，仅有结果汇报任务获得 `contents: write`，只更新 Release 说明中的自动验证区块，不上传或替换附件。状态为 pending、running、passed、failed 或 cancelled，并附 Actions 链接。完整检查失败会将该版标为 failed；维护者修复后必须同步新版本号并再次发布。不会自动改写源码、移动旧标签或回滚任何生产实例。
@@ -118,7 +120,7 @@ gh run rerun FULL_RUN_ID --repo reina0721/webmail
 手动公开现有草稿后，可针对该版本启动第二阶段，不重新执行第一阶段：
 
 ```bash
-gh workflow run full-validation.yml --repo reina0721/webmail --ref main -f release-version=v0.4.0-alpha.21
+gh workflow run full-validation.yml --repo reina0721/webmail --ref main -f release-version=v0.4.0-alpha.22
 ```
 
 也可在 Actions → Full validation → Run workflow 填写 `release-version`。流程按公开标签检出确切源码，验证版本与标签归属并下载实际附件；结果更新该 Release。留空时只检查所选分支／标签，不写发布状态。

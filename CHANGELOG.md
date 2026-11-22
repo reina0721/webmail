@@ -4,6 +4,18 @@ Notable changes are recorded here using [Keep a Changelog](https://keepachangelo
 
 ## [Unreleased]
 
+## [0.4.0-alpha.22] - 2026-11-23
+
+### Added
+
+- Add six accent color presets shared by Webmail and the administration console, with quick switching in Appearance settings and the command palette.
+- Add copy controls for version details, CLI commands, and selected configuration values.
+
+### Changed
+
+- Consolidate shared interface controls and refresh Webmail navigation, authentication, setup, and administration screens.
+- Standardize interface transitions and honor reduced-motion settings.
+
 ## [0.4.0-alpha.21] - 2026-11-19
 
 ### Changed

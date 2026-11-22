@@ -12,7 +12,7 @@ END = '<!-- mail-web-validation:end -->'
 LABELS = {'success': '✅ passed', 'failure': '❌ failed', 'cancelled': '⚠️ cancelled', 'in_progress': '⏳ running', 'pending': '⏳ pending'}
 
 
-def render(body, commit, phase, status, run_url):
+def render(body, commit, phase, status, run_url, *, skip_full_validation=False):
     if not re.fullmatch(r'[0-9a-f]{40}', commit) or phase not in ('fast', 'full') or status not in LABELS:
         raise ValueError('Invalid validation metadata')
     url = urllib.parse.urlsplit(run_url)
@@ -34,6 +34,8 @@ def render(body, commit, phase, status, run_url):
     line = f'- {"Fast checks" if phase == "fast" else "Full validation"}: {LABELS[status]} ([Actions]({run_url}))'
     if phase == 'fast':
         fast = line
+        if skip_full_validation:
+            full = '- Full validation: skipped'
     else:
         full = line
     return before + START + '\n' + '\n'.join([f'- Source commit: `{commit}`', fast, full]) + '\n' + END + after
@@ -72,7 +74,7 @@ def verify_owner(repository, version, commit, release):
     raise ValueError('Cannot resolve the published tag')
 
 
-def save_status(repository, version, commit, phase, status, run_url, publish=False):
+def save_status(repository, version, commit, phase, status, run_url, publish=False, *, skip_full_validation=False):
     if publish:
         if phase != 'fast' or status != 'success':
             raise ValueError('Publishing requires successful fast checks')
@@ -84,7 +86,7 @@ def save_status(repository, version, commit, phase, status, run_url, publish=Fal
         if release['draft']:
             raise ValueError('Validation status requires a published release')
     verify_owner(repository, version, commit, release)
-    body = render(release.get('body') or '', commit, phase, status, run_url)
+    body = render(release.get('body') or '', commit, phase, status, run_url, skip_full_validation=skip_full_validation)
     update = {'body': body}
     if publish:
         update['draft'] = False
@@ -106,9 +108,12 @@ def main():
     actions = parser.add_mutually_exclusive_group()
     actions.add_argument('--lookup', action='store_true')
     actions.add_argument('--publish', action='store_true')
+    parser.add_argument('--skip-full-validation', action='store_true')
     for name in ('commit', 'phase', 'status', 'run-url'):
         parser.add_argument('--' + name)
     args = parser.parse_args()
+    if args.skip_full_validation and not args.publish:
+        parser.error('--skip-full-validation requires --publish')
     if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', args.repository) or not re.fullmatch(r'v\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?', args.version):
         parser.error('Invalid repository or version')
     if args.lookup:
@@ -116,7 +121,8 @@ def main():
         return
     if not all((args.commit, args.phase, args.status, args.run_url)):
         parser.error('Status updates require --commit, --phase, --status and --run-url')
-    save_status(args.repository, args.version, args.commit, args.phase, args.status, args.run_url, args.publish)
+    save_status(args.repository, args.version, args.commit, args.phase, args.status, args.run_url,
+                args.publish, skip_full_validation=args.skip_full_validation)
 
 
 if __name__ == '__main__':

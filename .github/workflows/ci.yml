@@ -256,7 +256,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.metadata.outputs.version }}
+          SKIP_FULL_VALIDATION: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release-preview]') && contains(github.event.head_commit.message, '[skip-full-validation]') }}
         run: |
           set -eu
           test "$(sh tooling/release-guard.sh "$VERSION")" = existing
-          python3 tooling/release_status.py --publish --repository "$GITHUB_REPOSITORY" --version "$VERSION" --commit "$GITHUB_SHA" --phase fast --status success --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          set --
+          if [ "$SKIP_FULL_VALIDATION" = true ]; then
+            set -- --skip-full-validation
+          fi
+          python3 tooling/release_status.py --publish "$@" --repository "$GITHUB_REPOSITORY" --version "$VERSION" --commit "$GITHUB_SHA" --phase fast --status success --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
